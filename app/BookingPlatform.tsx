@@ -38,7 +38,7 @@ const creators: Creator[] = [
     nextSeat: "Wed Sep 2, 2026",
     note: "Show Amber the piece, the basket, or the gap in your capsule. She tells you whether it earns a place.",
     bio: "Capsule wardrobe and slow fashion. Minimal outfits, fewer better pieces, and a very useful bias toward buying nothing badly.",
-    image: "/amber-grid.png",
+    image: "/amber-grid.jpg",
     objectPosition: "50% 41%",
   },
   {
@@ -292,7 +292,7 @@ export function BookingPlatform() {
                       <img
                         alt="Amber Lowe profile"
                         className="avatar"
-                        src="/amber-profile.png"
+                        src="/amber-profile.jpg"
                       />
                     )}
                   </div>
@@ -331,7 +331,7 @@ export function BookingPlatform() {
         <aside className="booking-panel" aria-label="Selected booking">
           <div className="panel-card">
             <div className="panel-image">
-              <img alt="Amber Lowe outfit details" src="/amber-style.png" />
+              <img alt="Amber Lowe outfit details" src="/amber-style.jpg" />
             </div>
             <span className="eyebrow">First founding creator</span>
             <h2>{selectedCreator.offer}</h2>
