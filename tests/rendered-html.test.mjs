@@ -1,0 +1,57 @@
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import test from "node:test";
+
+async function render() {
+  const workerUrl = new URL("../dist/server/index.js", import.meta.url);
+  workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}`);
+  const { default: worker } = await import(workerUrl.href);
+
+  return worker.fetch(
+    new Request("http://localhost/", {
+      headers: { accept: "text/html" },
+    }),
+    {
+      ASSETS: {
+        fetch: async () => new Response("Not found", { status: 404 }),
+      },
+    },
+    {
+      waitUntil() {},
+      passThroughOnException() {},
+    },
+  );
+}
+
+test("server-renders the Take a Seat platform", async () => {
+  const response = await render();
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
+
+  const html = await response.text();
+  assert.match(html, /<title>Take a Seat \| Personal Office Hours<\/title>/i);
+  assert.match(html, /Amber Lowe/);
+  assert.match(html, /Buy It Once/);
+  assert.match(html, /Reserve your seat/);
+  assert.doesNotMatch(
+    html,
+    /Fifteen minutes\s*with the person you\s*already follow/i,
+  );
+  assert.doesNotMatch(html, /react-loading-skeleton|codex-preview|SkeletonPreview/);
+});
+
+test("removes starter metadata and preview dependencies", async () => {
+  const [page, layout, packageJson, css] = await Promise.all([
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../package.json", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(page, /export const metadata:\s*Metadata/);
+  assert.match(page, /<BookingPlatform \/>/);
+  assert.match(layout, /title:\s*"Take a Seat"/);
+  assert.match(packageJson, /"name": "take-a-seat-platform"/);
+  assert.doesNotMatch(packageJson, /react-loading-skeleton/);
+  assert.doesNotMatch(css, /#020617|codex-preview|SkeletonPreview/i);
+});
