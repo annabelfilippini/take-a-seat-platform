@@ -33,6 +33,8 @@ test("server-renders the Take a Seat platform", async () => {
   assert.match(html, /Amber Lowe/);
   assert.match(html, /Buy It Once/);
   assert.match(html, /Reserve your seat/);
+  assert.match(html, /amber-linen-set\.jpg/);
+  assert.doesNotMatch(html, /seats shown|booking now,\s*<!-- -->3<!-- -->\s*opening soon/i);
   assert.doesNotMatch(
     html,
     /Fifteen minutes\s*with the person you\s*already follow/i,

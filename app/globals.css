@@ -179,15 +179,15 @@ img {
 }
 
 .category-booking-now {
-  background-image: url("/amber-grid.jpg");
-  background-position: 50% 31%;
-  background-size: 190%;
+  background-image: url("/amber-linen-set.jpg");
+  background-position: 50% 50%;
+  background-size: cover;
 }
 
 .category-style-and-beauty {
-  background-image: url("/amber-style.jpg");
-  background-position: 50% 42%;
-  background-size: 185%;
+  background-image: url("/amber-linen-set.jpg");
+  background-position: 50% 50%;
+  background-size: cover;
 }
 
 .category-home-and-interiors {
@@ -274,29 +274,6 @@ img {
   font-size: 14px;
   line-height: 1.65;
   margin: 12px 0 0;
-}
-
-.results-bar {
-  align-items: end;
-  border-bottom: 1px solid var(--ink);
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 28px;
-  padding-bottom: 22px;
-}
-
-.results-bar p {
-  color: var(--sage);
-  font-size: 12px;
-  margin: 0 0 7px;
-  text-transform: uppercase;
-}
-
-.results-bar strong {
-  font-family: var(--serif);
-  font-size: clamp(30px, 4vw, 56px);
-  font-weight: 300;
-  line-height: 1;
 }
 
 .creator-grid {
@@ -712,12 +689,6 @@ img {
 
   .topnav button {
     grid-column: 1 / -1;
-  }
-
-  .results-bar {
-    align-items: start;
-    flex-direction: column;
-    gap: 16px;
   }
 
   .category-pill {

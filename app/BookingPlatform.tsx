@@ -38,8 +38,8 @@ const creators: Creator[] = [
     nextSeat: "Wed Sep 2, 2026",
     note: "Show Amber the piece, the basket, or the gap in your capsule. She tells you whether it earns a place.",
     bio: "Capsule wardrobe and slow fashion. Minimal outfits, fewer better pieces, and a very useful bias toward buying nothing badly.",
-    image: "/amber-grid.jpg",
-    objectPosition: "50% 41%",
+    image: "/amber-linen-set.jpg",
+    objectPosition: "50% 50%",
   },
   {
     id: "rented-flat",
@@ -231,25 +231,6 @@ export function BookingPlatform() {
         </aside>
 
         <div className="browse-column">
-          <div className="results-bar">
-            <div>
-              <p>{visibleCreators.length} seats shown</p>
-              <strong>
-                {activeCount} booking now, {soonCount} opening soon
-              </strong>
-            </div>
-            <button
-              className="text-button"
-              onClick={() => {
-                setCategory("All");
-                setQuery("");
-              }}
-              type="button"
-            >
-              Clear
-            </button>
-          </div>
-
           <div className="creator-grid">
             {visibleCreators.map((creator) => (
               <article
@@ -331,7 +312,7 @@ export function BookingPlatform() {
         <aside className="booking-panel" aria-label="Selected booking">
           <div className="panel-card">
             <div className="panel-image">
-              <img alt="Amber Lowe outfit details" src="/amber-style.jpg" />
+              <img alt="Amber Lowe in a linen set" src="/amber-linen-set.jpg" />
             </div>
             <span className="eyebrow">First founding creator</span>
             <h2>{selectedCreator.offer}</h2>
