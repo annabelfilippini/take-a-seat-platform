@@ -199,11 +199,6 @@ img {
   width: 180px;
 }
 
-.category-spacer {
-  height: 86px;
-  width: 180px;
-}
-
 .category-orb img {
   height: 100%;
   object-fit: cover;
@@ -623,11 +618,6 @@ img {
   }
 
   .category-orb {
-    height: 64px;
-    width: 142px;
-  }
-
-  .category-spacer {
     height: 64px;
     width: 142px;
   }

@@ -108,7 +108,7 @@ const creators: Creator[] = [
 ];
 
 const categories = [
-  { label: "Top Experts", filter: "All", image: null, position: "50% 50%" },
+  { label: "Top Experts", filter: "All", image: "/category-top-experts.png", position: "62% 48%" },
   { label: "Style & Beauty", filter: "Style & Beauty", image: "/category-style.png", position: "50% 48%" },
   { label: "Home Interiors", filter: "Home Interiors", image: "/category-home-interiors.png", position: "50% 50%" },
   { label: "Wellness", filter: "Wellness", image: "/category-wellness.png", position: "50% 52%" },
@@ -183,17 +183,13 @@ export function BookingPlatform() {
             onClick={() => setCategory(item.filter)}
             type="button"
           >
-            {item.image ? (
-              <span className="category-orb">
-                <img
-                  alt=""
-                  src={item.image}
-                  style={{ objectPosition: item.position }}
-                />
-              </span>
-            ) : (
-              <span className="category-spacer" aria-hidden="true" />
-            )}
+            <span className="category-orb">
+              <img
+                alt=""
+                src={item.image}
+                style={{ objectPosition: item.position }}
+              />
+            </span>
             <span>{item.label}</span>
           </button>
         ))}
