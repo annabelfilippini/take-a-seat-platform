@@ -23,12 +23,12 @@ type Creator = {
 const creators: Creator[] = [
   {
     id: "amber",
-    name: "Amber Lo",
+    name: "Amber May Lowe",
     title: "Capsule wardrobe and slow fashion creator",
     category: "Style & Beauty",
     status: "booking",
     offer: "Buy It Once",
-    price: "$45",
+    price: "£45",
     length: "15 minutes",
     note: "She helps people figure out how to put classic outfits together.",
     image: "/amber-card.png",
@@ -237,6 +237,11 @@ export function BookingPlatform() {
                   </span>
                 </div>
                 <p>{creator.note}</p>
+                {creator.id === "amber" ? (
+                  <a className="profile-link" href="/with/amber/">
+                    View profile
+                  </a>
+                ) : null}
               </div>
             </article>
           ))}
@@ -264,6 +269,11 @@ export function BookingPlatform() {
             {selectedCreator.name} is offering a private {selectedCreator.length} seat
             for decisions that need a trusted second opinion.
           </p>
+          {selectedCreator.id === "amber" ? (
+            <a className="profile-link booking-profile-link" href="/with/amber/">
+              See Amber profile
+            </a>
+          ) : null}
 
           {selectedCreator.status === "booking" ? (
             <div className="booking-flow">

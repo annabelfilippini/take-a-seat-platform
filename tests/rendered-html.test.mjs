@@ -2,13 +2,13 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-async function render() {
+async function render(path = "/") {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
   workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}`);
   const { default: worker } = await import(workerUrl.href);
 
   return worker.fetch(
-    new Request("http://localhost/", {
+    new Request(`http://localhost${path}`, {
       headers: { accept: "text/html" },
     }),
     {
@@ -39,11 +39,13 @@ test("server-renders the Take a Seat platform", async () => {
   assert.doesNotMatch(html, /Booking Now/);
   assert.match(html, /Style &amp; Beauty/);
   assert.match(html, /Home Interiors/);
-  assert.match(html, /Amber Lo/);
+  assert.match(html, /Amber May Lowe/);
+  assert.match(html, /View profile/);
+  assert.match(html, /\/with\/amber\//);
   assert.match(html, /Abby Catlin/);
   assert.match(html, /Alex Earl/);
   assert.match(html, /Buy It Once/);
-  assert.match(html, /Style &amp; Beauty for \$45/);
+  assert.match(html, /Style &amp; Beauty for £45/);
   assert.match(html, /Request this seat/);
   assert.doesNotMatch(html, /Access to the people you already trust/);
   assert.doesNotMatch(html, /seats shown|booking now,\s*<!-- -->3<!-- -->\s*opening soon/i);
@@ -68,4 +70,26 @@ test("removes starter metadata and preview dependencies", async () => {
   assert.match(packageJson, /"name": "take-a-seat-platform"/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
   assert.doesNotMatch(css, /#020617|codex-preview|SkeletonPreview/i);
+});
+
+test("server-renders Amber's profile page", async () => {
+  const response = await render("/with/amber");
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
+
+  const html = await response.text();
+  assert.match(html, /<title>Take a Seat with Amber May Lowe<\/title>/i);
+  assert.match(html, /Amber May Lowe/);
+  assert.match(html, /@ambermaylowe/);
+  assert.match(html, /About/);
+  assert.match(html, /Amber has a calm way of making clothes feel simpler/);
+  assert.match(html, /Buy It Once/);
+  assert.match(html, /Wardrobe Pass/);
+  assert.match(html, /15 minutes/);
+  assert.match(html, /£45/);
+  assert.match(html, /£80/);
+  assert.match(html, /Birmingham, UK/);
+  assert.match(html, /amber-card\.png/);
+  assert.match(html, /amber-style\.jpg/);
+  assert.match(html, /Show availability/);
 });
