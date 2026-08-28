@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 import { BookingPlatform } from "./BookingPlatform";
 
 export const metadata: Metadata = {
-  title: "Take a Seat | Personal Office Hours",
-  description: "Reserve private office hours with people worth knowing.",
+  title: "Take a Seat",
+  description:
+    "Take a seat with your favorite influencers and the people you trust most.",
 };
 
 export default function Home() {

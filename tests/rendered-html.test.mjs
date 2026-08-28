@@ -29,11 +29,18 @@ test("server-renders the Take a Seat platform", async () => {
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
 
   const html = await response.text();
-  assert.match(html, /<title>Take a Seat \| Personal Office Hours<\/title>/i);
+  assert.match(html, /<title>Take a Seat<\/title>/i);
+  assert.match(
+    html,
+    /Take a seat with your favorite influencers or with the people that you trust the most\./,
+  );
+  assert.match(html, /chair-hero\.png/);
+  assert.match(html, /Top Experts/);
+  assert.match(html, /Style &amp; Beauty/);
+  assert.match(html, /Home Interiors/);
   assert.match(html, /Amber Lowe/);
   assert.match(html, /Buy It Once/);
-  assert.match(html, /Reserve your seat/);
-  assert.match(html, /amber-linen-set\.jpg/);
+  assert.match(html, /Request this seat/);
   assert.doesNotMatch(html, /seats shown|booking now,\s*<!-- -->3<!-- -->\s*opening soon/i);
   assert.doesNotMatch(
     html,
