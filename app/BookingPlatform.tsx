@@ -15,36 +15,53 @@ type Creator = {
   price: string;
   length: string;
   note: string;
-  image: string;
+  image: string | null;
   objectPosition: string;
+  accent: string;
 };
 
 const creators: Creator[] = [
   {
     id: "amber",
-    name: "Amber Lowe",
+    name: "Amber Lo",
     title: "Capsule wardrobe and slow fashion creator",
     category: "Style & Beauty",
     status: "booking",
     offer: "Buy It Once",
     price: "$45",
-    length: "15 min",
-    note: "Show Amber the piece, basket, or gap in your capsule. Leave knowing what earns a place.",
-    image: "/amber-profile.jpg",
+    length: "15 minutes",
+    note: "She helps people figure out how to put classic outfits together.",
+    image: "/amber-headshot.jpg",
     objectPosition: "16% 17%",
+    accent: "amber",
   },
   {
-    id: "style-edit",
-    name: "The Style Edit",
-    title: "Founding creator search",
+    id: "abby",
+    name: "Abby Catlin",
+    title: "Founding creator preview",
     category: "Style & Beauty",
     status: "soon",
     offer: "Closet Clarity",
     price: "Soon",
-    length: "20 min",
-    note: "For outfits, events, repeat buys, and the pieces you keep almost returning.",
-    image: "/amber-style.jpg",
+    length: "15 minutes",
+    note: "A preview seat for everyday outfits, event looks, and better repeat pieces.",
+    image: null,
     objectPosition: "50% 16%",
+    accent: "style",
+  },
+  {
+    id: "alex",
+    name: "Alex Earl",
+    title: "Founding creator preview",
+    category: "Style & Beauty",
+    status: "soon",
+    offer: "Get Ready Edit",
+    price: "Soon",
+    length: "15 minutes",
+    note: "A sample card showing how another influencer profile will sit next to Amber.",
+    image: null,
+    objectPosition: "50% 50%",
+    accent: "beauty",
   },
   {
     id: "rented-flat",
@@ -56,52 +73,42 @@ const creators: Creator[] = [
     price: "Soon",
     length: "20 min",
     note: "What to change, what to leave, and what you will actually get your deposit back on.",
-    image: "/chair-hero.png",
-    objectPosition: "51% 58%",
+    image: null,
+    objectPosition: "50% 50%",
+    accent: "home",
   },
   {
-    id: "sleep-first",
-    name: "Evening Routine Audit",
-    title: "Simple wellness systems",
+    id: "wellness-preview",
+    name: "Wellness Edit",
+    title: "Founding creator preview",
     category: "Wellness",
     status: "soon",
-    offer: "Sleep First",
+    offer: "Routine Reset",
     price: "Soon",
-    length: "15 min",
-    note: "Find the one part of your evening that keeps stealing the next morning.",
-    image: "/amber-grid.jpg",
-    objectPosition: "50% 16%",
+    length: "15 minutes",
+    note: "A placeholder profile for wellness creators joining the platform later.",
+    image: null,
+    objectPosition: "50% 50%",
+    accent: "wellness",
   },
   {
-    id: "one-pan",
-    name: "Weeknight Food Person",
-    title: "Low-lift dinner advice",
+    id: "food-preview",
+    name: "Food Edit",
+    title: "Founding creator preview",
     category: "Food",
     status: "soon",
-    offer: "One Pan, Four Dinners",
+    offer: "Weeknight Plan",
     price: "Soon",
-    length: "15 min",
-    note: "Tell them what is in the fridge and what time you get home. Leave with a week you will cook.",
-    image: "/amber-linen-set.jpg",
-    objectPosition: "48% 22%",
-  },
-  {
-    id: "home-layers",
-    name: "Home Layers",
-    title: "Texture, lighting, and shelf help",
-    category: "Home Interiors",
-    status: "soon",
-    offer: "Room Reset",
-    price: "Soon",
-    length: "20 min",
-    note: "A quick edit for the corner, shelf, wall, or room that never quite comes together.",
-    image: "/chair-hero.png",
-    objectPosition: "46% 45%",
+    length: "15 minutes",
+    note: "A placeholder profile for food creators and practical meal planning seats.",
+    image: null,
+    objectPosition: "50% 50%",
+    accent: "food",
   },
 ];
 
 const categories = [
-  { label: "Top Experts", filter: "All", image: "/amber-profile.jpg", position: "16% 17%" },
+  { label: "Top Experts", filter: "All", image: "/amber-linen-set.jpg", position: "48% 22%" },
   { label: "Booking Now", filter: "Booking now", image: "/amber-linen-set.jpg", position: "48% 22%" },
   { label: "Style & Beauty", filter: "Style & Beauty", image: "/amber-style.jpg", position: "50% 16%" },
   { label: "Home Interiors", filter: "Home Interiors", image: "/chair-hero.png", position: "50% 54%" },
@@ -155,17 +162,16 @@ export function BookingPlatform() {
       </header>
 
       <section className="hero" id="top">
-        <p className="hero-blurb">
-          Take a seat with your favorite influencers or with the people that
-          you trust the most.
-        </p>
-        <div className="hero-image-wrap">
-          <h1>Take a Seat</h1>
-          <img
-            alt="A warm interior with a sculptural white chair facing built-in shelves"
-            className="hero-image"
-            src="/chair-hero.png"
-          />
+        <img
+          alt="A warm interior with a sculptural white chair facing built-in shelves"
+          className="hero-image"
+          src="/chair-hero.png"
+        />
+        <div className="hero-copy">
+          <h1>
+            <strong>Take a Seat</strong>
+            <span>with the people that you trust the most</span>
+          </h1>
         </div>
       </section>
 
@@ -191,11 +197,6 @@ export function BookingPlatform() {
       </section>
 
       <section className="browse-section" id="browse">
-        <div className="section-heading">
-          <span>Top Experts</span>
-          <h2>Access to the people you already trust</h2>
-        </div>
-
         <div className="expert-grid">
           {visibleCreators.map((creator) => (
             <article className="expert-card" key={creator.id}>
@@ -205,27 +206,38 @@ export function BookingPlatform() {
                 onClick={() => selectCreator(creator)}
                 type="button"
               >
-                <img
-                  alt={`${creator.name} profile`}
-                  src={creator.image}
-                  style={{ objectPosition: creator.objectPosition }}
-                />
-                <span>{creator.status === "booking" ? "Book now" : "Opening soon"}</span>
+                {creator.image ? (
+                  <img
+                    alt={`${creator.name} profile`}
+                    src={creator.image}
+                    style={{ objectPosition: creator.objectPosition }}
+                  />
+                ) : (
+                  <span className={`profile-placeholder profile-${creator.accent}`}>
+                    <b>{creator.name}</b>
+                  </span>
+                )}
               </button>
               <div className="expert-copy">
                 <div className="expert-topline">
-                  <strong>{creator.name}</strong>
-                  <span>5.0</span>
+                  <div>
+                    <strong>{creator.name}</strong>
+                    <span className="verified" aria-label="Verified creator">
+                      &#10003;
+                    </span>
+                  </div>
+                  <span className="rating">
+                    <span aria-hidden="true">&#9733;</span> 5.0
+                  </span>
                 </div>
-                <p>{creator.title}</p>
-                <h3>{creator.offer}</h3>
+                <div className="expert-rate">
+                  <span>
+                    {creator.status === "booking"
+                      ? `${creator.category} for ${creator.price} for ${creator.length}`
+                      : `${creator.category} opening soon`}
+                  </span>
+                </div>
                 <p>{creator.note}</p>
-                <div className="expert-footer">
-                  <span>{creator.category}</span>
-                  <b>
-                    {creator.price} <small>{creator.length}</small>
-                  </b>
-                </div>
               </div>
             </article>
           ))}
@@ -234,11 +246,17 @@ export function BookingPlatform() {
 
       <section className="booking-section" id="booking">
         <div className="booking-image">
-          <img
-            alt={`${selectedCreator.name} selected profile`}
-            src={selectedCreator.image}
-            style={{ objectPosition: selectedCreator.objectPosition }}
-          />
+          {selectedCreator.image ? (
+            <img
+              alt={`${selectedCreator.name} selected profile`}
+              src={selectedCreator.image}
+              style={{ objectPosition: selectedCreator.objectPosition }}
+            />
+          ) : (
+            <span className={`profile-placeholder profile-${selectedCreator.accent}`}>
+              <b>{selectedCreator.name}</b>
+            </span>
+          )}
         </div>
         <div className="booking-card">
           <span>{selectedCreator.status === "booking" ? "Booking now" : "Opening soon"}</span>

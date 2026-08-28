@@ -30,17 +30,18 @@ test("server-renders the Take a Seat platform", async () => {
 
   const html = await response.text();
   assert.match(html, /<title>Take a Seat<\/title>/i);
-  assert.match(
-    html,
-    /Take a seat with your favorite influencers or with the people that you trust the most\./,
-  );
+  assert.match(html, /with the people that you trust the most/);
   assert.match(html, /chair-hero\.png/);
   assert.match(html, /Top Experts/);
   assert.match(html, /Style &amp; Beauty/);
   assert.match(html, /Home Interiors/);
-  assert.match(html, /Amber Lowe/);
+  assert.match(html, /Amber Lo/);
+  assert.match(html, /Abby Catlin/);
+  assert.match(html, /Alex Earl/);
   assert.match(html, /Buy It Once/);
+  assert.match(html, /Style &amp; Beauty for \$45/);
   assert.match(html, /Request this seat/);
+  assert.doesNotMatch(html, /Access to the people you already trust/);
   assert.doesNotMatch(html, /seats shown|booking now,\s*<!-- -->3<!-- -->\s*opening soon/i);
   assert.doesNotMatch(
     html,
