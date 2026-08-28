@@ -5,11 +5,11 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://takeaseatwith.com"),
   title: "Take a Seat",
   description:
-    "Take a seat with your favorite influencers and the people you trust most.",
+    "Book private seats with rising creators, tastemakers, and experts.",
   openGraph: {
     title: "Take a Seat",
     description:
-      "Take a seat with your favorite influencers and the people you trust most.",
+      "Book private seats with rising creators, tastemakers, and experts.",
     images: [
       {
         url: "/og.png",
@@ -23,7 +23,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Take a Seat",
     description:
-      "Take a seat with your favorite influencers and the people you trust most.",
+      "Book private seats with rising creators, tastemakers, and experts.",
     images: ["/og.png"],
   },
   icons: {

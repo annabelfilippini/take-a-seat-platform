@@ -31,8 +31,8 @@ const creators: Creator[] = [
     price: "$45",
     length: "15 minutes",
     note: "She helps people figure out how to put classic outfits together.",
-    image: "/amber-headshot.jpg",
-    objectPosition: "16% 17%",
+    image: "/amber-card.png",
+    objectPosition: "50% 18%",
     accent: "amber",
   },
   {
@@ -108,12 +108,11 @@ const creators: Creator[] = [
 ];
 
 const categories = [
-  { label: "Top Experts", filter: "All", image: "/amber-linen-set.jpg", position: "48% 22%" },
-  { label: "Booking Now", filter: "Booking now", image: "/amber-linen-set.jpg", position: "48% 22%" },
-  { label: "Style & Beauty", filter: "Style & Beauty", image: "/amber-style.jpg", position: "50% 16%" },
-  { label: "Home Interiors", filter: "Home Interiors", image: "/chair-hero.png", position: "50% 54%" },
-  { label: "Wellness", filter: "Wellness", image: "/amber-grid.jpg", position: "50% 16%" },
-  { label: "Food", filter: "Food", image: "/amber-linen-set.jpg", position: "48% 60%" },
+  { label: "Top Experts", filter: "All", image: null, position: "50% 50%" },
+  { label: "Style & Beauty", filter: "Style & Beauty", image: "/category-style.png", position: "50% 48%" },
+  { label: "Home Interiors", filter: "Home Interiors", image: "/category-home-interiors.png", position: "50% 50%" },
+  { label: "Wellness", filter: "Wellness", image: "/category-wellness.png", position: "50% 52%" },
+  { label: "Food", filter: "Food", image: "/category-food.png", position: "66% 48%" },
 ];
 
 const slots = [
@@ -163,14 +162,14 @@ export function BookingPlatform() {
 
       <section className="hero" id="top">
         <img
-          alt="A warm interior with a sculptural white chair facing built-in shelves"
+          alt="A warm dressing room with a woven chair facing built-in closet shelves"
           className="hero-image"
-          src="/chair-hero.png"
+          src="/hero-chair.png"
         />
         <div className="hero-copy">
           <h1>
             <strong>Take a Seat</strong>
-            <span>with the people that you trust the most</span>
+            <span>with the ones to watch</span>
           </h1>
         </div>
       </section>
@@ -184,13 +183,17 @@ export function BookingPlatform() {
             onClick={() => setCategory(item.filter)}
             type="button"
           >
-            <span className="category-orb">
-              <img
-                alt=""
-                src={item.image}
-                style={{ objectPosition: item.position }}
-              />
-            </span>
+            {item.image ? (
+              <span className="category-orb">
+                <img
+                  alt=""
+                  src={item.image}
+                  style={{ objectPosition: item.position }}
+                />
+              </span>
+            ) : (
+              <span className="category-spacer" aria-hidden="true" />
+            )}
             <span>{item.label}</span>
           </button>
         ))}
