@@ -30,7 +30,7 @@ test("server-renders the Take a Seat platform", async () => {
 
   const html = await response.text();
   assert.match(html, /<title>Take a Seat<\/title>/i);
-  assert.match(html, />take a seat</);
+  assert.match(html, />Take a Seat</);
   assert.doesNotMatch(html, /with the ones to watch/);
   assert.match(html, /hero-chair\.png/);
   assert.match(html, /seat-mark\.png/);

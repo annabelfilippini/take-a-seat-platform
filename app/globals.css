@@ -90,19 +90,17 @@ img {
 }
 
 .topbar:not(.profile-topbar) .brand-mark {
-  border-radius: 0 0 44px 44px;
-  box-shadow: 0 18px 38px rgba(31, 29, 26, 0.24);
   display: block;
-  height: 72px;
-  overflow: hidden;
+  height: 58px;
+  overflow: visible;
   text-shadow: none;
-  width: 76px;
+  width: 86px;
 }
 
 .topbar:not(.profile-topbar) .brand-mark img {
   height: 100%;
-  object-fit: cover;
-  object-position: 43% 66%;
+  object-fit: contain;
+  object-position: center;
   width: 100%;
 }
 

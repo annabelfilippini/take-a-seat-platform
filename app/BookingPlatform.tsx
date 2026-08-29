@@ -151,7 +151,7 @@ export function BookingPlatform() {
           src="/hero-chair.png"
         />
         <div className="hero-copy">
-          <h1>take a seat</h1>
+          <h1>Take a Seat</h1>
         </div>
       </section>
 
