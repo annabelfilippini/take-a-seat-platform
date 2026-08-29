@@ -1,5 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 import type { Metadata } from "next";
+import Link from "next/link";
+import { AmberGallery } from "./AmberGallery";
 
 export const metadata: Metadata = {
   title: "Take a Seat with Amber May Lowe",
@@ -8,26 +10,28 @@ export const metadata: Metadata = {
 };
 
 const helpItems = [
-  "Deciding if a piece is actually worth buying.",
-  "Finding the missing basic in a small capsule wardrobe.",
-  "Choosing between two versions of the same thing.",
-  "Using what you already own before adding more.",
-  "Talking through an outfit for work, travel, dinner, or an event.",
-  "Spotting the thing you keep buying because the real gap is unclear.",
+  "Decide if a piece is worth buying.",
+  "Find the basic your capsule wardrobe is missing.",
+  "Choose between two versions of the same thing.",
+  "Use what you already own before adding more.",
+  "Talk through an outfit for work, travel, dinner, or an event.",
+  "Notice what you keep buying because the real gap is unclear.",
 ];
 
 const seats = [
   {
-    name: "Buy It Once",
+    name: "15 minutes",
     price: "£45",
-    length: "15 minutes with Amber Lowe",
+    format: "Private video call",
+    host: "Amber Lowe",
     description:
-      "A practical second opinion before you spend on one piece, one gap, or one almost-right outfit.",
+      "A quick second opinion before you spend on one piece, one gap, or one almost-right outfit.",
   },
   {
-    name: "Wardrobe Pass",
+    name: "30 minutes",
     price: "£80",
-    length: "30 minutes with Amber Lowe",
+    format: "Private video call",
+    host: "Amber Lowe",
     description:
       "More room to talk through a capsule gap, a few open tabs, or an outfit you want to get right.",
   },
@@ -36,10 +40,13 @@ const seats = [
 export default function AmberProfile() {
   return (
     <main className="platform-shell amber-profile-page">
+      <div className="profile-announcement">
+        Four private seats open with Amber this month
+      </div>
       <header className="topbar profile-topbar">
-        <a className="brand-mark" href="/" aria-label="Take a Seat home">
+        <Link className="brand-mark" href="/" aria-label="Take a Seat home">
           Take a Seat
-        </a>
+        </Link>
         <nav className="profile-nav" aria-label="Amber profile navigation">
           <a href="https://www.instagram.com/ambermaylowe/">@ambermaylowe</a>
           <a className="reserve-nav-button" href="#reserve">
@@ -73,35 +80,25 @@ export default function AmberProfile() {
           </a>
         </div>
 
-        <div className="amber-hero-gallery" aria-label="Amber's capsule wardrobe style">
-          <span className="amber-gallery-frame">
-            <img
-              alt="Amber May Lowe in a chocolate brown capsule outfit"
-              src="/amber-style.jpg"
-            />
-          </span>
-          <span className="amber-gallery-frame">
-            <img
-              alt="Amber May Lowe wearing black tailoring against a wood door"
-              src="/amber-card.png"
-            />
-          </span>
-        </div>
+        <AmberGallery />
       </section>
 
       <section className="amber-about-section" id="about">
         <div className="about-main">
           <h2>About</h2>
           <p>
-            Amber has a calm way of making clothes feel simpler. Her feed is
-            all warm neutrals, useful basics, denim, linen, black tailoring, and
-            the pieces you actually reach for after the package arrives.
+            Amber knows capsule wardrobes. Her feed moves between warm neutrals,
+            useful basics, denim, linen, and black tailoring.
           </p>
           <p>
-            This is not a full styling session. It is a private fifteen minutes
-            for one decision: buy it, skip it, wait, or look for something
-            better. The point is to leave the call with less noise and a cleaner
-            next move.
+            She knows how to style classics in a way that gives you a wardrobe
+            you can keep and wear for years.
+          </p>
+          <p>
+            If you have a question for Amber, bring it to the call. It can be an
+            outfit you need help with, a piece you are trying to style, or the
+            next thing you are thinking about ordering. Choose 15 or 30 minutes
+            and get her full attention.
           </p>
 
           <div className="help-card">
@@ -118,9 +115,9 @@ export default function AmberProfile() {
           <div className="why-card">
             <h3>Why a 1:1 call?</h3>
             <p>
-              Sometimes you do not need a moodboard. You need someone whose
+              Sometimes you do not need a moodboard. You need someone with
               taste you trust to look at the real options in front of you and
-              help you choose the simplest next move.
+              help you choose the next move.
             </p>
           </div>
         </div>
@@ -131,11 +128,24 @@ export default function AmberProfile() {
           <div className="seat-options">
             {seats.map((seat) => (
               <article className="seat-option" key={seat.name}>
-                <div>
+                <div className="seat-option-heading">
                   <h3>{seat.name}</h3>
-                  <strong>{seat.price}</strong>
+                  <span>{seat.format}</span>
                 </div>
-                <span>{seat.length}</span>
+                <dl className="seat-detail-list">
+                  <div>
+                    <dt>Host</dt>
+                    <dd>{seat.host}</dd>
+                  </div>
+                  <div>
+                    <dt>Time</dt>
+                    <dd>{seat.name}</dd>
+                  </div>
+                  <div>
+                    <dt>Price</dt>
+                    <dd>{seat.price}</dd>
+                  </div>
+                </dl>
                 <p>{seat.description}</p>
               </article>
             ))}

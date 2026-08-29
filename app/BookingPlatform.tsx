@@ -1,6 +1,7 @@
 "use client";
 
 /* eslint-disable @next/next/no-img-element */
+import Link from "next/link";
 import { useMemo, useState } from "react";
 
 type CreatorStatus = "booking" | "soon";
@@ -134,8 +135,8 @@ export function BookingPlatform() {
 
   return (
     <main className="platform-shell">
-      <header className="topbar">
-        <a className="brand-mark" href="#top" aria-label="Take a Seat home">
+      <header className="topbar home-topbar">
+        <a className="brand-mark home-hero-brand" href="#top" aria-label="Take a Seat home">
           Take a Seat
         </a>
         <nav className="topnav" aria-label="Primary navigation">
@@ -151,9 +152,18 @@ export function BookingPlatform() {
           src="/hero-chair.png"
         />
         <div className="hero-copy">
-          <h1>Take a Seat</h1>
+          <h1>
+            <span>Experience passion from the influential</span>
+            <strong>Take a Seat</strong>
+          </h1>
         </div>
       </section>
+
+      <div className="below-hero-bar">
+        <a className="below-hero-brand" href="#top" aria-label="Take a Seat home">
+          Take a Seat
+        </a>
+      </div>
 
       <section className="category-band" aria-label="Browse by category">
         {categories.map((item) => (
@@ -178,52 +188,70 @@ export function BookingPlatform() {
 
       <section className="browse-section" id="browse">
         <div className="expert-grid">
-          {visibleCreators.map((creator) => (
-            <article className="expert-card" key={creator.id}>
-              <div className="expert-image-frame">
-                {creator.image ? (
-                  <img
-                    alt={`${creator.name} profile`}
-                    src={creator.image}
-                    style={{ objectPosition: creator.objectPosition }}
-                  />
-                ) : (
-                  <span className={`profile-placeholder profile-${creator.accent}`}>
-                    <b>{creator.name}</b>
-                  </span>
-                )}
-              </div>
-              <div className="expert-copy">
-                <div className="expert-topline">
-                  <strong>{creator.name}</strong>
-                  <span className="rating">
-                    <span aria-hidden="true">&#9733;</span> 5.0
-                  </span>
+          {visibleCreators.map((creator) => {
+            const card = (
+              <article className="expert-card">
+                <div className="expert-image-frame">
+                  {creator.image ? (
+                    <img
+                      alt={`${creator.name} profile`}
+                      src={creator.image}
+                      style={{ objectPosition: creator.objectPosition }}
+                    />
+                  ) : (
+                    <span className={`profile-placeholder profile-${creator.accent}`}>
+                      <b>{creator.name}</b>
+                    </span>
+                  )}
                 </div>
-                <span className="expert-category">{creator.category}</span>
-                <span className="expert-rate">
-                  {creator.status === "booking"
-                    ? `${creator.price} • ${creator.length}`
-                    : "Opening soon"}
-                </span>
-                <p className="expert-note">{creator.note}</p>
-                {creator.id === "amber" ? (
-                  <a className="profile-link" href="/with/amber/">
-                    View profile
-                  </a>
-                ) : null}
-              </div>
-            </article>
-          ))}
+                <div className="expert-copy">
+                  <div className="expert-topline">
+                    <strong>{creator.name}</strong>
+                    <span className="rating">
+                      <span aria-hidden="true">&#9733;</span> 5.0
+                    </span>
+                  </div>
+                  <span className="expert-category">{creator.category}</span>
+                  <span className="expert-rate">
+                    {creator.status === "booking"
+                      ? `${creator.price} • ${creator.length}`
+                      : "Opening soon"}
+                  </span>
+                  <p className="expert-note">{creator.note}</p>
+                  {creator.id === "amber" ? (
+                    <span className="profile-link">View profile</span>
+                  ) : null}
+                </div>
+              </article>
+            );
+
+            if (creator.id === "amber") {
+              return (
+                <Link
+                  aria-label="View Amber May Lowe profile"
+                  className="expert-card-link"
+                  href="/with/amber/"
+                  key={creator.id}
+                >
+                  {card}
+                </Link>
+              );
+            }
+
+            return <div key={creator.id}>{card}</div>;
+          })}
         </div>
       </section>
 
       <section className="creator-invite" id="creators">
-        <span>For creators</span>
-        <h2>Share what people already ask you about.</h2>
+        <h2>
+          <span>For creators</span>
+          <strong>That crave a deeper community.</strong>
+        </h2>
         <p>
-          Interested in sharing your knowledge with followers who look up to
-          you? Apply to open a few private seats and we will review your fit.
+          Open a few private seats for followers who want your eye on something
+          specific. It is a simple way to know them better and share the advice
+          they already come to you for.
         </p>
         <a href="mailto:annabel@takeaseatwith.com?subject=Creator%20application">
           Apply to become a creator
