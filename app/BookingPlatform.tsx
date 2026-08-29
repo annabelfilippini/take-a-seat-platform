@@ -1,7 +1,6 @@
 "use client";
 
 /* eslint-disable @next/next/no-img-element */
-import Link from "next/link";
 import { useMemo, useState } from "react";
 
 type CreatorStatus = "booking" | "soon";
@@ -227,14 +226,14 @@ export function BookingPlatform() {
 
             if (creator.id === "amber") {
               return (
-                <Link
+                <a
                   aria-label="View Amber May Lowe profile"
                   className="expert-card-link"
-                  href="/with/amber/"
+                  href="/with/amber"
                   key={creator.id}
                 >
                   {card}
-                </Link>
+                </a>
               );
             }
 

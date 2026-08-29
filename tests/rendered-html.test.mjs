@@ -45,6 +45,10 @@ test("server-renders the Take a Seat platform", async () => {
   assert.match(html, /Amber May Lowe/);
   assert.match(html, /View profile/);
   assert.match(html, /\/with\/amber\/?/);
+  assert.match(
+    html,
+    /<a(?=[^>]*href="\/with\/amber")(?=[^>]*class="expert-card-link")[^>]*>/,
+  );
   assert.doesNotMatch(html, /Verified creator|&#10003;|✓/);
   assert.match(html, /Abby Catlin/);
   assert.match(html, /Alex Earl/);
