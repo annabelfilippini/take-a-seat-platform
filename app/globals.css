@@ -91,10 +91,10 @@ img {
 
 .topbar:not(.profile-topbar) .brand-mark {
   display: block;
-  height: 58px;
+  height: 86px;
   overflow: visible;
   text-shadow: none;
-  width: 86px;
+  width: 58px;
 }
 
 .topbar:not(.profile-topbar) .brand-mark img {
