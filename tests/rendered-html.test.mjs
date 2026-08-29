@@ -30,8 +30,10 @@ test("server-renders the Take a Seat platform", async () => {
 
   const html = await response.text();
   assert.match(html, /<title>Take a Seat<\/title>/i);
-  assert.match(html, /with the ones to watch/);
+  assert.match(html, />take a seat</);
+  assert.doesNotMatch(html, /with the ones to watch/);
   assert.match(html, /hero-chair\.png/);
+  assert.match(html, /seat-mark\.png/);
   assert.match(html, /amber-card\.png/);
   assert.match(html, /category-top-experts\.png/);
   assert.match(html, /category-food\.png/);
@@ -42,11 +44,13 @@ test("server-renders the Take a Seat platform", async () => {
   assert.match(html, /Amber May Lowe/);
   assert.match(html, /View profile/);
   assert.match(html, /\/with\/amber\//);
+  assert.doesNotMatch(html, /Verified creator|&#10003;|✓/);
   assert.match(html, /Abby Catlin/);
   assert.match(html, /Alex Earl/);
-  assert.match(html, /Buy It Once/);
-  assert.match(html, /Style &amp; Beauty for £45/);
-  assert.match(html, /Request this seat/);
+  assert.match(html, /£45 • 15 minutes/);
+  assert.match(html, /Apply to become a creator/);
+  assert.match(html, /Interested in sharing your knowledge/);
+  assert.doesNotMatch(html, /Book<\/a>|href="#booking"|id="booking"|Request this seat|Buy It Once/);
   assert.doesNotMatch(html, /Access to the people you already trust/);
   assert.doesNotMatch(html, /seats shown|booking now,\s*<!-- -->3<!-- -->\s*opening soon/i);
   assert.doesNotMatch(

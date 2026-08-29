@@ -115,17 +115,8 @@ const categories = [
   { label: "Food", filter: "Food", image: "/category-food.png", position: "66% 48%" },
 ];
 
-const slots = [
-  { date: "Wed Sep 2", time: "6:30 PM" },
-  { date: "Thu Sep 3", time: "12:15 PM" },
-  { date: "Sun Sep 6", time: "10:00 AM" },
-];
-
 export function BookingPlatform() {
   const [category, setCategory] = useState("All");
-  const [selectedCreator, setSelectedCreator] = useState(creators[0]);
-  const [slotIndex, setSlotIndex] = useState(0);
-  const [isRequested, setIsRequested] = useState(false);
 
   const visibleCreators = useMemo(() => {
     return creators.filter((creator) => {
@@ -141,21 +132,14 @@ export function BookingPlatform() {
     });
   }, [category]);
 
-  function selectCreator(creator: Creator) {
-    setSelectedCreator(creator);
-    setIsRequested(false);
-    document.getElementById("booking")?.scrollIntoView({ behavior: "smooth" });
-  }
-
   return (
     <main className="platform-shell">
       <header className="topbar">
         <a className="brand-mark" href="#top" aria-label="Take a Seat home">
-          Take a Seat
+          <img alt="Take a Seat" src="/seat-mark.png" />
         </a>
         <nav className="topnav" aria-label="Primary navigation">
           <a href="#browse">Browse</a>
-          <a href="#booking">Book</a>
           <a href="#creators">Creators</a>
         </nav>
       </header>
@@ -167,10 +151,7 @@ export function BookingPlatform() {
           src="/hero-chair.png"
         />
         <div className="hero-copy">
-          <h1>
-            <strong>Take a Seat</strong>
-            <span>with the ones to watch</span>
-          </h1>
+          <h1>take a seat</h1>
         </div>
       </section>
 
@@ -199,12 +180,7 @@ export function BookingPlatform() {
         <div className="expert-grid">
           {visibleCreators.map((creator) => (
             <article className="expert-card" key={creator.id}>
-              <button
-                aria-label={`View ${creator.name}`}
-                className="expert-image-button"
-                onClick={() => selectCreator(creator)}
-                type="button"
-              >
+              <div className="expert-image-frame">
                 {creator.image ? (
                   <img
                     alt={`${creator.name} profile`}
@@ -216,27 +192,21 @@ export function BookingPlatform() {
                     <b>{creator.name}</b>
                   </span>
                 )}
-              </button>
+              </div>
               <div className="expert-copy">
                 <div className="expert-topline">
-                  <div>
-                    <strong>{creator.name}</strong>
-                    <span className="verified" aria-label="Verified creator">
-                      &#10003;
-                    </span>
-                  </div>
+                  <strong>{creator.name}</strong>
                   <span className="rating">
                     <span aria-hidden="true">&#9733;</span> 5.0
                   </span>
                 </div>
-                <div className="expert-rate">
-                  <span>
-                    {creator.status === "booking"
-                      ? `${creator.category} for ${creator.price} for ${creator.length}`
-                      : `${creator.category} opening soon`}
-                  </span>
-                </div>
-                <p>{creator.note}</p>
+                <span className="expert-category">{creator.category}</span>
+                <span className="expert-rate">
+                  {creator.status === "booking"
+                    ? `${creator.price} • ${creator.length}`
+                    : "Opening soon"}
+                </span>
+                <p className="expert-note">{creator.note}</p>
                 {creator.id === "amber" ? (
                   <a className="profile-link" href="/with/amber/">
                     View profile
@@ -248,76 +218,16 @@ export function BookingPlatform() {
         </div>
       </section>
 
-      <section className="booking-section" id="booking">
-        <div className="booking-image">
-          {selectedCreator.image ? (
-            <img
-              alt={`${selectedCreator.name} selected profile`}
-              src={selectedCreator.image}
-              style={{ objectPosition: selectedCreator.objectPosition }}
-            />
-          ) : (
-            <span className={`profile-placeholder profile-${selectedCreator.accent}`}>
-              <b>{selectedCreator.name}</b>
-            </span>
-          )}
-        </div>
-        <div className="booking-card">
-          <span>{selectedCreator.status === "booking" ? "Booking now" : "Opening soon"}</span>
-          <h2>{selectedCreator.offer}</h2>
-          <p>
-            {selectedCreator.name} is offering a private {selectedCreator.length} seat
-            for decisions that need a trusted second opinion.
-          </p>
-          {selectedCreator.id === "amber" ? (
-            <a className="profile-link booking-profile-link" href="/with/amber/">
-              See Amber profile
-            </a>
-          ) : null}
-
-          {selectedCreator.status === "booking" ? (
-            <div className="booking-flow">
-              <div className="slot-grid" aria-label="Available times">
-                {slots.map((slot, index) => (
-                  <button
-                    aria-pressed={slotIndex === index}
-                    key={`${slot.date}-${slot.time}`}
-                    onClick={() => setSlotIndex(index)}
-                    type="button"
-                  >
-                    <strong>{slot.date}</strong>
-                    <span>{slot.time}</span>
-                  </button>
-                ))}
-              </div>
-              <button
-                className="primary-button"
-                onClick={() => setIsRequested(true)}
-                type="button"
-              >
-                {isRequested ? "Request received" : "Request this seat"}
-              </button>
-            </div>
-          ) : (
-            <button
-              className="secondary-button"
-              onClick={() => setSelectedCreator(creators[0])}
-              type="button"
-            >
-              See Amber seat
-            </button>
-          )}
-        </div>
-      </section>
-
       <section className="creator-invite" id="creators">
         <span>For creators</span>
-        <h2>Open a few seats. Keep it personal.</h2>
+        <h2>Share what people already ask you about.</h2>
         <p>
-          Take a Seat is for specific, human advice: one named offer, a few
-          openings a month, and people who already know why they trust you.
+          Interested in sharing your knowledge with followers who look up to
+          you? Apply to open a few private seats and we will review your fit.
         </p>
-        <a href="mailto:annabel@takeaseatwith.com">annabel@takeaseatwith.com</a>
+        <a href="mailto:annabel@takeaseatwith.com?subject=Creator%20application">
+          Apply to become a creator
+        </a>
       </section>
     </main>
   );
