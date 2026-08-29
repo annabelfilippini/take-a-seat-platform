@@ -16,12 +16,20 @@ npm run dev
 npm run build
 ```
 
-This starter does not use `wrangler.jsonc`.
+Production deploys use Cloudflare Workers:
+
+```bash
+npm run deploy
+```
+
+The canonical production URL is
+`https://take-a-seat-platform.annabelflip1.workers.dev/`.
 
 ## Included Shape
 
 - edit site code under `app/`
-- `.openai/hosting.json` declares optional Sites D1 and R2 bindings
+- `wrangler.deploy.jsonc` deploys the built Worker to `take-a-seat-platform`
+- `.openai/hosting.json` is legacy Sites metadata and is not the production deploy target
 - `vite.config.ts` simulates declared bindings for local development
 - `db/schema.ts` starts intentionally empty
 - `examples/d1/` contains an optional D1 example surface
@@ -91,7 +99,9 @@ actions tied to the current ChatGPT user. Leave public content anonymous.
 
 - `npm run dev`: start local development
 - `npm run build`: verify the vinext build output
-- `npm test`: build the starter and verify its rendered loading skeleton
+- `npm run deploy:dry-run`: verify the Workers deploy package without publishing
+- `npm run deploy`: publish to Cloudflare Workers
+- `npm test`: build and verify rendered HTML
 - `npm run db:generate`: generate Drizzle migrations after schema changes
 
 ## Learn More
