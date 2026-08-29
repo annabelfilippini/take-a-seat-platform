@@ -246,7 +246,7 @@ export function BookingPlatform() {
       <section className="creator-invite" id="creators">
         <h2>
           <span>For creators</span>
-          <strong>That crave a deeper community.</strong>
+          <strong>That crave a stronger community.</strong>
         </h2>
         <p>
           Open a few private seats for followers who want your eye on something

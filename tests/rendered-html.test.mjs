@@ -50,7 +50,7 @@ test("server-renders the Take a Seat platform", async () => {
   assert.match(html, /Alex Earl/);
   assert.match(html, /£45 • 15 minutes/);
   assert.match(html, /Apply to become a creator/);
-  assert.match(html, /That crave a deeper community/);
+  assert.match(html, /That crave a stronger community/);
   assert.match(html, /a simple way to know them better/);
   assert.doesNotMatch(html, /Book<\/a>|href="#booking"|id="booking"|Request this seat|Buy It Once/);
   assert.doesNotMatch(html, /Access to the people you already trust/);
