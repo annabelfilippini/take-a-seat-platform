@@ -630,16 +630,16 @@ img {
 .amber-profile-hero {
   align-items: center;
   display: grid;
-  gap: clamp(56px, 6vw, 144px);
-  grid-template-columns: minmax(320px, 0.35fr) minmax(0, 1fr);
+  gap: clamp(68px, 7vw, 176px);
+  grid-template-columns: minmax(390px, 0.39fr) minmax(0, 1fr);
   margin: 0 auto;
   max-width: none;
   min-height: calc(100svh - 118px);
-  padding: clamp(118px, 15vh, 174px) clamp(58px, 7vw, 210px) 104px;
+  padding: clamp(108px, 13vh, 146px) clamp(58px, 7vw, 210px) 116px;
 }
 
 .amber-hero-copy {
-  max-width: 430px;
+  max-width: 488px;
 }
 
 .amber-headshot {
@@ -666,10 +666,10 @@ img {
 }
 
 .amber-hero-copy h1 {
-  font-size: clamp(64px, 4.7vw, 92px);
+  font-size: clamp(72px, 5.2vw, 110px);
   font-weight: 300;
-  line-height: 0.98;
-  max-width: 390px;
+  line-height: 0.94;
+  max-width: 440px;
 }
 
 .amber-meta {
@@ -699,10 +699,10 @@ img {
 
 .amber-hero-copy > p:not(.amber-meta) {
   color: #4f4840;
-  font-size: clamp(17px, 1vw, 21px);
+  font-size: clamp(18px, 1.08vw, 22px);
   font-weight: 400;
-  line-height: 1.68;
-  margin: 30px 0 0;
+  line-height: 1.66;
+  margin: 32px 0 0;
 }
 
 .amber-hero-copy .profile-primary-button {
@@ -713,7 +713,7 @@ img {
 .amber-hero-gallery {
   align-self: center;
   display: block;
-  margin-top: 62px;
+  margin-top: 56px;
   position: relative;
 }
 
