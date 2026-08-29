@@ -136,7 +136,7 @@ export function BookingPlatform() {
     <main className="platform-shell">
       <header className="topbar">
         <a className="brand-mark" href="#top" aria-label="Take a Seat home">
-          <img alt="Take a Seat" src="/seat-mark.png" />
+          Take a Seat
         </a>
         <nav className="topnav" aria-label="Primary navigation">
           <a href="#browse">Browse</a>

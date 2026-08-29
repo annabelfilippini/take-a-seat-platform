@@ -89,21 +89,6 @@ img {
   white-space: nowrap;
 }
 
-.topbar:not(.profile-topbar) .brand-mark {
-  display: block;
-  height: 86px;
-  overflow: visible;
-  text-shadow: none;
-  width: 58px;
-}
-
-.topbar:not(.profile-topbar) .brand-mark img {
-  height: 100%;
-  object-fit: contain;
-  object-position: center;
-  width: 100%;
-}
-
 .topnav {
   align-items: center;
   display: flex;
