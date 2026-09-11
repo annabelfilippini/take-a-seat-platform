@@ -1,10 +1,10 @@
-import { getRequestAdminEmail } from "../../../admin-auth";
+import { getRequestAdminEmail } from "../../../_lib/admin-auth";
 import {
   canManageCreatorProfile,
-} from "../../../creator-onboarding";
-import { getSignedInClerkUser } from "../../../clerk-auth";
-import { getCustomerBooking } from "../../../bookings";
-import { approveBookingAndSendGoogleInvite } from "../../../google-calendar";
+} from "../../../_lib/creator-onboarding";
+import { getSignedInClerkUser } from "../../../_lib/clerk-auth";
+import { getCustomerBooking } from "../../../_lib/bookings";
+import { approveBookingAndSendGoogleInvite } from "../../../_lib/google-calendar";
 
 function redirectWithStatus(
   request: Request,

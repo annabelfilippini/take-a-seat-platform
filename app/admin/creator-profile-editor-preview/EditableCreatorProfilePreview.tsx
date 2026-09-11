@@ -10,7 +10,7 @@ import {
   type PointerEvent,
   type WheelEvent,
 } from "react";
-import { CREATOR_PROFILE_EDITOR_URL } from "../../creator-destination";
+import { CREATOR_PROFILE_EDITOR_URL } from "../../_lib/creator-destination";
 
 type EditableGalleryItem = {
   fileName?: string;

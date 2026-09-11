@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import { CreatorDirectory } from "../CreatorDirectory";
-import { PageHeader } from "../PageHeader";
+import { CreatorDirectory } from "../_components/CreatorDirectory";
+import { PageHeader } from "../_components/PageHeader";
 
 export const metadata: Metadata = {
   title: "Take a Seat | Creators",

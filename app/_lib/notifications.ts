@@ -3,7 +3,7 @@ import {
   creatorNotificationPreferences,
   creatorNotifications,
   creatorOnboardingProfiles,
-} from "../db/schema";
+} from "../../db/schema";
 import type { CustomerBooking } from "./bookings";
 
 const BOOKING_NOTIFICATION_TYPE = "booking_paid";
@@ -30,7 +30,7 @@ export function getDefaultCreatorNotificationPreference() {
 }
 
 export async function getCreatorNotificationPreferences(creatorId: string) {
-  const { getDb } = await import("../db");
+  const { getDb } = await import("../../db");
   const db = getDb();
   const [preferences] = await db
     .select()
@@ -51,7 +51,7 @@ export async function saveCreatorNotificationPreferences(
   creatorId: string,
   input: CreatorNotificationPreferenceInput,
 ) {
-  const { getDb } = await import("../db");
+  const { getDb } = await import("../../db");
   const db = getDb();
   const now = new Date().toISOString();
 
@@ -79,7 +79,7 @@ export async function saveCreatorNotificationPreferences(
 }
 
 export async function listCreatorNotifications(creatorId: string) {
-  const { getDb } = await import("../db");
+  const { getDb } = await import("../../db");
   const db = getDb();
 
   return db
@@ -132,7 +132,7 @@ export async function createCreatorAcceptedNotification({
   creatorId: string;
   creatorName: string;
 }) {
-  const { getDb } = await import("../db");
+  const { getDb } = await import("../../db");
   const db = getDb();
   const now = new Date().toISOString();
   const firstName = creatorName.trim().split(/\s+/u)[0] || "there";
@@ -184,7 +184,7 @@ export function getCreatorNotificationPreferenceInput(
 }
 
 async function createCreatorBookingNotification(booking: CustomerBooking) {
-  const { getDb } = await import("../db");
+  const { getDb } = await import("../../db");
   const db = getDb();
   const now = new Date().toISOString();
 
@@ -206,7 +206,7 @@ async function createCreatorBookingNotification(booking: CustomerBooking) {
 }
 
 async function getCreatorNotificationProfile(creatorId: string) {
-  const { getDb } = await import("../db");
+  const { getDb } = await import("../../db");
   const db = getDb();
   const [profile] = await db
     .select({

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { BookingPlatform } from "./BookingPlatform";
+import { BookingPlatform } from "./_components/BookingPlatform";
 
 export const metadata: Metadata = {
   title: "Take a Seat",

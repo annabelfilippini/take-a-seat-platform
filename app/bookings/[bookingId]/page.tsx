@@ -2,16 +2,16 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
-import { getSignedInAdminEmail } from "../../admin-auth";
+import { getSignedInAdminEmail } from "../../_lib/admin-auth";
 import {
   canManageCreatorProfile,
-} from "../../creator-onboarding";
-import { getSignedInClerkUserFromHeaders } from "../../clerk-auth";
+} from "../../_lib/creator-onboarding";
+import { getSignedInClerkUserFromHeaders } from "../../_lib/clerk-auth";
 import {
   formatBookingDateTime,
   getCustomerBooking,
   type CustomerBooking,
-} from "../../bookings";
+} from "../../_lib/bookings";
 
 type BookingPageProps = {
   params: {

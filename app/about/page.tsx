@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { PageHeader } from "../PageHeader";
+import { PageHeader } from "../_components/PageHeader";
 
 /* eslint-disable @next/next/no-img-element */
 

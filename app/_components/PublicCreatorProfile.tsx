@@ -6,7 +6,7 @@ import { useRef } from "react";
 import type {
   EditableCreatorMediaItem,
   EditableCreatorProfile,
-} from "./admin/creator-profile-editor-preview/creator-profile-editor-data";
+} from "../admin/creator-profile-editor-preview/creator-profile-editor-data";
 
 const tiktokPlayerOptions = [
   "autoplay=1",

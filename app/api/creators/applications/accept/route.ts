@@ -1,15 +1,15 @@
-import { getRequestAdminEmail } from "../../../../admin-auth";
+import { getRequestAdminEmail } from "../../../../_lib/admin-auth";
 import {
   acceptCreatorApplication,
   createCreatorInvite,
   CreatorPublishError,
   normalizeCreatorPublicId,
-} from "../../../../creator-onboarding";
+} from "../../../../_lib/creator-onboarding";
 import {
   sendCreatorAcceptedEmail,
   sendCreatorAcceptedSms,
-} from "../../../../email";
-import { createCreatorAcceptedNotification } from "../../../../notifications";
+} from "../../../../_lib/email";
+import { createCreatorAcceptedNotification } from "../../../../_lib/notifications";
 
 function redirectTo(request: Request, path: string, params: Record<string, string>) {
   const target = new URL(path, request.url);

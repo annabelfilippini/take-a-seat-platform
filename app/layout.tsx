@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import { ClerkAppProvider } from "./ClerkAppProvider";
-import { getClerkPublishableKey } from "./clerk-auth";
+import { ClerkAppProvider } from "./_components/ClerkAppProvider";
+import { getClerkPublishableKey } from "./_lib/clerk-auth";
 import "./globals.css";
 
 export const metadata: Metadata = {

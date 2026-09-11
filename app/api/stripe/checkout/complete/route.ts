@@ -1,9 +1,9 @@
-import { markBookingPaid } from "../../../../bookings";
-import { notifyCreatorBookingPaid } from "../../../../notifications";
+import { markBookingPaid } from "../../../../_lib/bookings";
+import { notifyCreatorBookingPaid } from "../../../../_lib/notifications";
 import {
   getStripeSecretKey,
   STRIPE_API_VERSION,
-} from "../../../../stripe-connect";
+} from "../../../../_lib/stripe-connect";
 
 type StripeCheckoutSessionDetails = {
   id: string;

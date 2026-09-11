@@ -64,8 +64,19 @@ Source control:
 
 - Durable GitHub repo: `annabelfilippini/take-a-seat-platform`.
 - `origin` points to GitHub and is the source-of-truth remote.
-- `sites` is retained as the legacy ChatGPT/Sites remote for history/tooling.
+- Some local checkouts may still have a legacy `sites` remote, but GitHub and
+  Cloudflare are the active source/deploy path.
 - Cleanup branch: `codex-take-a-seat-source-control-cleanup`.
+
+Code layout:
+
+- `app/` owns vinext routes and route-specific UI.
+- `app/_components/` owns shared React components.
+- `app/_lib/` owns server/domain helpers for auth, creators, bookings, email,
+  calendar, notifications, and Stripe.
+- `db/` owns the Drizzle connection and schema.
+- `drizzle/` owns generated D1 migration SQL and Drizzle metadata.
+- `public/` owns committed product imagery and icons.
 
 Database:
 
@@ -179,16 +190,10 @@ The creator backend is not cleanly separated yet:
 
 The public creator model is split:
 
-- Some creators are checked-in seed/static records in `app/creators.ts`.
+- Some creators are checked-in seed/static records in `app/_lib/creators.ts`.
 - Published accepted creators can be loaded from D1.
 - This is acceptable for launch only if the distinction is documented as
   `seed creators` versus `published marketplace creators`.
-
-The docs are mid-migration:
-
-- `README.md` is now operational.
-- `docs/creator-platform-plan.md` is the longer product/integration plan.
-- `docs/influencer-onboarding.md` is a practical setup checklist.
 
 Duplicate scratch files were compared and removed after the worktree was
 preserved in GitHub source control:
@@ -204,6 +209,14 @@ preserved in GitHub source control:
   favicon.
 - `tests/rendered-html.test 2.mjs`: starter preview tests replaced by the
   current route and integration smoke tests.
+
+Legacy starter/tooling artifacts removed during repository cleanup:
+
+- `.openai/hosting.json`: old Sites metadata. Cloudflare Workers is the active
+  deploy target.
+- `build/sites-vite-plugin.ts`: old Sites packaging hook.
+- `examples/d1/`: starter notes API example unrelated to Take a Seat.
+- `take-a-seat-home-updated.png`: old root-level screenshot artifact.
 
 ## Environment Map
 
@@ -245,14 +258,22 @@ Completed:
 - Removed obsolete duplicate scratch files after comparison.
 - Separated `/creators/dashboard` from the admin preview URL while preserving
   the existing editor component.
+- Removed legacy Sites packaging files, starter examples, and root screenshot
+  artifacts.
+- Moved shared components and domain helpers into `app/_components` and
+  `app/_lib`.
 
 Next:
 
-1. Verify Cloudflare and D1.
+1. Normalize GitHub branches.
+   Make `main` the default GitHub branch once this cleanup branch is reviewed
+   and pushed.
+
+2. Verify Cloudflare and D1.
    Confirm the intended D1 migrations are applied to the production database and
    that required secrets exist.
 
-2. Finish integration reliability.
+3. Finish integration reliability.
    Add Stripe webhook handling, complete calendar conflict checks, and test a
    full booking flow before taking real payments.
 

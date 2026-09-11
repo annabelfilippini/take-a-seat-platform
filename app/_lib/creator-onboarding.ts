@@ -9,7 +9,7 @@ import {
   creatorOnboardingProfiles,
   creatorStripeConnections,
   customerBookings,
-} from "../db/schema";
+} from "../../db/schema";
 import { creators, getCreatorById, getCreatorBySlug, type Creator, type Seat } from "./creators";
 import {
   normalizePhoneIdentity,
@@ -273,7 +273,7 @@ export async function createCreatorOnboardingProfile(
   input: CreatorOnboardingInput,
   requestedId?: string | null,
 ) {
-  const { getDb } = await import("../db");
+  const { getDb } = await import("../../db");
   const db = getDb();
   const now = new Date().toISOString();
   const id = requestedId ?? `onboard_${crypto.randomUUID()}`;
@@ -317,7 +317,7 @@ export async function saveCreatorProfileSettings(
   creatorId: string,
   input: CreatorProfileSettingsInput,
 ) {
-  const { getDb } = await import("../db");
+  const { getDb } = await import("../../db");
   const db = getDb();
   const now = new Date().toISOString();
   const applicationStatus = input.reviewSubmitted ? "in_review" : "draft";
@@ -400,7 +400,7 @@ export async function saveCreatorProfileSettings(
 }
 
 export async function listCreatorApplications() {
-  const { getDb } = await import("../db");
+  const { getDb } = await import("../../db");
   const db = getDb();
 
   return db
@@ -417,7 +417,7 @@ export async function getCreatorApplication(creatorId: string) {
     return null;
   }
 
-  const { getDb } = await import("../db");
+  const { getDb } = await import("../../db");
   const db = getDb();
   const cleanCreatorId = creatorId.slice(0, 120);
   const [profile] = await db
@@ -439,7 +439,7 @@ export async function getCreatorApplication(creatorId: string) {
 export async function getCreatorDashboardAccount(
   user: TakeASeatClerkUser,
 ): Promise<CreatorDashboardAccount> {
-  const { getDb } = await import("../db");
+  const { getDb } = await import("../../db");
   const db = getDb();
 
   const [existingAccount] = await db
@@ -518,7 +518,7 @@ export async function acceptCreatorApplication(
     return null;
   }
 
-  const { getDb } = await import("../db");
+  const { getDb } = await import("../../db");
   const db = getDb();
   const now = new Date().toISOString();
   const publicId =
@@ -689,7 +689,7 @@ export async function getAvailableCreatorPublicIdSuggestion(
 }
 
 async function isCreatorPublicIdTaken(publicId: string, currentCreatorId: string) {
-  const { getDb } = await import("../db");
+  const { getDb } = await import("../../db");
   const db = getDb();
   const [existing] = await db
     .select({ id: creatorOnboardingProfiles.id })
@@ -719,7 +719,7 @@ export async function getPublishedCreatorBySlug(slug: string) {
     return null;
   }
 
-  const { getDb } = await import("../db");
+  const { getDb } = await import("../../db");
   const db = getDb();
   const [profile] = await db
     .select()
@@ -779,7 +779,7 @@ export async function createCreatorInvite(
     throw new Error("Creator invite requires an email address.");
   }
 
-  const { getDb } = await import("../db");
+  const { getDb } = await import("../../db");
   const db = getDb();
   const now = new Date().toISOString();
   const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 14).toISOString();
@@ -881,7 +881,7 @@ export async function claimCreatorInvite(
     };
   }
 
-  const { getDb } = await import("../db");
+  const { getDb } = await import("../../db");
   const db = getDb();
   const now = new Date().toISOString();
   const [existingUserAccount] = await db
@@ -930,7 +930,7 @@ export async function claimCreatorInvite(
 }
 
 async function getAcceptedCreatorProfileForUser(user: TakeASeatClerkUser) {
-  const { getDb } = await import("../db");
+  const { getDb } = await import("../../db");
   const db = getDb();
 
   if (user.email) {
@@ -990,7 +990,7 @@ export async function canManageCreatorProfile(
     return false;
   }
 
-  const { getDb } = await import("../db");
+  const { getDb } = await import("../../db");
   const db = getDb();
   const [account] = await db
     .select()
@@ -1165,7 +1165,7 @@ function getSocialUrl(platform: "instagram" | "tiktok", handle: string | null) {
 }
 
 export async function saveCreatorAvailability(input: CreatorAvailabilityInput) {
-  const { getDb } = await import("../db");
+  const { getDb } = await import("../../db");
   const db = getDb();
   const now = new Date().toISOString();
 
@@ -1196,7 +1196,7 @@ export async function listCreatorAvailabilityRules(creatorId: string) {
     return [];
   }
 
-  const { getDb } = await import("../db");
+  const { getDb } = await import("../../db");
   const db = getDb();
 
   return db
@@ -1214,7 +1214,7 @@ export async function markCalendarConnected(creatorId: string) {
     return;
   }
 
-  const { getDb } = await import("../db");
+  const { getDb } = await import("../../db");
   const db = getDb();
   const now = new Date().toISOString();
 
@@ -1229,7 +1229,7 @@ export async function markStripeConnected(creatorId: string) {
     return;
   }
 
-  const { getDb } = await import("../db");
+  const { getDb } = await import("../../db");
   const db = getDb();
   const now = new Date().toISOString();
 
@@ -1251,7 +1251,7 @@ async function getValidCreatorInvite(token: string) {
     return null;
   }
 
-  const { getDb } = await import("../db");
+  const { getDb } = await import("../../db");
   const db = getDb();
   const tokenHash = await hashInviteToken(cleanToken);
   const [invite] = await db

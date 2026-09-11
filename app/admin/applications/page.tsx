@@ -4,8 +4,8 @@ import {
   DEFAULT_ADMIN_EMAIL,
   getAdminSignInHref,
   getSignedInAdminEmail,
-} from "../../admin-auth";
-import { listCreatorApplications } from "../../creator-onboarding";
+} from "../../_lib/admin-auth";
+import { listCreatorApplications } from "../../_lib/creator-onboarding";
 
 export const metadata: Metadata = {
   title: "Creator Applications | Take a Seat",

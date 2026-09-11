@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { PageHeader } from "../../PageHeader";
+import { PageHeader } from "../../_components/PageHeader";
 import { CreatorOnboardingForm } from "./CreatorOnboardingForm";
 
 export const metadata: Metadata = {

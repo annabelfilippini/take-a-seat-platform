@@ -1,10 +1,10 @@
 import {
   getCreatorOnboardingProfileId,
   markStripeConnected,
-} from "../../../../creator-onboarding";
+} from "../../../../_lib/creator-onboarding";
 import {
   markCreatorStripeReturned,
-} from "../../../../stripe-connect";
+} from "../../../../_lib/stripe-connect";
 
 function getSafeReturnTo(value: string | null, fallback: string) {
   if (!value || !value.startsWith("/") || value.startsWith("//")) {

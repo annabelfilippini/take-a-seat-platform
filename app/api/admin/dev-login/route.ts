@@ -2,7 +2,7 @@ import {
   getLocalAdminCookie,
   isLocalAdminDevEnabled,
   isLocalhostRequest,
-} from "../../../admin-auth";
+} from "../../../_lib/admin-auth";
 
 export function GET(request: Request) {
   if (!isLocalAdminDevEnabled() || !isLocalhostRequest(request.headers, request.url)) {

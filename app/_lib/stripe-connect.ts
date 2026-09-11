@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { creatorStripeConnections } from "../db/schema";
+import { creatorStripeConnections } from "../../db/schema";
 
 export const STRIPE_API_VERSION = "2026-08-26.dahlia";
 const STRIPE_API_BASE = "https://api.stripe.com";
@@ -89,7 +89,7 @@ export async function getCreatorStripeConnection(creatorId: string) {
     return testConnection;
   }
 
-  const { getDb } = await import("../db");
+  const { getDb } = await import("../../db");
   const db = getDb();
 
   const [connection] = await db
@@ -132,7 +132,7 @@ export async function saveCreatorStripeConnection({
   livemode: boolean;
   stripeAccountId: string;
 }) {
-  const { getDb } = await import("../db");
+  const { getDb } = await import("../../db");
   const db = getDb();
   const now = new Date().toISOString();
 
@@ -161,7 +161,7 @@ export async function saveCreatorStripeConnection({
 }
 
 export async function markCreatorStripeReturned(creatorId: string) {
-  const { getDb } = await import("../db");
+  const { getDb } = await import("../../db");
   const db = getDb();
   const now = new Date().toISOString();
 

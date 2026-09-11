@@ -2,8 +2,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { creators } from "../../creators";
-import { getPublicCreatorBySlug } from "../../creator-onboarding";
+import { creators } from "../../_lib/creators";
+import { getPublicCreatorBySlug } from "../../_lib/creator-onboarding";
 import { CustomerBookingFlow } from "../ella/CustomerBookingFlow";
 
 type CreatorProfilePageProps = {

@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import {
   getAdminSignInHref,
   getSignedInAdminEmail,
-} from "../../admin-auth";
-import { getCreatorApplication } from "../../creator-onboarding";
+} from "../../_lib/admin-auth";
+import { getCreatorApplication } from "../../_lib/creator-onboarding";
 import { CreatorProfileEditorAccess } from "./CreatorProfileEditorAccess";
 import { EditableCreatorProfilePreview } from "./EditableCreatorProfilePreview";
 import {

@@ -1,4 +1,4 @@
-import type { CreatorOnboardingProfile } from "../../creator-onboarding";
+import type { CreatorOnboardingProfile } from "../../_lib/creator-onboarding";
 
 export type EditableCreatorMediaItem = {
   id: string;

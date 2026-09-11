@@ -9,7 +9,7 @@ creator setup path before inviting an outside creator.
 
 ## Recommended Launch Flow
 
-1. Create the creator profile in `app/creators.ts`.
+1. Add seed/demo creator records only when needed in `app/_lib/creators.ts`.
 2. Save profile, seat copy, pricing, and weekly availability from
    `/creators/onboard`.
 3. Connect the creator's Google Calendar from `/creators/onboard`.
@@ -150,7 +150,8 @@ Paid booking model:
 
 ## Next Creator Checklist
 
-Add the next creator to `app/creators.ts` with unique values:
+For seed/demo creators, add the next creator to `app/_lib/creators.ts` with
+unique values:
 
 - `id`
 - `slug`
@@ -158,6 +159,7 @@ Add the next creator to `app/creators.ts` with unique values:
 - `seats[].id`
 - `seats[].stripePriceEnv`
 
-Then add a profile route under `app/with/<slug>/page.tsx`. Once repeated profile
-pages feel too similar, promote Amber's page into a reusable creator profile
-component.
+Accepted marketplace creators should use the application and onboarding flow so
+their operational profile data lives in D1. Add a bespoke profile route under
+`app/with/<slug>/page.tsx` only when the creator needs a temporary custom launch
+mockup; otherwise prefer the reusable `/with/[slug]` route.

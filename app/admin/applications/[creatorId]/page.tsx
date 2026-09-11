@@ -4,12 +4,12 @@ import {
   DEFAULT_ADMIN_EMAIL,
   getAdminSignInHref,
   getSignedInAdminEmail,
-} from "../../../admin-auth";
-import { CREATOR_PROFILE_EDITOR_URL } from "../../../creator-destination";
+} from "../../../_lib/admin-auth";
+import { CREATOR_PROFILE_EDITOR_URL } from "../../../_lib/creator-destination";
 import {
   getAvailableCreatorPublicIdSuggestion,
   getCreatorApplication,
-} from "../../../creator-onboarding";
+} from "../../../_lib/creator-onboarding";
 
 export const metadata: Metadata = {
   title: "Review Creator Application | Take a Seat",

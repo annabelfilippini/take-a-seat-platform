@@ -1,5 +1,5 @@
-import { getSignedInClerkUser } from "../../../../clerk-auth";
-import { claimCreatorInvite } from "../../../../creator-onboarding";
+import { getSignedInClerkUser } from "../../../../_lib/clerk-auth";
+import { claimCreatorInvite } from "../../../../_lib/creator-onboarding";
 
 export async function POST(request: Request) {
   const user = await getSignedInClerkUser(request);

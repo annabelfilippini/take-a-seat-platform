@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import { creatorCalendarConnections } from "../../../../../db/schema";
-import { markCalendarConnected } from "../../../../creator-onboarding";
+import { markCalendarConnected } from "../../../../_lib/creator-onboarding";
 import {
   encryptToken,
   getCookie,

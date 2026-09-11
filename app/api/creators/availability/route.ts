@@ -2,8 +2,8 @@ import {
   canManageCreatorProfile,
   getCreatorAvailabilityInput,
   saveCreatorAvailability,
-} from "../../../creator-onboarding";
-import { getSignedInClerkUser } from "../../../clerk-auth";
+} from "../../../_lib/creator-onboarding";
+import { getSignedInClerkUser } from "../../../_lib/clerk-auth";
 
 function redirectWithAvailabilityStatus(
   request: Request,

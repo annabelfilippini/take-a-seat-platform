@@ -2,7 +2,7 @@
 
 /* eslint-disable @next/next/no-img-element */
 import { useMemo, useState } from "react";
-import { creators } from "./creators";
+import { creators } from "../_lib/creators";
 
 const categories = [
   { label: "Top Experts", filter: "All", image: "/category-top-experts.png", position: "50% 34%" },

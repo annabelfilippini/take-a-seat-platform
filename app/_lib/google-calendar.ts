@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { creatorCalendarConnections } from "../db/schema";
+import { creatorCalendarConnections } from "../../db/schema";
 import {
   getCustomerBooking,
   markBookingApprovedWithCalendar,
@@ -60,7 +60,7 @@ export async function approveBookingAndSendGoogleInvite(bookingId: string) {
 }
 
 async function getCreatorCalendarAccessToken(creatorId: string) {
-  const { getDb } = await import("../db");
+  const { getDb } = await import("../../db");
   const db = getDb();
   const [connection] = await db
     .select()

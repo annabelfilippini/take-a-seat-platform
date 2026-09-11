@@ -1,7 +1,7 @@
 "use client";
 
 import { Show, SignInButton, UserButton } from "@clerk/react";
-import { CREATOR_PROFILE_EDITOR_URL } from "../creator-destination";
+import { CREATOR_PROFILE_EDITOR_URL } from "../_lib/creator-destination";
 
 export function CreatorAuthControls() {
   return (

@@ -1,18 +1,18 @@
-import { getSeatById } from "../../../creators";
+import { getSeatById } from "../../../_lib/creators";
 import {
   attachStripeCheckoutSession,
   createCheckoutBooking,
   getBookingRequestInput,
   type BookingRequestInput,
-} from "../../../bookings";
-import { getBookableCreatorById } from "../../../creator-onboarding";
+} from "../../../_lib/bookings";
+import { getBookableCreatorById } from "../../../_lib/creator-onboarding";
 import {
   getConnectedAccountTransferStatus,
   getCreatorStripeConnection,
   getRuntimeEnv,
   getStripeSecretKey,
   STRIPE_API_VERSION,
-} from "../../../stripe-connect";
+} from "../../../_lib/stripe-connect";
 
 type CheckoutPayload = {
   appointmentStartAt?: string;

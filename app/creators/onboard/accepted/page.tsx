@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { CREATOR_PROFILE_EDITOR_URL } from "../../../creator-destination";
+import { CREATOR_PROFILE_EDITOR_URL } from "../../../_lib/creator-destination";
 
 export const metadata: Metadata = {
   title: "Creator Setup | Take a Seat",

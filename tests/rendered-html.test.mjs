@@ -358,7 +358,7 @@ test("wires accepted creators to public profile publishing", async () => {
       new URL("../app/admin/applications/[creatorId]/page.tsx", import.meta.url),
       "utf8",
     ),
-    readFile(new URL("../app/creator-onboarding.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/_lib/creator-onboarding.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/with/[slug]/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/api/stripe/checkout/route.ts", import.meta.url), "utf8"),
   ]);
@@ -405,8 +405,8 @@ test("notifies accepted creators in email, text, and profile", async () => {
       new URL("../app/api/creators/applications/accept/route.ts", import.meta.url),
       "utf8",
     ),
-    readFile(new URL("../app/email.ts", import.meta.url), "utf8"),
-    readFile(new URL("../app/notifications.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/_lib/email.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/_lib/notifications.ts", import.meta.url), "utf8"),
     readFile(
       new URL(
         "../app/admin/creator-profile-editor-preview/EditableCreatorProfilePreview.tsx",
@@ -429,7 +429,7 @@ test("notifies accepted creators in email, text, and profile", async () => {
 });
 
 test("puts the admin review link before long application details in email", async () => {
-  const email = await readFile(new URL("../app/email.ts", import.meta.url), "utf8");
+  const email = await readFile(new URL("../app/_lib/email.ts", import.meta.url), "utf8");
   const topReviewLink = email.indexOf("Review application: ${reviewUrl}");
   const expertiseBlock = email.indexOf("\"Expertise:\"");
   const topHtmlLink = email.indexOf(

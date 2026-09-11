@@ -2,8 +2,8 @@ import {
   createCreatorOnboardingProfile,
   getCreatorOnboardingInput,
   getCreatorOnboardingProfileId,
-} from "../../../../creator-onboarding";
-import { getCreatorById } from "../../../../creators";
+} from "../../../../_lib/creator-onboarding";
+import { getCreatorById } from "../../../../_lib/creators";
 import {
   buildStripeReturnUrl,
   createAccountOnboardingLink,
@@ -13,7 +13,7 @@ import {
   getStripeSecretKey,
   saveCreatorStripeConnection,
   StripeConnectError,
-} from "../../../../stripe-connect";
+} from "../../../../_lib/stripe-connect";
 
 function redirectWithStripeStatus(
   request: Request,

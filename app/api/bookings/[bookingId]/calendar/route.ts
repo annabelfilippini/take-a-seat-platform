@@ -2,7 +2,7 @@ import {
   createCustomerCalendarIcs,
   getCustomerBooking,
   getCustomerCalendarFilename,
-} from "../../../../bookings";
+} from "../../../../_lib/bookings";
 
 type BookingCalendarRouteProps = {
   params: {

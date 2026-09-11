@@ -1,5 +1,5 @@
 import { and, eq } from "drizzle-orm";
-import { customerBookings } from "../db/schema";
+import { customerBookings } from "../../db/schema";
 import type { Creator, Seat } from "./creators";
 
 export type CustomerBooking = typeof customerBookings.$inferSelect;
@@ -54,7 +54,7 @@ export async function createCheckoutBooking({
     return bookingId;
   }
 
-  const { getDb } = await import("../db");
+  const { getDb } = await import("../../db");
   const db = getDb();
 
   await db.insert(customerBookings).values({
@@ -88,7 +88,7 @@ export async function attachStripeCheckoutSession(
     return;
   }
 
-  const { getDb } = await import("../db");
+  const { getDb } = await import("../../db");
   const db = getDb();
   const now = new Date().toISOString();
 
@@ -107,7 +107,7 @@ export async function markBookingPaid({
   stripeCheckoutSessionId: string;
   stripePaymentIntentId: string | null;
 }) {
-  const { getDb } = await import("../db");
+  const { getDb } = await import("../../db");
   const db = getDb();
   const now = new Date().toISOString();
 
@@ -133,7 +133,7 @@ export async function getCustomerBooking(bookingId: string) {
     return null;
   }
 
-  const { getDb } = await import("../db");
+  const { getDb } = await import("../../db");
   const db = getDb();
   const [booking] = await db
     .select()
@@ -153,7 +153,7 @@ export async function markBookingApprovedWithCalendar({
   googleCalendarEventId: string;
   googleCalendarHtmlLink: string | null;
 }) {
-  const { getDb } = await import("../db");
+  const { getDb } = await import("../../db");
   const db = getDb();
   const now = new Date().toISOString();
 

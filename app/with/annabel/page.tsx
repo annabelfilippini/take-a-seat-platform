@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { BookingRequestFields } from "../../BookingRequestForm";
-import { getCreatorById } from "../../creators";
+import { BookingRequestFields } from "../../_components/BookingRequestForm";
+import { getCreatorById } from "../../_lib/creators";
 
 export const metadata: Metadata = {
   title: "Take a Seat with Annabel Filippini",

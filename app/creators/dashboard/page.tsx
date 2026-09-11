@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { getSignedInCreatorEditorAccount } from "../../creator-dashboard";
+import { getSignedInCreatorEditorAccount } from "../../_lib/creator-dashboard";
 import { EditableCreatorProfilePreview } from "../../admin/creator-profile-editor-preview/EditableCreatorProfilePreview";
 import { getEditableCreatorProfile } from "../../admin/creator-profile-editor-preview/creator-profile-editor-data";
 

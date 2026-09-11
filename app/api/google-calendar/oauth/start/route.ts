@@ -12,7 +12,7 @@ import {
   createCreatorOnboardingProfile,
   getCreatorOnboardingInput,
   getCreatorOnboardingProfileId,
-} from "../../../../creator-onboarding";
+} from "../../../../_lib/creator-onboarding";
 
 export async function GET(request: Request) {
   const url = new URL(request.url);

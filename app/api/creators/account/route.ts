@@ -1,9 +1,9 @@
-import { getSignedInClerkUser } from "../../../clerk-auth";
-import { getCreatorDashboardAccount } from "../../../creator-onboarding";
+import { getSignedInClerkUser } from "../../../_lib/clerk-auth";
+import { getCreatorDashboardAccount } from "../../../_lib/creator-onboarding";
 import {
   getCreatorNotificationPreferences,
   listCreatorNotifications,
-} from "../../../notifications";
+} from "../../../_lib/notifications";
 
 export async function GET(request: Request) {
   const user = await getSignedInClerkUser(request);

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import { PageHeader } from "../PageHeader";
-import { getClerkPublishableKey } from "../clerk-auth";
-import { SignInClerkScreen } from "../SignInClerkScreen";
+import { PageHeader } from "../_components/PageHeader";
+import { getClerkPublishableKey } from "../_lib/clerk-auth";
+import { SignInClerkScreen } from "../_components/SignInClerkScreen";
 
 export const metadata: Metadata = {
   title: "Sign In | Take a Seat",

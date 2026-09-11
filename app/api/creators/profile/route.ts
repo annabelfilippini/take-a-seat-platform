@@ -3,11 +3,11 @@ import {
   getCreatorProfileSettingsInput,
   getCreatorSettingsId,
   saveCreatorProfileSettings,
-} from "../../../creator-onboarding";
-import { getRequestAdminEmail } from "../../../admin-auth";
-import { getSignedInClerkUser } from "../../../clerk-auth";
-import { CREATOR_PROFILE_EDITOR_URL } from "../../../creator-destination";
-import { sendCreatorApplicationEmail } from "../../../email";
+} from "../../../_lib/creator-onboarding";
+import { getRequestAdminEmail } from "../../../_lib/admin-auth";
+import { getSignedInClerkUser } from "../../../_lib/clerk-auth";
+import { CREATOR_PROFILE_EDITOR_URL } from "../../../_lib/creator-destination";
+import { sendCreatorApplicationEmail } from "../../../_lib/email";
 
 function profileStatusResponse(
   request: Request,

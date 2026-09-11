@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   CREATOR_PROFILE_EDITOR_URL,
   getCreatorProfileEditorUrl,
-} from "./creator-destination";
+} from "../_lib/creator-destination";
 
 type SignInClerkScreenProps = {
   className?: string;

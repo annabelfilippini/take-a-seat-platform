@@ -1,8 +1,8 @@
 /* eslint-disable @next/next/no-img-element */
 import type { Metadata } from "next";
 import Link from "next/link";
-import { getCreatorById } from "../../creators";
-import { getPublishedCreatorBySlug } from "../../creator-onboarding";
+import { getCreatorById } from "../../_lib/creators";
+import { getPublishedCreatorBySlug } from "../../_lib/creator-onboarding";
 import { CustomerBookingFlow } from "./CustomerBookingFlow";
 import { EllaGallery } from "./EllaGallery";
 

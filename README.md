@@ -27,9 +27,6 @@ The canonical production URL is:
 https://take-a-seat-platform.annabelflip1.workers.dev/
 ```
 
-The legacy `.openai/hosting.json` file is retained for local/tooling history,
-but it is not the production deploy target.
-
 ## Local Development
 
 Prerequisite:
@@ -65,6 +62,18 @@ stay in ignored local env files or Cloudflare Worker secrets.
 - Payments: Stripe Connect and Stripe Checkout groundwork.
 
 Cloudflare production bindings are declared in `wrangler.deploy.jsonc`.
+
+## Project Layout
+
+- `app/`: vinext routes and route-specific UI.
+- `app/_components/`: shared React components used across routes.
+- `app/_lib/`: server/domain helpers for auth, creators, bookings, email,
+  calendar, notifications, and Stripe.
+- `db/`: Drizzle database connection and schema.
+- `drizzle/`: generated D1 migration SQL and Drizzle metadata.
+- `public/`: committed visual assets used by the product.
+- `tests/`: route and integration smoke tests.
+- `worker/`: Cloudflare Worker entrypoint.
 
 ## Current Route Map
 
@@ -104,3 +113,6 @@ Already handled in the source-control cleanup branch:
 - Removed duplicate scratch files such as `app/page 2.tsx`,
   `app/globals 2.css`, and `tests/rendered-html.test 2.mjs` after comparison.
 - Separated the creator dashboard URL from the admin profile editor preview.
+- Removed legacy Sites packaging files and starter D1 example code.
+- Moved shared UI and domain helpers out of the route root into
+  `app/_components` and `app/_lib`.

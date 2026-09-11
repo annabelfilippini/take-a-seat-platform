@@ -1,9 +1,9 @@
-import { getSignedInClerkUser } from "../../../../clerk-auth";
-import { canManageCreatorProfile } from "../../../../creator-onboarding";
+import { getSignedInClerkUser } from "../../../../_lib/clerk-auth";
+import { canManageCreatorProfile } from "../../../../_lib/creator-onboarding";
 import {
   getCreatorNotificationPreferenceInput,
   saveCreatorNotificationPreferences,
-} from "../../../../notifications";
+} from "../../../../_lib/notifications";
 
 type NotificationPreferencePayload = {
   bookingEmailEnabled?: unknown;

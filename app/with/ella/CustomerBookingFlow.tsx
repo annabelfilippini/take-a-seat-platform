@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import type { Seat } from "../../creators";
+import type { Seat } from "../../_lib/creators";
 
 type CustomerBookingFlowProps = {
   creatorId: string;
