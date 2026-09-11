@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHmac } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
@@ -62,6 +63,14 @@ function withEnv(values, callback) {
         }
       }
     });
+}
+
+function signStripeWebhookPayload(payload, secret, timestamp = Math.floor(Date.now() / 1000)) {
+  const signature = createHmac("sha256", secret)
+    .update(`${timestamp}.${payload}`)
+    .digest("hex");
+
+  return `t=${timestamp},v1=${signature}`;
 }
 
 test("server-renders the public booking homepage", async () => {
@@ -392,6 +401,9 @@ test("wires accepted creators to public profile publishing", async () => {
   assert.match(acceptRoute, /sendCreatorAcceptedSms/);
   assert.match(acceptRoute, /createCreatorAcceptedNotification/);
   assert.match(acceptRoute, /inviteToken:\s*invite\?\.token/);
+  assert.match(adminApplicationPage, /Accept and send setup email/);
+  assert.match(adminApplicationPage, /Send setup email again/);
+  assert.match(adminApplicationPage, /\/api\/creators\/applications\/invite/);
   assert.match(creatorOnboarding, /originalApplicationId/);
   assert.match(
     creatorOnboarding,
@@ -414,9 +426,13 @@ test("wires accepted creators to public profile publishing", async () => {
 });
 
 test("notifies accepted creators in email, text, and profile", async () => {
-  const [acceptRoute, email, notifications, editor] = await Promise.all([
+  const [acceptRoute, inviteRoute, email, notifications, editor] = await Promise.all([
     readFile(
       new URL("../app/api/creators/applications/accept/route.ts", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../app/api/creators/applications/invite/route.ts", import.meta.url),
       "utf8",
     ),
     readFile(new URL("../app/_lib/email.ts", import.meta.url), "utf8"),
@@ -433,6 +449,13 @@ test("notifies accepted creators in email, text, and profile", async () => {
   assert.match(acceptRoute, /sendCreatorAcceptedEmail/);
   assert.match(acceptRoute, /sendCreatorAcceptedSms/);
   assert.match(acceptRoute, /createCreatorAcceptedNotification/);
+  assert.match(inviteRoute, /sendCreatorAcceptedEmail/);
+  assert.match(inviteRoute, /createCreatorInvite/);
+  assert.match(inviteRoute, /applicationStatus !== "accepted"/);
+  assert.match(inviteRoute, /inviteEmail: email\.status/);
+  assert.match(email, /You've been accepted by Take a Seat/);
+  assert.match(email, /Click on this link to view and edit your profile/);
+  assert.match(email, /View and edit your profile/);
   assert.match(email, /CREATOR_PROFILE_EDITOR_URL\}\?invite=/);
   assert.match(email, /inviteToken\?: string/);
   assert.match(notifications, /application_accepted/);
@@ -834,5 +857,78 @@ test("creates Stripe Checkout destination charges with a platform fee", async ()
   assert.match(
     body.get("integration_identifier") ?? "",
     /^take_a_seat_checkout_[a-z]{8}$/,
+  );
+});
+
+test("requires a configured Stripe webhook secret", async () => {
+  const response = await dispatch("/api/stripe/webhook", {
+    body: JSON.stringify({ id: "evt_test", type: "ping" }),
+    headers: {
+      "content-type": "application/json",
+    },
+    method: "POST",
+  });
+
+  assert.equal(response.status, 500);
+  assert.deepEqual(await response.json(), {
+    detail: "stripe-webhook-secret",
+    status: "setup-needed",
+  });
+});
+
+test("rejects Stripe webhooks with an invalid signature", async () => {
+  await withEnv(
+    {
+      STRIPE_WEBHOOK_SECRET: "whsec_test_take_a_seat",
+    },
+    async () => {
+      const response = await dispatch("/api/stripe/webhook", {
+        body: JSON.stringify({ id: "evt_test", type: "ping" }),
+        headers: {
+          "content-type": "application/json",
+          "stripe-signature": "t=1789098782,v1=not-a-real-signature",
+        },
+        method: "POST",
+      });
+
+      assert.equal(response.status, 400);
+      assert.deepEqual(await response.json(), {
+        detail: "signature",
+        status: "invalid",
+      });
+    },
+  );
+});
+
+test("accepts signed Stripe webhook events", async () => {
+  await withEnv(
+    {
+      STRIPE_WEBHOOK_SECRET: "whsec_test_take_a_seat",
+    },
+    async () => {
+      const payload = JSON.stringify({
+        data: {
+          object: {
+            id: "evt_test",
+          },
+        },
+        id: "evt_test",
+        type: "ping",
+      });
+      const response = await dispatch("/api/stripe/webhook", {
+        body: payload,
+        headers: {
+          "content-type": "application/json",
+          "stripe-signature": signStripeWebhookPayload(
+            payload,
+            "whsec_test_take_a_seat",
+          ),
+        },
+        method: "POST",
+      });
+
+      assert.equal(response.status, 200);
+      assert.deepEqual(await response.json(), { received: true });
+    },
   );
 });

@@ -150,6 +150,16 @@ export async function markBookingPaid({
   stripeCheckoutSessionId: string;
   stripePaymentIntentId: string | null;
 }) {
+  const existingBooking = await getCustomerBooking(bookingId);
+
+  if (
+    !existingBooking ||
+    existingBooking.stripeCheckoutSessionId !== stripeCheckoutSessionId ||
+    existingBooking.status !== BOOKING_STATUS.checkoutStarted
+  ) {
+    return null;
+  }
+
   const { getDb } = await import("../../db");
   const db = getDb();
   const now = new Date().toISOString();
@@ -165,6 +175,7 @@ export async function markBookingPaid({
       and(
         eq(customerBookings.id, bookingId),
         eq(customerBookings.stripeCheckoutSessionId, stripeCheckoutSessionId),
+        eq(customerBookings.status, BOOKING_STATUS.checkoutStarted),
       ),
     );
 

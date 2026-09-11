@@ -14,6 +14,7 @@ GOOGLE_TOKEN_ENCRYPTION_KEY="replace_with_random_32_byte_secret"
 
 # Stripe secret from the Stripe Dashboard. Use a test key locally.
 STRIPE_SECRET_KEY="sk_test_replace_me"
+STRIPE_WEBHOOK_SECRET="whsec_replace_me"
 # Default country for creator Stripe Connect onboarding until the form collects country.
 STRIPE_CONNECT_COUNTRY="US"
 # Take a Seat platform fee in basis points. 1500 = 15%.
@@ -37,13 +38,9 @@ TAKE_A_SEAT_ADMIN_PHONES="13035550000"
 # Optional local-only admin bypass for development. Keep false outside localhost.
 TAKE_A_SEAT_DEV_ADMIN_ENABLED="false"
 
-# Stripe Price IDs for Amber's bookable seats.
-STRIPE_PRICE_AMBER_15="price_replace_me"
-STRIPE_PRICE_AMBER_30="price_replace_me"
-
-# Nikki B. launch keys.
-STRIPE_PRICE_NIKKI_15="price_replace_me"
-STRIPE_PRICE_NIKKI_30="price_replace_me"
+# Stripe Price IDs for Ella's bookable seats.
+STRIPE_PRICE_ELLA_15="price_replace_me"
+STRIPE_PRICE_ELLA_30="price_replace_me"
 
 # Annabel internal checkout test keys.
 STRIPE_PRICE_ANNABEL_15="price_replace_me"
