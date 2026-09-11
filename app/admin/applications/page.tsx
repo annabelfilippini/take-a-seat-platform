@@ -72,11 +72,10 @@ export default async function AdminApplicationsPage({
         <div className="admin-queue" role="list">
           {applications.length ? (
             applications.map((application) => (
-              <Link
+              <a
                 className="admin-application-row"
                 href={`/admin/applications/${application.id}`}
                 key={application.id}
-                role="listitem"
               >
                 <span className={`admin-status admin-status-${application.applicationStatus}`}>
                   {application.applicationStatus.replace("_", " ")}
@@ -88,7 +87,7 @@ export default async function AdminApplicationsPage({
                     ? `Submitted ${formatDate(application.reviewSubmittedAt)}`
                     : `Created ${formatDate(application.createdAt)}`}
                 </small>
-              </Link>
+              </a>
             ))
           ) : (
             <p className="admin-empty">No creator applications yet.</p>

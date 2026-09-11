@@ -205,12 +205,11 @@ export default async function AdminApplicationPage({
               <h2>All applications</h2>
               <div className="admin-mini-queue" role="list">
                 {applications.map((item) => (
-                  <Link
+                  <a
                     aria-current={item.id === application.id ? "page" : undefined}
                     className="admin-mini-application-row"
                     href={`/admin/applications/${item.id}`}
                     key={item.id}
-                    role="listitem"
                   >
                     <strong>{item.name}</strong>
                     <span className={`admin-status admin-status-${item.applicationStatus}`}>
@@ -221,7 +220,7 @@ export default async function AdminApplicationPage({
                         ? `Submitted ${formatDate(item.reviewSubmittedAt)}`
                         : `Created ${formatDate(item.createdAt)}`}
                     </small>
-                  </Link>
+                  </a>
                 ))}
               </div>
               <Link href="/admin/applications">Open full queue</Link>
