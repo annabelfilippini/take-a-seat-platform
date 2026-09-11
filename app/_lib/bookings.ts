@@ -1,5 +1,11 @@
 import { and, eq } from "drizzle-orm";
 import { customerBookings } from "../../db/schema";
+import {
+  getDateValueInTimezone,
+  getMatchedAvailabilitySlot,
+  getWeekKey,
+  localDateTimeToUtc,
+} from "./availability";
 import type { Creator, Seat } from "./creators";
 
 export type CustomerBooking = typeof customerBookings.$inferSelect;
@@ -18,6 +24,7 @@ const BOOKING_STATUS = {
   paid: "paid",
   requested: "requested",
 } as const;
+const CHECKOUT_SLOT_HOLD_MINUTES = 30;
 const TEST_BOOKINGS_ENV = "TAKE_A_SEAT_TEST_BOOKINGS";
 
 export function getBookingRequestInput(
@@ -79,6 +86,90 @@ export async function createCheckoutBooking({
   });
 
   return bookingId;
+}
+
+export async function isBookingSlotAvailable({
+  creator,
+  input,
+  seat,
+}: {
+  creator: Creator;
+  input: BookingRequestInput;
+  seat: Seat;
+}) {
+  const matchedSlot = getMatchedAvailabilitySlot({
+    appointmentStartAt: input.appointmentStartAt,
+    availabilityRules: creator.availabilityRules ?? [],
+    creatorId: creator.id,
+    seat,
+    timezone: input.timezone,
+  });
+
+  if (!matchedSlot) {
+    return false;
+  }
+
+  if (isTestBookingStoreEnabled()) {
+    return true;
+  }
+
+  const existingBookings = await listCreatorBookings(creator.id);
+  const blockingBookings = existingBookings.filter(isBlockingBooking);
+  let bookingsOnDay = 0;
+  let bookingsInWeek = 0;
+  const requestedWeekKey = getWeekKey(matchedSlot.creatorDate);
+
+  for (const booking of blockingBookings) {
+    const existingStart = localDateTimeToUtc(
+      booking.appointmentStartAt,
+      booking.timezone,
+    );
+    const existingEnd = localDateTimeToUtc(booking.appointmentEndAt, booking.timezone);
+
+    if (!existingStart || !existingEnd) {
+      continue;
+    }
+
+    if (
+      intervalsOverlap(
+        matchedSlot.appointmentStartUtc,
+        matchedSlot.appointmentEndUtc,
+        existingStart,
+        existingEnd,
+      )
+    ) {
+      return false;
+    }
+
+    const existingCreatorDate = getDateValueInTimezone(
+      existingStart,
+      matchedSlot.creatorTimezone,
+    );
+
+    if (existingCreatorDate === matchedSlot.creatorDate) {
+      bookingsOnDay += 1;
+    }
+
+    if (getWeekKey(existingCreatorDate) === requestedWeekKey) {
+      bookingsInWeek += 1;
+    }
+  }
+
+  if (
+    matchedSlot.maxBookingsPerDay !== null &&
+    bookingsOnDay >= matchedSlot.maxBookingsPerDay
+  ) {
+    return false;
+  }
+
+  if (
+    matchedSlot.maxBookingsPerWeek !== null &&
+    bookingsInWeek >= matchedSlot.maxBookingsPerWeek
+  ) {
+    return false;
+  }
+
+  return true;
 }
 
 export async function createBookingRequest({
@@ -196,6 +287,16 @@ export async function getCustomerBooking(bookingId: string) {
     .limit(1);
 
   return booking ?? null;
+}
+
+async function listCreatorBookings(creatorId: string) {
+  const { getDb } = await import("../../db");
+  const db = getDb();
+
+  return db
+    .select()
+    .from(customerBookings)
+    .where(eq(customerBookings.creatorId, creatorId));
 }
 
 export async function markBookingApprovedWithCalendar({
@@ -338,6 +439,31 @@ function addMinutesToLocalDateTime(value: string, minutes: number) {
   const date = new Date(`${value}Z`);
   date.setUTCMinutes(date.getUTCMinutes() + minutes);
   return date.toISOString().slice(0, 19);
+}
+
+function isBlockingBooking(booking: CustomerBooking) {
+  if (
+    booking.status === BOOKING_STATUS.requested ||
+    booking.status === BOOKING_STATUS.paid ||
+    booking.status === BOOKING_STATUS.approved
+  ) {
+    return true;
+  }
+
+  if (booking.status !== BOOKING_STATUS.checkoutStarted) {
+    return false;
+  }
+
+  return Date.parse(booking.createdAt) > Date.now() - CHECKOUT_SLOT_HOLD_MINUTES * 60_000;
+}
+
+function intervalsOverlap(
+  firstStart: Date,
+  firstEnd: Date,
+  secondStart: Date,
+  secondEnd: Date,
+) {
+  return firstStart < secondEnd && secondStart < firstEnd;
 }
 
 function formatLocalDateTimeForIcs(value: string) {

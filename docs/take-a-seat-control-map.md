@@ -118,6 +118,8 @@ Calendar:
 - Google Calendar supplies real busy/free conflicts and creator-owned event
   creation.
 - OAuth routes exist, but launch booking flow still needs final reliability work.
+- Booking request and Stripe Checkout routes server-validate submitted times
+  against creator availability before creating a booking.
 
 Payments:
 
@@ -295,8 +297,9 @@ Next:
 
 3. Finish integration reliability.
    Complete a Stripe Connect onboarding pass from an accepted creator profile,
-   test the signed Stripe webhook with a full checkout, complete calendar
-   conflict checks, and test a full booking flow before taking real payments.
+   test the signed Stripe webhook with a full checkout, complete Google Calendar
+   busy/free conflict checks, and test a full booking flow before taking real
+   payments.
 
 ## Launch Gate
 

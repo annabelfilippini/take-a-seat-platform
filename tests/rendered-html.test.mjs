@@ -461,10 +461,80 @@ test("wires accepted creators to public profile publishing", async () => {
   assert.match(dynamicProfilePage, /availabilityRules=\{creator\.availabilityRules\}/);
   assert.match(checkoutRoute, /getBookableCreatorById/);
   assert.match(requestRoute, /createBookingRequest/);
+  assert.match(requestRoute, /isBookingSlotAvailable/);
   assert.match(requestRoute, /notifyCreatorBookingRequested/);
+  assert.match(checkoutRoute, /isBookingSlotAvailable/);
   assert.match(customerBookingFlow, /Find Availability/);
   assert.match(customerBookingFlow, /action="\/api\/bookings\/request"/);
   assert.match(customerBookingFlow, /Send request/);
+});
+
+test("rejects manually submitted booking times outside creator availability", async () => {
+  const requestResponse = await dispatch("/api/bookings/request", {
+    body: new URLSearchParams({
+      appointmentStartAt: "2026-09-18T10:30",
+      creatorId: "ella",
+      customerEmail: "customer@example.com",
+      customerName: "Customer Example",
+      returnTo: "/with/ella",
+      seatId: "ella-15",
+      timezone: "America/New_York",
+    }),
+    headers: {
+      "content-type": "application/x-www-form-urlencoded",
+    },
+    method: "POST",
+  });
+
+  assert.equal(requestResponse.status, 303);
+  assert.match(
+    requestResponse.headers.get("location") ?? "",
+    /\/with\/ella\?booking=error&detail=availability$/,
+  );
+
+  const originalFetch = globalThis.fetch;
+  let stripeFetchCalled = false;
+  globalThis.fetch = async () => {
+    stripeFetchCalled = true;
+    return new Response("unexpected", { status: 500 });
+  };
+
+  try {
+    await withEnv(
+      {
+        STRIPE_PRICE_ELLA_15: "price_test_ella_15",
+        STRIPE_SECRET_KEY: "sk_test_take_a_seat",
+        TAKE_A_SEAT_PLATFORM_FEE_BPS: "1500",
+      },
+      async () => {
+        const checkoutResponse = await dispatch("/api/stripe/checkout", {
+          body: new URLSearchParams({
+            appointmentStartAt: "2026-09-18T10:30",
+            creatorId: "ella",
+            customerEmail: "customer@example.com",
+            customerName: "Customer Example",
+            returnTo: "/with/ella",
+            seatId: "ella-15",
+            timezone: "America/New_York",
+          }),
+          headers: {
+            "content-type": "application/x-www-form-urlencoded",
+          },
+          method: "POST",
+        });
+
+        assert.equal(checkoutResponse.status, 303);
+        assert.match(
+          checkoutResponse.headers.get("location") ?? "",
+          /\/with\/ella\?booking=error&detail=availability$/,
+        );
+      },
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+
+  assert.equal(stripeFetchCalled, false);
 });
 
 test("notifies accepted creators in email, text, and profile", async () => {
@@ -889,7 +959,7 @@ test("creates Stripe Checkout destination charges with a platform fee", async ()
       async () => {
         const response = await dispatch("/api/stripe/checkout", {
           body: new URLSearchParams({
-            appointmentStartAt: "2026-09-18T10:30",
+            appointmentStartAt: "2026-09-17T09:30",
             creatorId: "ella",
             customerEmail: "customer@example.com",
             customerName: "Customer Example",
@@ -926,7 +996,7 @@ test("creates Stripe Checkout destination charges with a platform fee", async ()
   assert.equal(body.get("line_items[0][price]"), "price_test_ella_15");
   assert.match(body.get("client_reference_id") ?? "", /^booking_/);
   assert.match(body.get("metadata[booking_id]") ?? "", /^booking_/);
-  assert.equal(body.get("metadata[appointment_start_at]"), "2026-09-18T10:30:00");
+  assert.equal(body.get("metadata[appointment_start_at]"), "2026-09-17T09:30:00");
   assert.equal(body.get("metadata[customer_email]"), "customer@example.com");
   assert.equal(body.get("metadata[customer_name]"), "Customer Example");
   assert.equal(body.get("metadata[timezone]"), "America/New_York");

@@ -2,6 +2,7 @@ import {
   createBookingRequest,
   getCustomerBooking,
   getBookingRequestInput,
+  isBookingSlotAvailable,
 } from "../../../_lib/bookings";
 import { getBookableCreatorById } from "../../../_lib/creator-onboarding";
 import { getSeatById } from "../../../_lib/creators";
@@ -130,6 +131,22 @@ export async function POST(request: Request) {
     return redirectTo(
       appendBookingStatus(request, returnTo, "error", "booking-details"),
     );
+  }
+
+  try {
+    const isAvailable = await isBookingSlotAvailable({
+      creator,
+      input: bookingInput,
+      seat,
+    });
+
+    if (!isAvailable) {
+      return redirectTo(
+        appendBookingStatus(request, returnTo, "error", "availability"),
+      );
+    }
+  } catch {
+    return redirectTo(appendBookingStatus(request, returnTo, "setup-needed", "d1"));
   }
 
   try {

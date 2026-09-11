@@ -3,6 +3,7 @@ import {
   attachStripeCheckoutSession,
   createCheckoutBooking,
   getBookingRequestInput,
+  isBookingSlotAvailable,
   type BookingRequestInput,
 } from "../../../_lib/bookings";
 import { getBookableCreatorById } from "../../../_lib/creator-onboarding";
@@ -252,6 +253,22 @@ export async function POST(request: Request) {
     return redirectTo(
       appendBookingStatus(request, returnTo, "error", "booking-details"),
     );
+  }
+
+  try {
+    const isAvailable = await isBookingSlotAvailable({
+      creator,
+      input: bookingInput,
+      seat,
+    });
+
+    if (!isAvailable) {
+      return redirectTo(
+        appendBookingStatus(request, returnTo, "error", "availability"),
+      );
+    }
+  } catch {
+    return redirectTo(appendBookingStatus(request, returnTo, "setup-needed", "d1"));
   }
 
   const secretKey = getStripeSecretKey();
