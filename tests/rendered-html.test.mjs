@@ -230,6 +230,20 @@ test("legacy creator auth paths redirect into current auth and creator dashboard
   assert.match(dashboardHtml, /redirect_url=%2Fcreators%2Fdashboard/);
   assert.doesNotMatch(dashboardHtml, /Creator Profile Editor Preview/);
 
+  const stripeReturnDashboardResponse = await render(
+    "/creators/dashboard?stripe=setup-needed&detail=stripe-transfers",
+  );
+  assert.equal(stripeReturnDashboardResponse.status, 200);
+  const stripeReturnDashboardHtml = await stripeReturnDashboardResponse.text();
+  assert.match(
+    stripeReturnDashboardHtml,
+    /You&#x27;re almost done\. Sign in to return to your creator dashboard\./,
+  );
+  assert.match(
+    stripeReturnDashboardHtml,
+    /we will text you a verification code/,
+  );
+
   const invitedDashboardResponse = await render(
     "/creators/dashboard?invite=test_invite_token",
   );

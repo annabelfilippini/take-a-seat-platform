@@ -37,23 +37,37 @@ export default async function CreatorDashboardPage({
     );
   }
 
-  return <CreatorDashboardAccess inviteToken={inviteToken} />;
+  return (
+    <CreatorDashboardAccess
+      inviteToken={inviteToken}
+      isStripeReturn={hasStripeReturn(searchParams?.stripe)}
+    />
+  );
 }
 
-function CreatorDashboardAccess({ inviteToken }: { inviteToken: string | null }) {
+function CreatorDashboardAccess({
+  inviteToken,
+  isStripeReturn,
+}: {
+  inviteToken: string | null;
+  isStripeReturn: boolean;
+}) {
   const redirectUrl = inviteToken
     ? `/creators/dashboard?invite=${encodeURIComponent(inviteToken)}`
     : "/creators/dashboard";
+  const heading = isStripeReturn
+    ? "You're almost done. Sign in to return to your creator dashboard."
+    : "Sign in with your creator phone.";
+  const description = isStripeReturn
+    ? "Use the phone number from your accepted creator application and we will text you a verification code."
+    : "Accepted creators can manage their profile, availability, payments, and booking notifications here.";
 
   return (
     <main className="admin-page">
       <section className="admin-shell admin-locked" aria-labelledby="locked-heading">
         <span>Creator dashboard</span>
-        <h1 id="locked-heading">Sign in with your creator phone.</h1>
-        <p>
-          Accepted creators can manage their profile, availability, payments, and
-          booking notifications here.
-        </p>
+        <h1 id="locked-heading">{heading}</h1>
+        <p>{description}</p>
         <a
           className="creator-apply-primary"
           href={`/sign-in?redirect_url=${encodeURIComponent(redirectUrl)}`}
@@ -70,4 +84,8 @@ function CreatorDashboardAccess({ inviteToken }: { inviteToken: string | null })
 
 function getInviteToken(value: string | string[] | undefined) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function hasStripeReturn(value: string | string[] | undefined) {
+  return typeof value === "string" && value.trim().length > 0;
 }
