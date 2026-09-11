@@ -21,8 +21,7 @@
   "secrets": {
     "required": [
       "CLERK_SECRET_KEY",
-      "RESEND_API_KEY",
-      "STRIPE_WEBHOOK_SECRET"
+      "RESEND_API_KEY"
     ]
   },
   "no_bundle": true,

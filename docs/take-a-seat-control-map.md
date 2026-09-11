@@ -257,7 +257,7 @@ Required or expected production secrets:
 - `GOOGLE_OAUTH_REDIRECT_URI`
 - `GOOGLE_TOKEN_ENCRYPTION_KEY`
 - `STRIPE_SECRET_KEY`
-- `STRIPE_WEBHOOK_SECRET`
+- `STRIPE_WEBHOOK_SECRET` before testing paid booking webhooks
 - `STRIPE_CONNECT_COUNTRY`
 - Creator Stripe Price IDs such as `STRIPE_PRICE_ANNABEL_15`
 
