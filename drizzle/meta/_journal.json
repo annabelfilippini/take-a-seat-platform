@@ -1,5 +1,97 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "entries": []
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1788310588413,
+      "tag": "0000_solid_major_mapleleaf",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1788313294992,
+      "tag": "0001_easy_wrecking_crew",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1788318000000,
+      "tag": "0002_creator_stripe_connections",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1788318568262,
+      "tag": "0003_common_captain_cross",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1788320778987,
+      "tag": "0004_past_elektra",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1788457888657,
+      "tag": "0005_huge_bill_hollister",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1788892197856,
+      "tag": "0006_smiling_smasher",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1788921241274,
+      "tag": "0007_heavy_lionheart",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1788925242658,
+      "tag": "0008_deep_lady_bullseye",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1789069755515,
+      "tag": "0009_concerned_sue_storm",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1789071737453,
+      "tag": "0010_chunky_amphibian",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1789079345580,
+      "tag": "0012_clammy_black_bird",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1789080839260,
+      "tag": "0013_parched_blue_marvel",
+      "breakpoints": true
+    }
+  ]
 }

@@ -1,0 +1,43 @@
+NEXT_PUBLIC_SITE_URL="http://localhost:3000"
+
+# Clerk creator auth. The publishable key can be public; the secret key must
+# stay private and should be set as a Cloudflare secret in production.
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="pk_test_replace_me"
+CLERK_SECRET_KEY="sk_test_replace_me"
+
+# Google Calendar OAuth.
+GOOGLE_CLIENT_ID="replace_me.apps.googleusercontent.com"
+GOOGLE_CLIENT_SECRET="GOCSPX_replace_me"
+GOOGLE_OAUTH_REDIRECT_URI="http://localhost:3000/api/google-calendar/oauth/callback"
+# Optional locally. Production should use a separate random secret for token encryption.
+GOOGLE_TOKEN_ENCRYPTION_KEY="replace_with_random_32_byte_secret"
+
+# Stripe secret from the Stripe Dashboard. Use a test key locally.
+STRIPE_SECRET_KEY="sk_test_replace_me"
+# Default country for creator Stripe Connect onboarding until the form collects country.
+STRIPE_CONNECT_COUNTRY="US"
+# Take a Seat platform fee in basis points. 1500 = 15%.
+TAKE_A_SEAT_PLATFORM_FEE_BPS="1500"
+
+# Creator application emails. `TAKE_A_SEAT_EMAIL_FROM` must be a verified
+# sender/domain in Resend.
+RESEND_API_KEY="re_replace_me"
+TAKE_A_SEAT_EMAIL_FROM="Take a Seat <applications@takeaseatwith.com>"
+TAKE_A_SEAT_APPLICATION_RECIPIENT="annabelflip1@gmail.com"
+TAKE_A_SEAT_ADMIN_EMAILS="annabelflip1@gmail.com"
+# Optional comma-separated phone allowlist for local/admin Clerk phone sign-in.
+TAKE_A_SEAT_ADMIN_PHONES="13035550000"
+# Optional local-only admin bypass for development. Keep false outside localhost.
+TAKE_A_SEAT_DEV_ADMIN_ENABLED="false"
+
+# Stripe Price IDs for Amber's bookable seats.
+STRIPE_PRICE_AMBER_15="price_replace_me"
+STRIPE_PRICE_AMBER_30="price_replace_me"
+
+# Nikki B. launch keys.
+STRIPE_PRICE_NIKKI_15="price_replace_me"
+STRIPE_PRICE_NIKKI_30="price_replace_me"
+
+# Annabel internal checkout test keys.
+STRIPE_PRICE_ANNABEL_15="price_replace_me"
+STRIPE_PRICE_ANNABEL_30="price_replace_me"

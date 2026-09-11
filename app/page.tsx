@@ -4,7 +4,7 @@ import { BookingPlatform } from "./BookingPlatform";
 export const metadata: Metadata = {
   title: "Take a Seat",
   description:
-    "Book private seats with rising creators, tastemakers, and experts.",
+    "Choose a private seat with rising creators, tastemakers, and experts.",
 };
 
 export default function Home() {

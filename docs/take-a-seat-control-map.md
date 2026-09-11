@@ -1,0 +1,276 @@
+# Take a Seat Control Map
+
+Last updated: 2026-09-10
+
+This is the working source of truth for Take a Seat while the product is being
+organized. It should stay short, current, and operational.
+
+## Product North Star
+
+Take a Seat is a curated marketplace where people can book private 1:1 calls
+with creators, tastemakers, and experts they already trust.
+
+The product should feel polished and editorial on the public side, but
+operationally calm behind the scenes. The backend should let Annabel review and
+approve creators, let accepted creators manage the pieces that affect their
+bookings, and let Take a Seat safely coordinate money, calendar time, email, and
+booking status.
+
+## Product Surfaces
+
+Public website:
+
+- Introduces the brand.
+- Lets visitors browse creators and categories.
+- Shows public creator profiles.
+- Lets customers pick a creator, seat length, and available time.
+- Does not require customer accounts for v1 paid bookings.
+
+Creator backend:
+
+- Invite-only for accepted creators.
+- Lets creators edit profile content that affects buyer confidence.
+- Lets creators set 15 minute and 30 minute seat pricing.
+- Lets creators manage weekly availability and booking limits.
+- Lets creators connect Google Calendar.
+- Lets creators connect Stripe payouts.
+- Shows booking notifications and setup status.
+
+Admin:
+
+- Reviews creator applications.
+- Accepts creators and sends invite links.
+- Controls final public profile approval.
+- Controls category placement, homepage featuring, refunds, exceptions, and
+  launch readiness.
+- Should not be the permanent home for normal creator self-service.
+
+Customer account area:
+
+- Not a v1 requirement.
+- Add later only if saved bookings, reschedules, purchase history, messaging, or
+  repeat booking workflows need it.
+
+## Current Technical Shape
+
+App/runtime:
+
+- Framework: vinext.
+- Production target: Cloudflare Workers.
+- Production config: `wrangler.deploy.jsonc`.
+- Local Vite config: `vite.config.ts`.
+
+Source control:
+
+- Current branch: `main`.
+- Current configured remote is a Sites-style remote named `sites`.
+- A durable GitHub repo should be added before this becomes launch-critical.
+
+Database:
+
+- Cloudflare D1 binding: `DB`.
+- Database name: `take-a-seat-platform-db`.
+- Database id: `144a50a9-e15d-4fcc-a8eb-7e3bed735895`.
+- Schema: `db/schema.ts`.
+- Migrations: `drizzle/`.
+
+Auth:
+
+- Clerk is the intended account system.
+- Shared sign-in route: `/sign-in`.
+- Sign-in method: phone code, with email support where Clerk/user records expose
+  email.
+- Admin access is allowlist-based through configured admin emails and optional
+  admin phones.
+- Creator access is based on accepted creator profile identity and creator
+  account links in D1.
+
+Email:
+
+- Resend is used for transactional email.
+- Current branded sender: `Take a Seat <applications@takeaseatwith.com>`.
+- Application recipient/admin email is configured through runtime values.
+
+Calendar:
+
+- Google Calendar OAuth is the chosen scheduling integration.
+- Take a Seat owns public availability rules.
+- Google Calendar supplies real busy/free conflicts and creator-owned event
+  creation.
+- OAuth routes exist, but launch booking flow still needs final reliability work.
+
+Payments:
+
+- Stripe Connect is the chosen marketplace payment model.
+- Creators use connected accounts.
+- Buyer checkout uses Stripe Checkout.
+- Destination charges are the intended first model.
+- A Stripe webhook is required before real paid bookings should be considered
+  reliable.
+
+## Data Ownership
+
+D1 should own operational marketplace state:
+
+- Creator applications and published profile fields.
+- Creator account links to Clerk users.
+- Creator invite tokens.
+- Creator Google Calendar connections.
+- Creator Stripe connections.
+- Creator availability rules.
+- Customer bookings.
+- Creator notification preferences and notifications.
+
+Checked-in static data should only own:
+
+- Seed/demo creators.
+- Public copy and imagery that is not operational state.
+- Temporary launch fixtures, clearly named as such.
+
+## Current Route Ownership
+
+Public:
+
+- `/`
+- `/take-a-seat`
+- `/with/[slug]`
+- `/with/ella`
+- `/with/annabel`
+- `/with/amber`
+- `/about`
+
+Auth:
+
+- `/sign-in`
+- `/sign-up`
+- `/creators/sign-in`
+- `/creators/sign-up`
+
+Creator:
+
+- `/creators/onboard`
+- `/creators/dashboard`
+
+Admin:
+
+- `/admin/applications`
+- `/admin/applications/[creatorId]`
+- `/admin/creator-profile-editor-preview`
+
+API:
+
+- `/api/creators/*`
+- `/api/google-calendar/oauth/*`
+- `/api/stripe/*`
+- `/api/bookings/*`
+- `/api/admin/dev-login`
+
+## Known Prototype Edges
+
+The creator backend is not cleanly separated yet:
+
+- `/creators/dashboard` currently redirects to
+  `/admin/creator-profile-editor-preview`.
+- `app/creator-destination.ts` ignores the creator id and always returns the
+  admin preview editor.
+- The profile editor component serves both admin preview and accepted creator
+  access.
+
+The public creator model is split:
+
+- Some creators are checked-in seed/static records in `app/creators.ts`.
+- Published accepted creators can be loaded from D1.
+- This is acceptable for launch only if the distinction is documented as
+  `seed creators` versus `published marketplace creators`.
+
+The docs are mid-migration:
+
+- `README.md` is now operational.
+- `docs/creator-platform-plan.md` is the longer product/integration plan.
+- `docs/influencer-onboarding.md` is a practical setup checklist.
+
+The worktree has duplicate scratch files:
+
+- `app/BookingPlatform 2.tsx`
+- `app/globals 2.css`
+- `app/globals 3.css`
+- `app/layout 2.tsx`
+- `app/page 2.tsx`
+- `tests/rendered-html.test 2.mjs`
+
+Do not delete these blindly. Compare or archive them after the main worktree is
+safe in source control.
+
+## Environment Map
+
+Local:
+
+- `.env.local` and `.dev.vars` are ignored.
+- `.dev.vars.example` documents expected local runtime values.
+- `npm run dev` starts local development.
+
+Production:
+
+- `wrangler.deploy.jsonc` declares Worker name, D1 binding, public vars, and
+  required secrets.
+- Non-secret public/config values can live in Wrangler vars.
+- Secret values should be set as Cloudflare Worker secrets.
+
+Required or expected production secrets:
+
+- `CLERK_SECRET_KEY`
+- `RESEND_API_KEY`
+- `GOOGLE_CLIENT_ID`
+- `GOOGLE_CLIENT_SECRET`
+- `GOOGLE_OAUTH_REDIRECT_URI`
+- `GOOGLE_TOKEN_ENCRYPTION_KEY`
+- `STRIPE_SECRET_KEY`
+- `STRIPE_CONNECT_COUNTRY`
+- Creator Stripe Price IDs such as `STRIPE_PRICE_ANNABEL_15`
+
+## Recommended Cleanup Sequence
+
+1. Preserve the current worktree.
+   Add a durable GitHub remote or otherwise make sure the current state is not
+   only local/Sites-hosted.
+
+2. Decide what gets committed.
+   Review uncommitted files, group them into sensible commits, and do not deploy
+   until the dirty worktree is understood.
+
+3. Clean the docs.
+   Keep this control map current, keep README operational, and move long plans
+   into `docs/`.
+
+4. Separate creator and admin routes.
+   Move the creator self-service backend toward a creator-owned route while
+   keeping admin approval under `/admin`.
+
+5. Clean duplicate scratch files.
+   Compare the `2` and `3` suffixed files, then archive or remove them once the
+   real files are confirmed.
+
+6. Verify Cloudflare and D1.
+   Confirm the intended D1 migrations are applied to the production database and
+   that required secrets exist.
+
+7. Finish integration reliability.
+   Add Stripe webhook handling, complete calendar conflict checks, and test a
+   full booking flow before taking real payments.
+
+## Launch Gate
+
+Before inviting real creators or taking real paid bookings, Take a Seat should
+have:
+
+- GitHub/source control as the durable source of truth.
+- A clean deployment story from committed code to Cloudflare Workers.
+- Admin application review working in production.
+- Accepted creator login working through Clerk.
+- Creator profile setup working outside an admin-labeled preview route.
+- D1 migrations applied.
+- Resend branded emails verified after deployment.
+- Stripe Connect test account onboarding completed.
+- Stripe webhook handling in place.
+- Google Calendar OAuth and event creation tested.
+- One full test booking from public profile to paid checkout to calendar event.

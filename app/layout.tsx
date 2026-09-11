@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { ClerkAppProvider } from "./ClerkAppProvider";
+import { getClerkPublishableKey } from "./clerk-auth";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -37,9 +39,15 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const clerkPublishableKey = getClerkPublishableKey();
+
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <ClerkAppProvider publishableKey={clerkPublishableKey}>
+          {children}
+        </ClerkAppProvider>
+      </body>
     </html>
   );
 }

@@ -16,6 +16,8 @@
     "db:generate": "drizzle-kit generate"
   },
   "dependencies": {
+    "@clerk/backend": "^3.17.1",
+    "@clerk/react": "^6.15.1",
     "drizzle-orm": "0.45.2",
     "react": "19.2.6",
     "react-dom": "19.2.6"

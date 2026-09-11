@@ -1,0 +1,2 @@
+ALTER TABLE `creator_onboarding_profiles` ADD `original_application_id` text;--> statement-breakpoint
+CREATE UNIQUE INDEX `creator_onboarding_profiles_original_application_id_idx` ON `creator_onboarding_profiles` (`original_application_id`);

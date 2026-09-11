@@ -1,110 +1,101 @@
-# vinext-starter
+# Take a Seat
 
-A clean full-stack starter running on
-[vinext](https://github.com/cloudflare/vinext), with optional Cloudflare D1 and
-Drizzle support.
+Take a Seat is a creator marketplace for booking private 1:1 seats with
+creators, tastemakers, and experts. The product has three main surfaces:
 
-## Prerequisites
+- Public website: brand, creator discovery, public creator profiles, and booking
+  entry points.
+- Creator backend: invite-only creator profile setup, availability, calendar,
+  payout, pricing, and booking notifications.
+- Admin: application review, creator approval, profile publishing, operational
+  overrides, and launch readiness checks.
 
-- Node.js `>=22.13.0`
+Start with `docs/take-a-seat-control-map.md` when you need the current source of
+truth for architecture, environments, roles, and cleanup priorities.
 
-## Quick Start
+## Current Production Target
 
-```bash
-npm install
-npm run dev
-npm run build
-```
-
-Production deploys use Cloudflare Workers:
+Production deploys use Cloudflare Workers through `wrangler.deploy.jsonc`.
 
 ```bash
 npm run deploy
 ```
 
-The canonical production URL is
-`https://take-a-seat-platform.annabelflip1.workers.dev/`.
+The canonical production URL is:
 
-## Included Shape
-
-- edit site code under `app/`
-- `wrangler.deploy.jsonc` deploys the built Worker to `take-a-seat-platform`
-- `.openai/hosting.json` is legacy Sites metadata and is not the production deploy target
-- `vite.config.ts` simulates declared bindings for local development
-- `db/schema.ts` starts intentionally empty
-- `examples/d1/` contains an optional D1 example surface
-- `drizzle.config.ts` supports local migration generation when needed
-
-## Workspace Auth Headers
-
-Signed-in visitors receive both `oai-authenticated-user-id` and `oai-authenticated-user-email`. Private Sites require every visitor to sign in; public Sites may also have anonymous visitors, for whom neither header is present.
-
-The user ID is stable for the same user on the same Site and different across Sites. Email and name are intended for display or contact purposes.
-
-SIWC-authenticated workspace sites may also receive
-`oai-authenticated-user-full-name` when the user's SIWC profile has a non-empty
-`name` claim. The full-name value is percent-encoded UTF-8 and is accompanied by
-`oai-authenticated-user-full-name-encoding: percent-encoded-utf-8`.
-
-Treat the full name as optional and fall back to email when it is absent:
-
-```tsx
-import { headers } from "next/headers";
-
-export default async function Home() {
-  const requestHeaders = await headers();
-  const userId = requestHeaders.get("oai-authenticated-user-id");
-  const email = requestHeaders.get("oai-authenticated-user-email");
-  const encodedFullName = requestHeaders.get("oai-authenticated-user-full-name");
-  const fullName =
-    encodedFullName &&
-    requestHeaders.get("oai-authenticated-user-full-name-encoding") ===
-      "percent-encoded-utf-8"
-      ? decodeURIComponent(encodedFullName)
-      : null;
-
-  const displayName = fullName ?? email;
-  // ...
-}
+```text
+https://take-a-seat-platform.annabelflip1.workers.dev/
 ```
 
-## Optional Dispatch-Owned ChatGPT Sign-In
+The legacy `.openai/hosting.json` file is retained for local/tooling history,
+but it is not the production deploy target.
 
-Import the ready-to-use helpers from `app/chatgpt-auth.ts` when the site needs
-optional or required ChatGPT sign-in:
+## Local Development
 
-- Use `getChatGPTUser()` for optional signed-in UI.
-- Use `requireChatGPTUser(returnTo)` for server-rendered pages that should send
-  anonymous visitors through Sign in with ChatGPT.
-- Use `chatGPTSignInPath(returnTo)` and `chatGPTSignOutPath(returnTo)` for
-  browser links or actions.
-- Pass a same-origin relative `returnTo` path for the destination after sign-in
-  or sign-out. The helper validates and safely encodes it.
-- Mark protected pages with `export const dynamic = "force-dynamic"` because
-  they depend on per-request identity headers.
+Prerequisite:
 
-Dispatch owns `/signin-with-chatgpt`, `/signout-with-chatgpt`, `/callback`, the
-OAuth cookies, and identity header injection. Do not implement app routes for
-those reserved paths. Routes that do not import and call the helper remain
-anonymous-compatible.
+- Node.js `>=22.13.0`
 
-SIWC establishes identity only; it does not prove workspace membership. Use the
-Sites hosting platform's access policy controls for workspace-wide restrictions,
-or enforce explicit server-side membership or allowlist checks.
+Useful commands:
 
-Use SIWC for account pages, user-specific dashboards, saved records, and write
-actions tied to the current ChatGPT user. Leave public content anonymous.
+```bash
+npm install
+npm run dev
+npm run build
+npm test
+```
 
-## Useful Commands
+Other commands:
 
-- `npm run dev`: start local development
-- `npm run build`: verify the vinext build output
-- `npm run deploy:dry-run`: verify the Workers deploy package without publishing
-- `npm run deploy`: publish to Cloudflare Workers
-- `npm test`: build and verify rendered HTML
-- `npm run db:generate`: generate Drizzle migrations after schema changes
+```bash
+npm run deploy:dry-run
+npm run db:generate
+```
 
-## Learn More
+Local runtime values are represented in `.dev.vars.example`. Real secrets should
+stay in ignored local env files or Cloudflare Worker secrets.
 
-- [vinext Documentation](https://github.com/cloudflare/vinext)
-- [Drizzle D1 Guide](https://orm.drizzle.team/docs/get-started/d1-new)
+## Core Services
+
+- App/runtime: vinext on Cloudflare Workers.
+- Database: Cloudflare D1 via Drizzle schema in `db/schema.ts`.
+- Auth: Clerk phone-code sign-in at `/sign-in`.
+- Email: Resend transactional email.
+- Calendar: Google Calendar OAuth groundwork.
+- Payments: Stripe Connect and Stripe Checkout groundwork.
+
+Cloudflare production bindings are declared in `wrangler.deploy.jsonc`.
+
+## Current Route Map
+
+- `/`: public homepage.
+- `/take-a-seat`: creator directory.
+- `/with/[slug]`: reusable public creator profile route.
+- `/with/ella`, `/with/annabel`, `/with/amber`: profile/test routes that still
+  need consolidation into the reusable route over time.
+- `/sign-in`: shared Clerk phone sign-in.
+- `/creators/onboard`: creator application and setup entry.
+- `/creators/dashboard`: currently redirects to the profile editor preview.
+- `/admin/applications`: admin creator application queue.
+- `/admin/creator-profile-editor-preview`: current shared admin/creator profile
+  editor prototype.
+
+## Important Docs
+
+- `docs/take-a-seat-control-map.md`: source of truth for product, architecture,
+  environments, roles, and cleanup.
+- `docs/creator-platform-plan.md`: longer creator marketplace and integrations
+  plan.
+- `docs/influencer-onboarding.md`: practical creator launch checklist and
+  runtime setup notes.
+
+## Cleanup Priorities
+
+Do not deploy the current dirty worktree until these are handled:
+
+1. Commit or otherwise preserve the current state in a real source-of-truth repo.
+2. Separate the creator backend route from the admin preview route.
+3. Remove or archive duplicate scratch files such as `app/page 2.tsx` and
+   `app/globals 2.css`.
+4. Confirm D1 migrations are applied to the intended Cloudflare database.
+5. Add Stripe webhooks before any real paid booking flow is treated as reliable.

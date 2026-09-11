@@ -1,0 +1,22 @@
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  width="28"
+  height="28"
+  viewBox="0 0 28 28"
+  fill="none"
+  aria-hidden="true"
+>
+  <circle
+    cx="11.75"
+    cy="11.75"
+    r="7.75"
+    stroke="currentColor"
+    stroke-width="4"
+  />
+  <path
+    d="M17.7 17.7L23 23"
+    stroke="currentColor"
+    stroke-linecap="round"
+    stroke-width="4"
+  />
+</svg>

@@ -10,11 +10,33 @@
   "observability": {
     "enabled": true
   },
+  "vars": {
+    "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_test_Z3VpZGVkLW5hcndoYWwtMTEzMy5jbGVyay5hY2NvdW50cy5kZXYk",
+    "NEXT_PUBLIC_SITE_URL": "https://take-a-seat-platform.annabelflip1.workers.dev",
+    "TAKE_A_SEAT_ADMIN_EMAILS": "annabelflip1@gmail.com",
+    "TAKE_A_SEAT_APPLICATION_RECIPIENT": "annabelflip1@gmail.com",
+    "TAKE_A_SEAT_EMAIL_FROM": "Take a Seat <applications@takeaseatwith.com>",
+    "TAKE_A_SEAT_PLATFORM_FEE_BPS": "1500"
+  },
+  "secrets": {
+    "required": [
+      "CLERK_SECRET_KEY",
+      "RESEND_API_KEY"
+    ]
+  },
   "no_bundle": true,
   "rules": [
     {
       "type": "ESModule",
       "globs": ["**/*.js", "**/*.mjs"]
+    }
+  ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "take-a-seat-platform-db",
+      "database_id": "144a50a9-e15d-4fcc-a8eb-7e3bed735895",
+      "migrations_dir": "drizzle"
     }
   ]
 }
