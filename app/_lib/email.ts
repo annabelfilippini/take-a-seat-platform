@@ -57,11 +57,13 @@ export async function sendCreatorApplicationEmail({
   request,
 }: CreatorApplicationEmail): Promise<EmailResult> {
   const adminEmail = getApplicationRecipient();
+  const queueUrl = buildAbsoluteUrl(request, "/admin/applications");
   const reviewUrl = buildAbsoluteUrl(request, `/admin/applications/${creatorId}`);
   const subject = `New Take a Seat application: ${input.name}`;
   const text = [
     "New Take a Seat creator application",
     "",
+    `Open application queue: ${queueUrl}`,
     `Review application: ${reviewUrl}`,
     "",
     `Name: ${input.name}`,
@@ -73,12 +75,14 @@ export async function sendCreatorApplicationEmail({
     "Expertise:",
     input.profileDetails,
     "",
+    `Open application queue: ${queueUrl}`,
     `Review application: ${reviewUrl}`,
   ].join("\n");
 
   const html = [
     "<h1>New creator application</h1>",
     "<p>A creator applied to Take a Seat.</p>",
+    `<p><a href="${escapeHtml(queueUrl)}">Open application queue</a></p>`,
     `<p><a href="${escapeHtml(reviewUrl)}">Review and accept application</a></p>`,
     "<ul>",
     `<li><strong>Name:</strong> ${escapeHtml(input.name)}</li>`,
@@ -88,6 +92,7 @@ export async function sendCreatorApplicationEmail({
     `<li><strong>Category:</strong> ${escapeHtml(input.category)}</li>`,
     "</ul>",
     `<p><strong>Expertise:</strong><br>${escapeHtml(input.profileDetails).replace(/\n/g, "<br>")}</p>`,
+    `<p><a href="${escapeHtml(queueUrl)}">Open application queue</a></p>`,
     `<p><a href="${escapeHtml(reviewUrl)}">Review and accept application</a></p>`,
   ].join("");
 

@@ -9,6 +9,8 @@ import { CREATOR_PROFILE_EDITOR_URL } from "../../../_lib/creator-destination";
 import {
   getAvailableCreatorPublicIdSuggestion,
   getCreatorApplication,
+  listCreatorApplications,
+  type CreatorOnboardingProfile,
 } from "../../../_lib/creator-onboarding";
 
 export const metadata: Metadata = {
@@ -34,9 +36,13 @@ export default async function AdminApplicationPage({
   }
 
   let application;
+  let applications: CreatorOnboardingProfile[] = [];
 
   try {
-    application = await getCreatorApplication(params.creatorId);
+    [application, applications] = await Promise.all([
+      getCreatorApplication(params.creatorId),
+      listCreatorApplications(),
+    ]);
   } catch {
     return (
       <main className="admin-page">
@@ -147,50 +153,79 @@ export default async function AdminApplicationPage({
             </section>
           </article>
 
-          <aside className="admin-accept-panel" aria-label="Accept application">
-            <span>Decision</span>
-            <h2>Accept application</h2>
-            <form action="/api/creators/applications/accept" method="post">
-              <input name="creatorId" type="hidden" value={application.id} />
-              <label className="admin-public-id-field">
-                <span>Public creator ID</span>
-                <input
-                  defaultValue={suggestedPublicId}
-                  disabled={application.applicationStatus === "accepted"}
-                  name="publicCreatorId"
-                  pattern="[a-z0-9](?:[a-z0-9-]{0,118}[a-z0-9])?"
-                  required
-                />
-                <small>/with/{suggestedPublicId}</small>
-              </label>
-              <button
-                className="creator-apply-primary"
-                disabled={application.applicationStatus === "accepted"}
-                type="submit"
-              >
-                {application.applicationStatus === "accepted"
-                  ? "Already accepted"
-                  : "Accept and send setup email"}
-              </button>
-            </form>
-            {application.applicationStatus === "accepted" ? (
-              <form action="/api/creators/applications/invite" method="post">
+          <aside className="admin-review-sidebar">
+            <section className="admin-accept-panel" aria-label="Accept application">
+              <span>Decision</span>
+              <h2>Accept application</h2>
+              <form action="/api/creators/applications/accept" method="post">
                 <input name="creatorId" type="hidden" value={application.id} />
+                <label className="admin-public-id-field">
+                  <span>Public creator ID</span>
+                  <input
+                    defaultValue={suggestedPublicId}
+                    disabled={application.applicationStatus === "accepted"}
+                    name="publicCreatorId"
+                    pattern="[a-z0-9](?:[a-z0-9-]{0,118}[a-z0-9])?"
+                    required
+                  />
+                  <small>/with/{suggestedPublicId}</small>
+                </label>
                 <button
-                  className="creator-apply-secondary"
-                  disabled={!application.email}
+                  className="creator-apply-primary"
+                  disabled={application.applicationStatus === "accepted"}
                   type="submit"
                 >
-                  Send setup email again
+                  {application.applicationStatus === "accepted"
+                    ? "Already accepted"
+                    : "Accept and send setup email"}
                 </button>
-                <small>
-                  {application.email
-                    ? `Sends a fresh profile edit link to ${application.email}.`
-                    : "Add an email before sending a setup link."}
-                </small>
               </form>
-            ) : null}
-            <a href={acceptedLink}>Open creator setup view</a>
+              {application.applicationStatus === "accepted" ? (
+                <form action="/api/creators/applications/invite" method="post">
+                  <input name="creatorId" type="hidden" value={application.id} />
+                  <button
+                    className="creator-apply-secondary"
+                    disabled={!application.email}
+                    type="submit"
+                  >
+                    Send setup email again
+                  </button>
+                  <small>
+                    {application.email
+                      ? `Sends a fresh profile edit link to ${application.email}.`
+                      : "Add an email before sending a setup link."}
+                  </small>
+                </form>
+              ) : null}
+              <a href={acceptedLink}>Open creator setup view</a>
+            </section>
+
+            <section className="admin-accept-panel" aria-label="All applications">
+              <span>Queue</span>
+              <h2>All applications</h2>
+              <div className="admin-mini-queue" role="list">
+                {applications.map((item) => (
+                  <Link
+                    aria-current={item.id === application.id ? "page" : undefined}
+                    className="admin-mini-application-row"
+                    href={`/admin/applications/${item.id}`}
+                    key={item.id}
+                    role="listitem"
+                  >
+                    <strong>{item.name}</strong>
+                    <span className={`admin-status admin-status-${item.applicationStatus}`}>
+                      {item.applicationStatus.replace("_", " ")}
+                    </span>
+                    <small>
+                      {item.reviewSubmittedAt
+                        ? `Submitted ${formatDate(item.reviewSubmittedAt)}`
+                        : `Created ${formatDate(item.createdAt)}`}
+                    </small>
+                  </Link>
+                ))}
+              </div>
+              <Link href="/admin/applications">Open full queue</Link>
+            </section>
           </aside>
         </div>
       </section>
@@ -275,6 +310,20 @@ function getAdminApplicationReturnTo(
 
 function getStatus(value: string | string[] | undefined) {
   return typeof value === "string" ? value : null;
+}
+
+function formatDate(value: string) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat("en", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  }).format(date);
 }
 
 function getAcceptErrorMessage(detail: string | null) {

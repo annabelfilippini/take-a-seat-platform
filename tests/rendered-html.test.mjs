@@ -431,6 +431,8 @@ test("wires accepted creators to public profile publishing", async () => {
   assert.match(aliasMigration, /creator_onboarding_profiles_original_application_id_idx/);
   assert.match(adminApplicationPage, /name="publicCreatorId"/);
   assert.match(adminApplicationPage, /This application link moved/);
+  assert.match(adminApplicationPage, /listCreatorApplications/);
+  assert.match(adminApplicationPage, /All applications/);
   assert.match(adminApplicationPage, /<dt>Instagram<\/dt>/);
   assert.match(adminApplicationPage, /<dt>TikTok<\/dt>/);
   assert.doesNotMatch(
@@ -592,6 +594,7 @@ test("puts the admin review link before long application details in email", asyn
   assert.ok(topReviewLink > -1);
   assert.ok(expertiseBlock > -1);
   assert.ok(topReviewLink < expertiseBlock);
+  assert.match(email, /Open application queue: \$\{queueUrl\}/);
   assert.ok(topHtmlLink > -1);
   assert.ok(htmlDetails > -1);
   assert.ok(topHtmlLink < htmlDetails);
