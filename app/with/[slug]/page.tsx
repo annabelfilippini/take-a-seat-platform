@@ -10,6 +10,7 @@ type CreatorProfilePageProps = {
   params: {
     slug: string;
   };
+  searchParams?: Record<string, string | string[] | undefined>;
 };
 
 function InstagramIcon() {
@@ -54,7 +55,10 @@ export async function generateMetadata({
   };
 }
 
-export default async function CreatorProfilePage({ params }: CreatorProfilePageProps) {
+export default async function CreatorProfilePage({
+  params,
+  searchParams,
+}: CreatorProfilePageProps) {
   const creator = await getPublicCreatorBySlug(params.slug);
   const profile = creator?.profile;
 
@@ -68,6 +72,7 @@ export default async function CreatorProfilePage({ params }: CreatorProfilePageP
   )}`;
   const isBookable = creator.status === "booking" && creator.seats.length > 0;
   const primaryActionLabel = isBookable ? "Reserve your seat" : "Request this creator";
+  const bookingNotice = getBookingNotice(searchParams, creator.name);
 
   return (
     <main className="platform-shell amber-profile-page">
@@ -167,7 +172,13 @@ export default async function CreatorProfilePage({ params }: CreatorProfilePageP
             <>
               <h2>Choose a call</h2>
               <p>Private video call on Google Meet.</p>
+              {bookingNotice ? (
+                <p className="booking-notice booking-status-notice">
+                  {bookingNotice}
+                </p>
+              ) : null}
               <CustomerBookingFlow
+                availabilityRules={creator.availabilityRules}
                 creatorId={creator.id}
                 creatorName={creator.name}
                 returnTo={`/with/${creator.slug}`}
@@ -201,4 +212,47 @@ export default async function CreatorProfilePage({ params }: CreatorProfilePageP
       </section>
     </main>
   );
+}
+
+function getBookingNotice(
+  searchParams: CreatorProfilePageProps["searchParams"],
+  creatorName: string,
+) {
+  const status = getSingleSearchParam(searchParams?.booking);
+  const detail = getSingleSearchParam(searchParams?.detail);
+  const firstName = creatorName.split(/\s+/u)[0] || creatorName;
+
+  if (!status) {
+    return null;
+  }
+
+  if (status === "requested") {
+    return `Your request was sent. ${firstName} will review it and follow up with the next step.`;
+  }
+
+  if (status === "setup-needed") {
+    return "Booking setup is not finished yet, so payment cannot start.";
+  }
+
+  if (status === "error" && detail === "booking-details") {
+    return "The request needs a valid time and email address.";
+  }
+
+  if (status === "error") {
+    return "The request could not be sent. Check the details and try again.";
+  }
+
+  if (status === "cancelled") {
+    return "Payment was cancelled. You can choose another time when you are ready.";
+  }
+
+  return null;
+}
+
+function getSingleSearchParam(value: string | string[] | undefined) {
+  if (Array.isArray(value)) {
+    return value[0] ?? null;
+  }
+
+  return value ?? null;
 }

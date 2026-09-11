@@ -33,6 +33,17 @@ export async function getSignedInCreatorEditorAccount(
     ]);
 
     return {
+      availabilityRules: account.availabilityRules.map((rule) => ({
+        bufferMinutes: rule.bufferMinutes,
+        dayOfWeek: rule.dayOfWeek,
+        enabled: rule.enabled,
+        endTime: rule.endTime,
+        maxBookingsPerDay: rule.maxBookingsPerDay,
+        maxBookingsPerWeek: rule.maxBookingsPerWeek,
+        minNoticeMinutes: rule.minNoticeMinutes,
+        startTime: rule.startTime,
+        timezone: rule.timezone,
+      })),
       notificationPreferences: {
         bookingEmailEnabled: notificationPreferences.bookingEmailEnabled,
         bookingProfileEnabled: notificationPreferences.bookingProfileEnabled,

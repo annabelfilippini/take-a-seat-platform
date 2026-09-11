@@ -254,6 +254,7 @@ test("server-renders the admin creator profile editor preview", async () => {
   assert.match(html, /Photos and videos/);
   assert.match(html, />Save media<\/button>/);
   assert.match(html, />Availability<\/h2>/);
+  assert.match(html, />Save availability<\/button>/);
   assert.match(html, /Stripe payouts/);
   assert.match(html, /Connect Stripe/);
   assert.match(html, /Booking notifications/);
@@ -340,6 +341,8 @@ test("wires accepted creators to public profile publishing", async () => {
     creatorOnboarding,
     dynamicProfilePage,
     checkoutRoute,
+    requestRoute,
+    customerBookingFlow,
   ] = await Promise.all([
     readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),
     readFile(
@@ -361,6 +364,11 @@ test("wires accepted creators to public profile publishing", async () => {
     readFile(new URL("../app/_lib/creator-onboarding.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/with/[slug]/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/api/stripe/checkout/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/bookings/request/route.ts", import.meta.url), "utf8"),
+    readFile(
+      new URL("../app/with/ella/CustomerBookingFlow.tsx", import.meta.url),
+      "utf8",
+    ),
   ]);
 
   assert.match(schema, /publicSlug:\s*text\("public_slug"\)/);
@@ -396,7 +404,13 @@ test("wires accepted creators to public profile publishing", async () => {
   assert.match(creatorOnboarding, /STRIPE_PRICE_\$\{envSafeCreatorId\}_\$\{minutes\}/);
   assert.match(dynamicProfilePage, /getPublicCreatorBySlug/);
   assert.match(dynamicProfilePage, /<CustomerBookingFlow/);
+  assert.match(dynamicProfilePage, /availabilityRules=\{creator\.availabilityRules\}/);
   assert.match(checkoutRoute, /getBookableCreatorById/);
+  assert.match(requestRoute, /createBookingRequest/);
+  assert.match(requestRoute, /notifyCreatorBookingRequested/);
+  assert.match(customerBookingFlow, /Find Availability/);
+  assert.match(customerBookingFlow, /action="\/api\/bookings\/request"/);
+  assert.match(customerBookingFlow, /Send request/);
 });
 
 test("notifies accepted creators in email, text, and profile", async () => {
@@ -549,7 +563,7 @@ test("server-renders Ella's profile page", async () => {
   assert.doesNotMatch(html, /ella-reference-sundress\.jpg/);
   assert.doesNotMatch(html, /ella-reference-street-style\.jpg/);
   assert.doesNotMatch(html, /ella-reference-coast\.jpg/);
-  assert.match(html, /Show availability/);
+  assert.match(html, /Find Availability/);
   assert.match(html, /Seats are non-refundable/);
   assert.doesNotMatch(html, /Choose a time and then Ella will get a short note/);
   assert.doesNotMatch(html, /Providence College/);

@@ -16,6 +16,7 @@ const BOOKING_STATUS = {
   approved: "approved",
   checkoutStarted: "checkout_started",
   paid: "paid",
+  requested: "requested",
 } as const;
 const TEST_BOOKINGS_ENV = "TAKE_A_SEAT_TEST_BOOKINGS";
 
@@ -73,6 +74,48 @@ export async function createCheckoutBooking({
     seatId: seat.id,
     seatName: seat.name,
     status: BOOKING_STATUS.checkoutStarted,
+    timezone: input.timezone,
+    updatedAt: now,
+  });
+
+  return bookingId;
+}
+
+export async function createBookingRequest({
+  creator,
+  input,
+  seat,
+}: {
+  creator: Creator;
+  input: BookingRequestInput;
+  seat: Seat;
+}) {
+  const now = new Date().toISOString();
+  const bookingId = `booking_${crypto.randomUUID()}`;
+
+  if (isTestBookingStoreEnabled()) {
+    return bookingId;
+  }
+
+  const { getDb } = await import("../../db");
+  const db = getDb();
+
+  await db.insert(customerBookings).values({
+    appointmentEndAt: addMinutesToLocalDateTime(
+      input.appointmentStartAt,
+      getSeatDurationMinutes(seat),
+    ),
+    appointmentStartAt: input.appointmentStartAt,
+    createdAt: now,
+    creatorId: creator.id,
+    creatorName: creator.name,
+    customerEmail: input.customerEmail,
+    customerName: input.customerName,
+    customerNote: input.customerNote,
+    id: bookingId,
+    seatId: seat.id,
+    seatName: seat.name,
+    status: BOOKING_STATUS.requested,
     timezone: input.timezone,
     updatedAt: now,
   });

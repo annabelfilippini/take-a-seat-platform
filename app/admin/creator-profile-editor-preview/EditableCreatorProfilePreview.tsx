@@ -81,6 +81,18 @@ export type EditableCreatorNotification = {
   type: string;
 };
 
+type EditableAvailabilityRule = {
+  bufferMinutes?: number | null;
+  dayOfWeek: number;
+  enabled?: boolean;
+  endTime: string;
+  maxBookingsPerDay?: number | null;
+  maxBookingsPerWeek?: number | null;
+  minNoticeMinutes?: number | null;
+  startTime: string;
+  timezone: string;
+};
+
 const creatorTabs: Array<{ id: EditableCreatorTab; label: string }> = [
   { id: "profile", label: "Profile" },
   { id: "availability", label: "Availability" },
@@ -180,10 +192,12 @@ const tiktokPlayerOptions = [
 ].join("&");
 
 export function EditableCreatorProfilePreview({
+  initialAvailabilityRules = [],
   initialProfile,
   initialNotificationPreferences = defaultNotificationPreferences,
   initialNotifications = [],
 }: {
+  initialAvailabilityRules?: EditableAvailabilityRule[];
   initialProfile: EditableProfileState;
   initialNotificationPreferences?: EditableNotificationPreferences;
   initialNotifications?: EditableCreatorNotification[];
@@ -1008,6 +1022,7 @@ export function EditableCreatorProfilePreview({
         <EditableAvailabilityPanel
           calendarConnectedAt={profile.calendarConnectedAt}
           creatorId={profile.id}
+          initialRules={initialAvailabilityRules}
           timezone={profile.timezone}
         />
       </section>
@@ -1100,10 +1115,12 @@ function TikTokIcon() {
 function EditableAvailabilityPanel({
   calendarConnectedAt,
   creatorId,
+  initialRules,
   timezone: initialTimezone,
 }: {
   calendarConnectedAt?: string | null;
   creatorId: string;
+  initialRules: EditableAvailabilityRule[];
   timezone: string;
 }) {
   const calendarConnected = Boolean(calendarConnectedAt);
@@ -1116,31 +1133,18 @@ function EditableAvailabilityPanel({
   const [visibleMonthValue, setVisibleMonthValue] = useState(firstMonth?.value ?? "");
   const [selectedWeekValue, setSelectedWeekValue] = useState(firstWeek?.value ?? "");
   const [datePickerOpen, setDatePickerOpen] = useState(false);
+  const initialSlotKeys = useMemo(
+    () => getAvailabilitySlotKeysFromRules(initialRules),
+    [initialRules],
+  );
   const [availabilityByWeek, setAvailabilityByWeek] = useState<Record<string, string[]>>(
     () => ({
-      [firstWeek?.value ?? ""]: [
-        "2|10:00",
-        "2|10:15",
-        "2|10:30",
-        "2|10:45",
-        "2|11:00",
-        "2|11:15",
-        "2|11:30",
-        "2|11:45",
-        "4|14:00",
-        "4|14:15",
-        "4|14:30",
-        "4|14:45",
-        "4|15:00",
-        "4|15:15",
-        "4|15:30",
-        "4|15:45",
-        "4|16:00",
-        "4|16:15",
-        "4|16:30",
-        "4|16:45",
-      ],
+      [firstWeek?.value ?? ""]:
+        initialSlotKeys.length > 0 ? initialSlotKeys : getDefaultAvailabilitySlotKeys(),
     }),
+  );
+  const [saveStatus, setSaveStatus] = useState<"error" | "idle" | "saved" | "saving">(
+    initialRules.length > 0 ? "saved" : "idle",
   );
   const paintActionRef = useRef<"clear" | "select" | null>(null);
   const paintStartRef = useRef<{ dayOfWeek: number; slotIndex: number } | null>(null);
@@ -1160,8 +1164,12 @@ function EditableAvailabilityPanel({
     [firstWeek, selectedWeekValue],
   );
   const selectedSlots = useMemo(
-    () => new Set(availabilityByWeek[selectedWeek?.value ?? ""] ?? []),
-    [availabilityByWeek, selectedWeek],
+    () =>
+      new Set(
+        availabilityByWeek[selectedWeek?.value ?? ""] ??
+          (initialSlotKeys.length > 0 ? initialSlotKeys : []),
+      ),
+    [availabilityByWeek, initialSlotKeys, selectedWeek],
   );
   const selectedWeekDays = selectedWeek?.days ?? availabilityDays.map((day) => ({
     ...day,
@@ -1184,6 +1192,14 @@ function EditableAvailabilityPanel({
   }
 
   function selectCalendarWeek(weekValue: string) {
+    setAvailabilityByWeek((current) =>
+      current[weekValue]
+        ? current
+        : {
+            ...current,
+            [weekValue]: initialSlotKeys.length > 0 ? initialSlotKeys : [],
+          },
+    );
     setSelectedWeekValue(weekValue);
     setDatePickerOpen(false);
   }
@@ -1210,6 +1226,7 @@ function EditableAvailabilityPanel({
         [weekValue]: sortAvailabilitySlotKeys(Array.from(nextWeekSlots)),
       };
     });
+    setSaveStatus("idle");
   }
 
   function toggleSlot(dayOfWeek: number, startTime: string) {
@@ -1314,20 +1331,56 @@ function EditableAvailabilityPanel({
     }
   }
 
+  async function saveAvailability() {
+    setSaveStatus("saving");
+
+    try {
+      const response = await fetch("/api/creators/availability", {
+        body: getAvailabilityFormData({
+          creatorId,
+          initialRules,
+          selectedSlots,
+          timezone,
+        }),
+        headers: { accept: "application/json" },
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        throw new Error("Availability save failed.");
+      }
+
+      setSaveStatus("saved");
+    } catch {
+      setSaveStatus("error");
+    }
+  }
+
   return (
     <div className="editable-editor-panel editable-wide-editor-panel">
       <div className="creator-form-header">
         <div className="editable-section-heading">
           <h2>Availability</h2>
         </div>
-        <a
-          className="seat-secondary-button compact-form-button"
-          href={`/api/google-calendar/oauth/start?creatorId=${encodeURIComponent(
-            creatorId,
-          )}&returnTo=${CREATOR_PROFILE_EDITOR_URL}`}
-        >
-          {calendarConnected ? "Calendar connected" : "Connect calendar"}
-        </a>
+        <div className="editable-save-status-group">
+          <span className={saveStatus === "saved" ? "dashboard-status-complete" : "dashboard-status"}>
+            {saveStatus === "saving"
+              ? "Saving"
+              : saveStatus === "saved"
+                ? "Saved"
+                : saveStatus === "error"
+                  ? "Needs attention"
+                  : "Unsaved"}
+          </span>
+          <a
+            className="seat-secondary-button compact-form-button"
+            href={`/api/google-calendar/oauth/start?creatorId=${encodeURIComponent(
+              creatorId,
+            )}&returnTo=${CREATOR_PROFILE_EDITOR_URL}`}
+          >
+            {calendarConnected ? "Calendar connected" : "Connect calendar"}
+          </a>
+        </div>
       </div>
 
       <section className="availability-date-picker" aria-label="Select availability week">
@@ -1434,8 +1487,13 @@ function EditableAvailabilityPanel({
         </div>
       </div>
 
-      <button className="editable-primary-button editable-save-button" type="button">
-        Save availability
+      <button
+        className="editable-primary-button editable-save-button"
+        disabled={saveStatus === "saving" || selectedSlots.size === 0}
+        onClick={saveAvailability}
+        type="button"
+      >
+        {saveStatus === "saving" ? "Saving availability" : "Save availability"}
       </button>
     </div>
   );
@@ -2009,6 +2067,102 @@ function formatDurationLabel(value: EditableDurationValue) {
 
   const minutes = Math.round(parsed);
   return `${minutes} ${minutes === 1 ? "minute" : "minutes"}`;
+}
+
+function getDefaultAvailabilitySlotKeys() {
+  return [
+    "2|10:00",
+    "2|10:15",
+    "2|10:30",
+    "2|10:45",
+    "2|11:00",
+    "2|11:15",
+    "2|11:30",
+    "2|11:45",
+    "4|14:00",
+    "4|14:15",
+    "4|14:30",
+    "4|14:45",
+    "4|15:00",
+    "4|15:15",
+    "4|15:30",
+    "4|15:45",
+    "4|16:00",
+    "4|16:15",
+    "4|16:30",
+    "4|16:45",
+  ];
+}
+
+function getAvailabilitySlotKeysFromRules(rules: EditableAvailabilityRule[]) {
+  const slotKeys = rules.flatMap((rule) => {
+    if (rule.enabled === false) {
+      return [];
+    }
+
+    const startIndex = availabilityTimeSlots.findIndex(
+      (slot) => slot.value === rule.startTime,
+    );
+    const endIndex = availabilityTimeSlots.findIndex(
+      (slot) => slot.value === rule.endTime,
+    );
+
+    if (startIndex < 0 || endIndex < 0 || endIndex <= startIndex) {
+      return [];
+    }
+
+    return availabilityTimeSlots
+      .slice(startIndex, endIndex)
+      .map((slot) => getAvailabilitySlotKey(rule.dayOfWeek, slot.value));
+  });
+
+  return sortAvailabilitySlotKeys(Array.from(new Set(slotKeys)));
+}
+
+function getAvailabilityFormData({
+  creatorId,
+  initialRules,
+  selectedSlots,
+  timezone,
+}: {
+  creatorId: string;
+  initialRules: EditableAvailabilityRule[];
+  selectedSlots: Set<string>;
+  timezone: string;
+}) {
+  const formData = new FormData();
+  const firstRule = initialRules.find((rule) => rule.enabled !== false);
+
+  formData.set("creatorId", creatorId);
+  formData.set("timezone", timezone);
+  formData.set("returnTo", CREATOR_PROFILE_EDITOR_URL);
+  formData.set(
+    "availabilitySlots",
+    JSON.stringify(getAvailabilitySlotPayload(selectedSlots)),
+  );
+  formData.set("bufferMinutes", String(firstRule?.bufferMinutes ?? 15));
+  formData.set("minNoticeMinutes", String(firstRule?.minNoticeMinutes ?? 1440));
+
+  if (firstRule?.maxBookingsPerDay) {
+    formData.set("maxBookingsPerDay", String(firstRule.maxBookingsPerDay));
+  }
+
+  if (firstRule?.maxBookingsPerWeek) {
+    formData.set("maxBookingsPerWeek", String(firstRule.maxBookingsPerWeek));
+  }
+
+  return formData;
+}
+
+function getAvailabilitySlotPayload(selectedSlots: Set<string>) {
+  return sortAvailabilitySlotKeys(Array.from(selectedSlots))
+    .map((key) => parseAvailabilitySlotKey(key))
+    .filter((slot): slot is { dayOfWeek: number; slotIndex: number } => Boolean(slot))
+    .map((slot) => ({
+      dayOfWeek: slot.dayOfWeek,
+      startTime: availabilityTimeSlots[slot.slotIndex]?.value,
+    }))
+    .filter((slot) => Boolean(slot.startTime));
 }
 
 function EditableInput({

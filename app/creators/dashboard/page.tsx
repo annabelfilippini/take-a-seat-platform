@@ -16,6 +16,7 @@ export default async function CreatorDashboardPage() {
   if (creatorAccount) {
     return (
       <EditableCreatorProfilePreview
+        initialAvailabilityRules={creatorAccount.availabilityRules}
         initialNotificationPreferences={creatorAccount.notificationPreferences}
         initialNotifications={creatorAccount.notifications}
         initialProfile={getEditableCreatorProfile(creatorAccount.profile)}

@@ -167,6 +167,7 @@ export default async function EllaProfile({ searchParams }: EllaProfileProps) {
             </p>
           ) : null}
           <CustomerBookingFlow
+            availabilityRules={creator.availabilityRules}
             creatorId={creator.id}
             creatorName={creator.name}
             returnTo={`/with/${creator.slug}`}
@@ -210,6 +211,10 @@ function getBookingNotice(
 
   if (status === "cancelled") {
     return "Payment was cancelled. You can choose another time when you are ready.";
+  }
+
+  if (status === "requested") {
+    return "Your request was sent. Ella will review it and follow up with the next step.";
   }
 
   return null;

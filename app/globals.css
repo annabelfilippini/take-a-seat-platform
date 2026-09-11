@@ -2131,7 +2131,7 @@ img {
   display: flex;
   inset: 0;
   justify-content: center;
-  padding: clamp(78px, 9svh, 100px) 24px 24px;
+  padding: clamp(8px, 2svh, 20px) 24px 16px;
   position: fixed;
   z-index: 200;
 }
@@ -2142,7 +2142,7 @@ img {
   border-radius: 8px;
   box-shadow: 0 30px 80px rgba(31, 29, 26, 0.28);
   color: var(--ink);
-  max-height: calc(100svh - clamp(86px, 10svh, 114px));
+  max-height: calc(100svh - 16px);
   max-width: 820px;
   overflow: auto;
   width: min(100%, 820px);

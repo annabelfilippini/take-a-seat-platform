@@ -2,9 +2,10 @@
 
 import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import type { Seat } from "../../_lib/creators";
+import type { CreatorAvailabilityRule, Seat } from "../../_lib/creators";
 
 type CustomerBookingFlowProps = {
+  availabilityRules?: CreatorAvailabilityRule[];
   creatorId: string;
   creatorName: string;
   returnTo?: string;
@@ -24,9 +25,9 @@ type ViewerSlot = {
   startsAtUtc: number;
 };
 
-const creatorTimezone = "America/New_York";
 const fallbackViewerTimezone = "America/Los_Angeles";
 const weekdayLabels = ["S", "M", "T", "W", "T", "F", "S"];
+const defaultAvailabilityWindowDays = 75;
 const ellaAvailability: AvailabilityDay[] = [
   { date: "2026-09-17", times: ["09:30", "11:00"] },
   { date: "2026-09-22", times: ["10:00", "12:30", "15:00"] },
@@ -38,6 +39,7 @@ const ellaAvailability: AvailabilityDay[] = [
 ];
 
 export function CustomerBookingFlow({
+  availabilityRules = [],
   creatorId,
   creatorName,
   returnTo = "/with/ella",
@@ -45,26 +47,36 @@ export function CustomerBookingFlow({
 }: CustomerBookingFlowProps) {
   const firstSeat = seats[0];
   const [activeSeatId, setActiveSeatId] = useState(firstSeat?.id ?? "");
+  const activeSeat = seats.find((seat) => seat.id === activeSeatId) ?? firstSeat;
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [socialHandle, setSocialHandle] = useState("");
   const [topic, setTopic] = useState("");
   const [isOpen, setIsOpen] = useState(false);
-  const [selectedDate, setSelectedDate] = useState("2026-09-29");
+  const [availabilityWindowStart] = useState(() => getAvailabilityWindowStart());
+  const [selectedDate, setSelectedDate] = useState("");
   const [selectedSlotId, setSelectedSlotId] = useState("");
   const [viewerTimezone] = useState(getDetectedTimezone);
-  const [visibleMonth, setVisibleMonth] = useState("2026-09");
+  const [visibleMonth, setVisibleMonth] = useState(() =>
+    formatMonthValue(availabilityWindowStart),
+  );
 
   const viewerAvailability = useMemo(
-    () => getViewerAvailability(viewerTimezone),
-    [viewerTimezone],
+    () =>
+      getViewerAvailability({
+        availabilityRules,
+        creatorId,
+        seat: activeSeat,
+        viewerTimezone,
+        windowStart: availabilityWindowStart,
+      }),
+    [activeSeat, availabilityRules, availabilityWindowStart, creatorId, viewerTimezone],
   );
   const availabilityByDate = useMemo(
     () => new Map(viewerAvailability.map((day) => [day.date, day.slots])),
     [viewerAvailability],
   );
-  const activeSeat = seats.find((seat) => seat.id === activeSeatId) ?? firstSeat;
   const visibleAvailability = viewerAvailability.filter((day) =>
     day.date.startsWith(visibleMonth),
   );
@@ -122,7 +134,7 @@ export function CustomerBookingFlow({
         <div className="customer-booking-modal">
           <header className="customer-booking-header">
             <div>
-              <h2 id="customer-booking-title">Book consultation</h2>
+              <h2 id="customer-booking-title">Find availability</h2>
               <p>
                 {activeSeat.name} with {creatorName}
               </p>
@@ -140,7 +152,7 @@ export function CustomerBookingFlow({
           <div className="customer-booking-summary">
             <strong>1:1 Video Consultation</strong>
             <span>
-              {activeSeat.name} - Private - {activeSeat.price}
+              {activeSeat.name} - private request - {activeSeat.price}
             </span>
           </div>
 
@@ -223,9 +235,14 @@ export function CustomerBookingFlow({
                   </button>
                 ))}
               </div>
+              {!selectedSlots.length ? (
+                <p className="customer-booking-prompt">
+                  No open times are listed for this month yet.
+                </p>
+              ) : null}
               {selectedSlot ? (
                 <form
-                  action="/api/stripe/checkout"
+                  action="/api/bookings/request"
                   className="customer-booking-form"
                   method="post"
                 >
@@ -299,7 +316,7 @@ export function CustomerBookingFlow({
                     </label>
                   </div>
                   <button className="seat-primary-button" type="submit">
-                    Continue to payment
+                    Send request
                   </button>
                 </form>
               ) : null}
@@ -338,7 +355,7 @@ export function CustomerBookingFlow({
               onClick={() => openBooking(seat.id)}
               type="button"
             >
-              Show availability
+              Find Availability
             </button>
           </article>
         ))}
@@ -397,8 +414,29 @@ function formatSelectedDate(dateValue: string) {
   }).format(date);
 }
 
-function getViewerAvailability(viewerTimezone: string) {
-  const slots = ellaAvailability.flatMap((day) =>
+function getAvailabilityWindowStart() {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+}
+
+function getViewerAvailability({
+  availabilityRules,
+  creatorId,
+  seat,
+  viewerTimezone,
+  windowStart,
+}: {
+  availabilityRules: CreatorAvailabilityRule[];
+  creatorId: string;
+  seat: Seat | undefined;
+  viewerTimezone: string;
+  windowStart: Date;
+}) {
+  const sourceAvailability = availabilityRules.length
+    ? getRuleAvailabilityDays(availabilityRules, seat, windowStart)
+    : getFallbackAvailabilityDays(creatorId);
+  const creatorTimezone = sourceAvailability[0]?.timezone ?? fallbackViewerTimezone;
+  const slots = sourceAvailability.flatMap((day) =>
     day.times.map((time) => {
       const instant = zonedTimeToUtc(day.date, time, creatorTimezone);
       const localDate = formatDateValueInTimezone(instant, viewerTimezone);
@@ -426,6 +464,100 @@ function getViewerAvailability(viewerTimezone: string) {
     date,
     slots: daySlots,
   })).sort((first, second) => first.date.localeCompare(second.date));
+}
+
+function getFallbackAvailabilityDays(creatorId: string) {
+  if (creatorId !== "ella") {
+    return [];
+  }
+
+  return ellaAvailability.map((day) => ({
+    ...day,
+    timezone: "America/New_York",
+  }));
+}
+
+function getRuleAvailabilityDays(
+  rules: CreatorAvailabilityRule[],
+  seat: Seat | undefined,
+  windowStart: Date,
+) {
+  const enabledRules = rules.filter((rule) => rule.enabled !== false);
+  const days: Array<AvailabilityDay & { timezone: string }> = [];
+  const durationMinutes = getSeatDurationMinutes(seat);
+
+  for (let index = 0; index < defaultAvailabilityWindowDays; index += 1) {
+    const date = addDays(windowStart, index);
+    const dateRules = enabledRules.filter((rule) => rule.dayOfWeek === date.getDay());
+
+    if (!dateRules.length) {
+      continue;
+    }
+
+    const times = dateRules.flatMap((rule) =>
+      getAvailabilityTimesForRule(rule, durationMinutes),
+    );
+
+    if (times.length) {
+      days.push({
+        date: formatLocalDateValue(date),
+        times: Array.from(new Set(times)).sort(),
+        timezone: dateRules[0]?.timezone ?? fallbackViewerTimezone,
+      });
+    }
+  }
+
+  return days;
+}
+
+function getAvailabilityTimesForRule(
+  rule: CreatorAvailabilityRule,
+  durationMinutes: number,
+) {
+  const times: string[] = [];
+  const bufferMinutes = rule.bufferMinutes ?? 0;
+  const stepMinutes = Math.max(15, durationMinutes + bufferMinutes);
+  let cursor = getMinutesFromTime(rule.startTime);
+  const endMinutes = getMinutesFromTime(rule.endTime);
+
+  while (cursor + durationMinutes <= endMinutes) {
+    times.push(formatMinutesAsTime(cursor));
+    cursor += stepMinutes;
+  }
+
+  return times;
+}
+
+function getSeatDurationMinutes(seat: Seat | undefined) {
+  const match = seat?.name.match(/\d+/u);
+  const minutes = match ? Number(match[0]) : 15;
+
+  return Number.isFinite(minutes) && minutes > 0 ? minutes : 15;
+}
+
+function getMinutesFromTime(value: string) {
+  const [hours, minutes] = value.split(":").map(Number);
+  return hours * 60 + minutes;
+}
+
+function formatMinutesAsTime(value: number) {
+  const hours = Math.floor(value / 60);
+  const minutes = value % 60;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+}
+
+function addDays(date: Date, count: number) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + count);
+  return next;
+}
+
+function formatLocalDateValue(date: Date) {
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("-");
 }
 
 function zonedTimeToUtc(dateValue: string, timeValue: string, timezone: string) {

@@ -24,6 +24,26 @@ function redirectWithAvailabilityStatus(
   });
 }
 
+function availabilityStatusResponse(
+  request: Request,
+  status: string,
+  detail?: string,
+  returnTo?: string | null,
+) {
+  if (wantsJson(request)) {
+    return Response.json(
+      { detail: detail ?? null, status },
+      { status: status === "saved" ? 200 : 400 },
+    );
+  }
+
+  return redirectWithAvailabilityStatus(request, status, detail, returnTo);
+}
+
+function wantsJson(request: Request) {
+  return request.headers.get("accept")?.includes("application/json") ?? false;
+}
+
 function getSafeReturnTo(value: string | null | undefined, fallback: string) {
   if (!value || !value.startsWith("/") || value.startsWith("//")) {
     return fallback;
@@ -39,7 +59,7 @@ export async function POST(request: Request) {
   const safeReturnTo = typeof returnTo === "string" ? returnTo : null;
 
   if (!input) {
-    return redirectWithAvailabilityStatus(
+    return availabilityStatusResponse(
       request,
       "error",
       "availability-required",
@@ -54,7 +74,7 @@ export async function POST(request: Request) {
       : false;
 
     if (!canManage) {
-      return redirectWithAvailabilityStatus(
+      return availabilityStatusResponse(
         request,
         "error",
         "creator-access",
@@ -62,7 +82,7 @@ export async function POST(request: Request) {
       );
     }
   } catch {
-    return redirectWithAvailabilityStatus(
+    return availabilityStatusResponse(
       request,
       "setup-needed",
       "creator-auth",
@@ -73,8 +93,8 @@ export async function POST(request: Request) {
   try {
     await saveCreatorAvailability(input);
   } catch {
-    return redirectWithAvailabilityStatus(request, "setup-needed", "d1", safeReturnTo);
+    return availabilityStatusResponse(request, "setup-needed", "d1", safeReturnTo);
   }
 
-  return redirectWithAvailabilityStatus(request, "saved", undefined, safeReturnTo);
+  return availabilityStatusResponse(request, "saved", undefined, safeReturnTo);
 }

@@ -223,6 +223,69 @@ export async function sendCreatorBookingSms({
   });
 }
 
+export async function sendCreatorBookingRequestEmail({
+  booking,
+  request,
+  to,
+}: CreatorBookingNotification): Promise<EmailResult> {
+  const bookingUrl = buildAbsoluteUrl(
+    request,
+    `/bookings/${encodeURIComponent(booking.id)}`,
+  );
+  const customerLabel = booking.customerName ?? booking.customerEmail;
+  const subject = `New Take a Seat request: ${booking.seatName}`;
+  const text = [
+    `${customerLabel} requested a Take a Seat call with you.`,
+    "",
+    `Seat: ${booking.seatName}`,
+    `Requested time: ${formatBookingDateTime(booking)}`,
+    `Customer email: ${booking.customerEmail}`,
+    booking.customerNote ? `Customer note: ${booking.customerNote}` : null,
+    "",
+    `Review request: ${bookingUrl}`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+  const html = [
+    "<h1>New booking request</h1>",
+    `<p>${escapeHtml(customerLabel)} requested a Take a Seat call with you.</p>`,
+    "<ul>",
+    `<li><strong>Seat:</strong> ${escapeHtml(booking.seatName)}</li>`,
+    `<li><strong>Requested time:</strong> ${escapeHtml(formatBookingDateTime(booking))}</li>`,
+    `<li><strong>Customer email:</strong> ${escapeHtml(booking.customerEmail)}</li>`,
+    booking.customerNote
+      ? `<li><strong>Customer note:</strong> ${escapeHtml(booking.customerNote)}</li>`
+      : null,
+    "</ul>",
+    `<p><a href="${escapeHtml(bookingUrl)}">Review request</a></p>`,
+  ]
+    .filter(Boolean)
+    .join("");
+
+  return sendEmail({
+    idempotencyKey: `take-a-seat-booking-request-${booking.id}`,
+    html,
+    replyTo: booking.customerEmail,
+    subject,
+    text,
+    to,
+  });
+}
+
+export async function sendCreatorBookingRequestSms({
+  booking,
+  request,
+  to,
+}: CreatorBookingNotification): Promise<SmsResult> {
+  return sendSms({
+    body: `New Take a Seat request: ${booking.seatName} with ${booking.customerName ?? booking.customerEmail} on ${formatBookingDateTime(booking)}. ${buildAbsoluteUrl(
+      request,
+      `/bookings/${encodeURIComponent(booking.id)}`,
+    )}`,
+    to,
+  });
+}
+
 async function sendSms({
   body,
   to,

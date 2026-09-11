@@ -11,6 +11,18 @@ export type Seat = {
   stripePriceEnv: string;
 };
 
+export type CreatorAvailabilityRule = {
+  bufferMinutes?: number | null;
+  dayOfWeek: number;
+  enabled?: boolean;
+  endTime: string;
+  maxBookingsPerDay?: number | null;
+  maxBookingsPerWeek?: number | null;
+  minNoticeMinutes?: number | null;
+  startTime: string;
+  timezone: string;
+};
+
 export type Creator = {
   id: string;
   slug: string;
@@ -30,6 +42,7 @@ export type Creator = {
   instagramUrl?: string;
   tiktokUrl?: string;
   location?: string;
+  availabilityRules?: CreatorAvailabilityRule[];
   profile?: {
     announcement: string;
     intro: string;

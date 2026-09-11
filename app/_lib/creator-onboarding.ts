@@ -736,7 +736,13 @@ export async function getPublishedCreatorBySlug(slug: string) {
     .orderBy(desc(creatorOnboardingProfiles.publishedAt))
     .limit(1);
 
-  return profile ? createPublishedCreator(profile) : null;
+  if (!profile) {
+    return null;
+  }
+
+  const availabilityRules = await listCreatorAvailabilityRules(profile.id);
+
+  return createPublishedCreator(profile, availabilityRules);
 }
 
 export async function getPublicCreatorBySlug(slug: string) {
@@ -1006,7 +1012,10 @@ export async function canManageCreatorProfile(
   return Boolean(account);
 }
 
-export function createPublishedCreator(profile: CreatorOnboardingProfile): Creator {
+export function createPublishedCreator(
+  profile: CreatorOnboardingProfile,
+  availabilityRules: CreatorAvailabilityRule[] = [],
+): Creator {
   const seats = createPublishedSeats(profile);
   const firstSeat = seats[0] ?? null;
   const publicSlug = normalizeCreatorPublicId(profile.publicSlug) ?? profile.id;
@@ -1019,6 +1028,17 @@ export function createPublishedCreator(profile: CreatorOnboardingProfile): Creat
 
   return {
     accent: getCreatorAccent(profile.category),
+    availabilityRules: availabilityRules.map((rule) => ({
+      bufferMinutes: rule.bufferMinutes,
+      dayOfWeek: rule.dayOfWeek,
+      enabled: rule.enabled,
+      endTime: rule.endTime,
+      maxBookingsPerDay: rule.maxBookingsPerDay,
+      maxBookingsPerWeek: rule.maxBookingsPerWeek,
+      minNoticeMinutes: rule.minNoticeMinutes,
+      startTime: rule.startTime,
+      timezone: rule.timezone,
+    })),
     category: profile.category || "Style & Beauty",
     id: profile.id,
     image: profile.profileImageUrl || null,

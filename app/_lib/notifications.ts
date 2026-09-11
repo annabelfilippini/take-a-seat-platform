@@ -7,6 +7,7 @@ import {
 import type { CustomerBooking } from "./bookings";
 
 const BOOKING_NOTIFICATION_TYPE = "booking_paid";
+const BOOKING_REQUEST_NOTIFICATION_TYPE = "booking_requested";
 const ACCEPTED_NOTIFICATION_TYPE = "application_accepted";
 
 export type CreatorNotificationPreference =
@@ -125,6 +126,41 @@ export async function notifyCreatorBookingPaid({
   }
 }
 
+export async function notifyCreatorBookingRequested({
+  booking,
+  request,
+}: {
+  booking: CustomerBooking;
+  request: Request;
+}) {
+  const preferences = await getCreatorNotificationPreferences(booking.creatorId);
+  const profile = await getCreatorNotificationProfile(booking.creatorId);
+
+  if (preferences.bookingProfileEnabled) {
+    await createCreatorBookingRequestNotification(booking);
+  }
+
+  if (preferences.bookingEmailEnabled && profile?.email) {
+    const { sendCreatorBookingRequestEmail } = await import("./email");
+
+    await sendCreatorBookingRequestEmail({
+      booking,
+      request,
+      to: profile.email,
+    });
+  }
+
+  if (preferences.bookingSmsEnabled && profile?.phone) {
+    const { sendCreatorBookingRequestSms } = await import("./email");
+
+    await sendCreatorBookingRequestSms({
+      booking,
+      request,
+      to: profile.phone,
+    });
+  }
+}
+
 export async function createCreatorAcceptedNotification({
   creatorId,
   creatorName,
@@ -199,6 +235,28 @@ async function createCreatorBookingNotification(booking: CustomerBooking) {
       readAt: null,
       title: "New paid booking",
       type: BOOKING_NOTIFICATION_TYPE,
+    })
+    .onConflictDoNothing({
+      target: [creatorNotifications.bookingId, creatorNotifications.type],
+    });
+}
+
+async function createCreatorBookingRequestNotification(booking: CustomerBooking) {
+  const { getDb } = await import("../../db");
+  const db = getDb();
+  const now = new Date().toISOString();
+
+  await db
+    .insert(creatorNotifications)
+    .values({
+      body: `${booking.customerName ?? booking.customerEmail} requested ${booking.seatName} for ${formatBookingNotificationTime(booking)}.`,
+      bookingId: booking.id,
+      createdAt: now,
+      creatorId: booking.creatorId,
+      id: `notification_${crypto.randomUUID()}`,
+      readAt: null,
+      title: "New booking request",
+      type: BOOKING_REQUEST_NOTIFICATION_TYPE,
     })
     .onConflictDoNothing({
       target: [creatorNotifications.bookingId, creatorNotifications.type],
