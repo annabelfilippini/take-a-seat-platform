@@ -58,20 +58,24 @@ export default async function AdminApplicationPage({
   const emailStatus = getStatus(searchParams?.email);
   const profileStatus = getStatus(searchParams?.profile);
   const smsStatus = getStatus(searchParams?.sms);
+  const inviteEmailStatus = getStatus(searchParams?.inviteEmail);
   const acceptDetail = getStatus(searchParams?.detail);
   const emailDetail = getStatus(searchParams?.emailDetail);
   const smsDetail = getStatus(searchParams?.smsDetail);
+  const inviteEmailDetail = getStatus(searchParams?.inviteEmailDetail);
   const suggestedPublicId =
     await getAvailableCreatorPublicIdSuggestion(application);
-  const acceptMessage =
-    acceptStatus === "accepted"
-      ? [
-          "Accepted.",
-          getNotificationStatus("Email", emailStatus, emailDetail),
-          getNotificationStatus("Text", smsStatus, smsDetail),
-          `Profile ${profileStatus === "sent" ? "notified" : "not updated"}.`,
-        ].join(" ")
-      : getAcceptErrorMessage(acceptDetail);
+  const noticeMessage = getNoticeMessage({
+    acceptDetail,
+    acceptStatus,
+    emailDetail,
+    emailStatus,
+    inviteEmailDetail,
+    inviteEmailStatus,
+    profileStatus,
+    smsDetail,
+    smsStatus,
+  });
 
   return (
     <main className="admin-page">
@@ -90,9 +94,9 @@ export default async function AdminApplicationPage({
           Back to queue
         </Link>
 
-        {acceptStatus ? (
+        {noticeMessage ? (
           <p className="admin-notice">
-            {acceptMessage}
+            {noticeMessage}
           </p>
         ) : null}
 
@@ -166,9 +170,26 @@ export default async function AdminApplicationPage({
               >
                 {application.applicationStatus === "accepted"
                   ? "Already accepted"
-                  : "Accept and invite"}
+                  : "Accept and send setup email"}
               </button>
             </form>
+            {application.applicationStatus === "accepted" ? (
+              <form action="/api/creators/applications/invite" method="post">
+                <input name="creatorId" type="hidden" value={application.id} />
+                <button
+                  className="creator-apply-secondary"
+                  disabled={!application.email}
+                  type="submit"
+                >
+                  Send setup email again
+                </button>
+                <small>
+                  {application.email
+                    ? `Sends a fresh profile edit link to ${application.email}.`
+                    : "Add an email before sending a setup link."}
+                </small>
+              </form>
+            ) : null}
             <a href={acceptedLink}>Open creator setup view</a>
           </aside>
         </div>
@@ -227,11 +248,61 @@ function getStatus(value: string | string[] | undefined) {
 }
 
 function getAcceptErrorMessage(detail: string | null) {
+  if (!detail) {
+    return null;
+  }
+
   if (detail === "public-id-taken") {
     return "Application update failed: that public creator ID is already taken. Try the suggested available ID below.";
   }
 
   return `Application update failed${detail ? `: ${detail}` : ""}.`;
+}
+
+function getNoticeMessage({
+  acceptDetail,
+  acceptStatus,
+  emailDetail,
+  emailStatus,
+  inviteEmailDetail,
+  inviteEmailStatus,
+  profileStatus,
+  smsDetail,
+  smsStatus,
+}: {
+  acceptDetail: string | null;
+  acceptStatus: string | null;
+  emailDetail: string | null;
+  emailStatus: string | null;
+  inviteEmailDetail: string | null;
+  inviteEmailStatus: string | null;
+  profileStatus: string | null;
+  smsDetail: string | null;
+  smsStatus: string | null;
+}) {
+  if (acceptStatus === "accepted") {
+    return [
+      "Accepted.",
+      getNotificationStatus("Email", emailStatus, emailDetail),
+      getNotificationStatus("Text", smsStatus, smsDetail),
+      `Profile ${profileStatus === "sent" ? "notified" : "not updated"}.`,
+    ].join(" ");
+  }
+
+  if (inviteEmailStatus === "sent") {
+    return "Setup email sent with a fresh profile edit link.";
+  }
+
+  if (inviteEmailStatus === "skipped") {
+    const reason = getNotificationSkipReason(inviteEmailDetail);
+    return `Setup email not sent${reason ? `: ${reason}` : ""}.`;
+  }
+
+  if (inviteEmailStatus === "error") {
+    return getAcceptErrorMessage(acceptDetail) ?? "Setup email failed.";
+  }
+
+  return getAcceptErrorMessage(acceptDetail);
 }
 
 function getNotificationStatus(
@@ -255,6 +326,8 @@ function getNotificationSkipReason(detail: string | null) {
       return "sender is not configured";
     case "missing-key":
       return "API key is not configured";
+    case "missing-recipient":
+      return "creator email is not available";
     case "request-failed":
       return "provider request failed";
     default:

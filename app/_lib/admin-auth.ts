@@ -8,7 +8,7 @@ const LOCAL_ADMIN_COOKIE_VALUE = "1";
 const USER_EMAIL_HEADER = "oai-authenticated-user-email";
 
 export function getAdminEmails() {
-  const configured = process.env.TAKE_A_SEAT_ADMIN_EMAILS;
+  const configured = getRuntimeEnv("TAKE_A_SEAT_ADMIN_EMAILS");
   const emails = configured
     ? configured.split(",").map((email) => email.trim().toLowerCase())
     : [DEFAULT_ADMIN_EMAIL];
@@ -17,7 +17,7 @@ export function getAdminEmails() {
 }
 
 export function getAdminPhones() {
-  const configured = process.env.TAKE_A_SEAT_ADMIN_PHONES;
+  const configured = getRuntimeEnv("TAKE_A_SEAT_ADMIN_PHONES");
   const phones = configured
     ? configured.split(",").map((phone) => normalizePhoneIdentity(phone))
     : [];
@@ -36,7 +36,7 @@ export function isTakeASeatAdminPhone(phone: string | null | undefined) {
 }
 
 export function isLocalAdminDevEnabled() {
-  return process.env.TAKE_A_SEAT_DEV_ADMIN_ENABLED === "true";
+  return getRuntimeEnv("TAKE_A_SEAT_DEV_ADMIN_ENABLED") === "true";
 }
 
 export async function getSignedInAdminEmail() {
@@ -148,6 +148,18 @@ function getRequestHostname(requestHeaders: Headers, requestUrl?: string) {
   const host = requestHeaders.get("host");
 
   return host?.split(":")[0] ?? null;
+}
+
+function getRuntimeEnv(name: string) {
+  const globalEnv = (globalThis as Record<string, unknown>).env;
+  const cloudflareValue =
+    globalEnv && typeof globalEnv === "object"
+      ? (globalEnv as Record<string, unknown>)[name]
+      : undefined;
+  const processValue =
+    typeof process === "object" && process.env ? process.env[name] : undefined;
+  const value = typeof cloudflareValue === "string" ? cloudflareValue : processValue;
+  return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
 function parseCookie(cookieHeader: string | null) {

@@ -1,7 +1,6 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element */
-import Link from "next/link";
+/* eslint-disable @next/next/no-html-link-for-pages, @next/next/no-img-element */
 import {
   useEffect,
   useMemo,
@@ -625,9 +624,9 @@ export function EditableCreatorProfilePreview({
     <main className="platform-shell amber-profile-page editable-profile-page">
       <div className="profile-announcement">Editable creator profile preview</div>
       <header className="topbar profile-topbar">
-        <Link className="brand-mark" href="/" aria-label="Take a Seat home">
+        <a className="brand-mark" href="/" aria-label="Take a Seat home">
           Take a Seat
-        </Link>
+        </a>
         <nav className="profile-nav" aria-label="Editable profile preview tabs">
           {creatorTabs.map((tab) => (
             <button

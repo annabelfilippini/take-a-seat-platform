@@ -10,8 +10,21 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
-export default async function CreatorDashboardPage() {
-  const creatorAccount = await getSignedInCreatorEditorAccount();
+type CreatorDashboardPageProps = {
+  searchParams?: Record<string, string | string[] | undefined>;
+};
+
+export default async function CreatorDashboardPage({
+  searchParams,
+}: CreatorDashboardPageProps) {
+  const inviteToken = getInviteToken(searchParams?.invite);
+  const requestPath = inviteToken
+    ? `/creators/dashboard?invite=${encodeURIComponent(inviteToken)}`
+    : "/creators/dashboard";
+  const creatorAccount = await getSignedInCreatorEditorAccount(
+    requestPath,
+    inviteToken,
+  );
 
   if (creatorAccount) {
     return (
@@ -24,10 +37,14 @@ export default async function CreatorDashboardPage() {
     );
   }
 
-  return <CreatorDashboardAccess />;
+  return <CreatorDashboardAccess inviteToken={inviteToken} />;
 }
 
-function CreatorDashboardAccess() {
+function CreatorDashboardAccess({ inviteToken }: { inviteToken: string | null }) {
+  const redirectUrl = inviteToken
+    ? `/creators/dashboard?invite=${encodeURIComponent(inviteToken)}`
+    : "/creators/dashboard";
+
   return (
     <main className="admin-page">
       <section className="admin-shell admin-locked" aria-labelledby="locked-heading">
@@ -39,7 +56,7 @@ function CreatorDashboardAccess() {
         </p>
         <a
           className="creator-apply-primary"
-          href="/sign-in?redirect_url=%2Fcreators%2Fdashboard"
+          href={`/sign-in?redirect_url=${encodeURIComponent(redirectUrl)}`}
         >
           Sign in with phone
         </a>
@@ -49,4 +66,8 @@ function CreatorDashboardAccess() {
       </section>
     </main>
   );
+}
+
+function getInviteToken(value: string | string[] | undefined) {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
 }

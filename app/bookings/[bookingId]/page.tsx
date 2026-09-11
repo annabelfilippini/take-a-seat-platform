@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-html-link-for-pages */
 import type { Metadata } from "next";
 import Link from "next/link";
 import { headers } from "next/headers";
@@ -48,9 +49,9 @@ export default async function BookingPage({
   return (
     <main className="platform-shell amber-profile-page">
       <header className="topbar profile-topbar">
-        <Link className="brand-mark" href="/" aria-label="Take a Seat home">
+        <a className="brand-mark" href="/" aria-label="Take a Seat home">
           Take a Seat
-        </Link>
+        </a>
         <nav className="profile-nav" aria-label="Booking navigation">
           <Link href={`/with/${booking.creatorId}`}>Creator</Link>
           <Link className="profile-sign-in-link" href="/sign-in">

@@ -1,6 +1,6 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element */
+/* eslint-disable @next/next/no-html-link-for-pages, @next/next/no-img-element */
 import Link from "next/link";
 import { useRef } from "react";
 import type {
@@ -51,9 +51,9 @@ export function PublicCreatorProfile({
     <main className="platform-shell amber-profile-page public-profile-page">
       <div className="profile-announcement">Now booking on Take a Seat</div>
       <header className="topbar profile-topbar">
-        <Link className="brand-mark" href="/" aria-label="Take a Seat home">
+        <a className="brand-mark" href="/" aria-label="Take a Seat home">
           Take a Seat
-        </Link>
+        </a>
         <nav className="profile-nav" aria-label={`${profile.name} profile navigation`}>
           <Link href="/creators/onboard">Apply</Link>
           <a className="reserve-nav-button" href="#reserve">

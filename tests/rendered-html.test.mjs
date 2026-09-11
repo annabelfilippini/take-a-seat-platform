@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHmac } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
@@ -62,6 +63,14 @@ function withEnv(values, callback) {
         }
       }
     });
+}
+
+function signStripeWebhookPayload(payload, secret, timestamp = Math.floor(Date.now() / 1000)) {
+  const signature = createHmac("sha256", secret)
+    .update(`${timestamp}.${payload}`)
+    .digest("hex");
+
+  return `t=${timestamp},v1=${signature}`;
 }
 
 test("server-renders the public booking homepage", async () => {
@@ -185,6 +194,20 @@ test("server-renders the account sign-in entry", async () => {
   );
 });
 
+test("reads Clerk and admin auth settings from Cloudflare runtime env", async () => {
+  const [adminAuth, clerkAuth] = await Promise.all([
+    readFile(new URL("../app/_lib/admin-auth.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/_lib/clerk-auth.ts", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(adminAuth, /\(globalThis as Record<string, unknown>\)\.env/);
+  assert.match(adminAuth, /getRuntimeEnv\("TAKE_A_SEAT_ADMIN_PHONES"\)/);
+  assert.match(adminAuth, /getRuntimeEnv\("TAKE_A_SEAT_ADMIN_EMAILS"\)/);
+  assert.match(clerkAuth, /\(globalThis as Record<string, unknown>\)\.env/);
+  assert.match(clerkAuth, /getRuntimeEnv\("CLERK_SECRET_KEY"\)/);
+  assert.match(clerkAuth, /getRuntimeEnv\("NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY"\)/);
+});
+
 test("legacy creator auth paths redirect into current auth and creator dashboard routes", async () => {
   const signInResponse = await render("/creators/sign-in");
   assert.equal(signInResponse.status, 307);
@@ -206,6 +229,16 @@ test("legacy creator auth paths redirect into current auth and creator dashboard
   assert.match(dashboardHtml, /Sign in with your creator phone/);
   assert.match(dashboardHtml, /redirect_url=%2Fcreators%2Fdashboard/);
   assert.doesNotMatch(dashboardHtml, /Creator Profile Editor Preview/);
+
+  const invitedDashboardResponse = await render(
+    "/creators/dashboard?invite=test_invite_token",
+  );
+  assert.equal(invitedDashboardResponse.status, 200);
+  const invitedDashboardHtml = await invitedDashboardResponse.text();
+  assert.match(
+    invitedDashboardHtml,
+    /redirect_url=%2Fcreators%2Fdashboard%3Finvite%3Dtest_invite_token/,
+  );
 
   const retiredSetupResponse = await render(
     "/creators/onboard/accepted?creatorId=onboard_test",
@@ -392,6 +425,9 @@ test("wires accepted creators to public profile publishing", async () => {
   assert.match(acceptRoute, /sendCreatorAcceptedSms/);
   assert.match(acceptRoute, /createCreatorAcceptedNotification/);
   assert.match(acceptRoute, /inviteToken:\s*invite\?\.token/);
+  assert.match(adminApplicationPage, /Accept and send setup email/);
+  assert.match(adminApplicationPage, /Send setup email again/);
+  assert.match(adminApplicationPage, /\/api\/creators\/applications\/invite/);
   assert.match(creatorOnboarding, /originalApplicationId/);
   assert.match(
     creatorOnboarding,
@@ -414,9 +450,14 @@ test("wires accepted creators to public profile publishing", async () => {
 });
 
 test("notifies accepted creators in email, text, and profile", async () => {
-  const [acceptRoute, email, notifications, editor] = await Promise.all([
+  const [acceptRoute, dashboard, inviteRoute, email, notifications, editor] = await Promise.all([
     readFile(
       new URL("../app/api/creators/applications/accept/route.ts", import.meta.url),
+      "utf8",
+    ),
+    readFile(new URL("../app/_lib/creator-dashboard.ts", import.meta.url), "utf8"),
+    readFile(
+      new URL("../app/api/creators/applications/invite/route.ts", import.meta.url),
       "utf8",
     ),
     readFile(new URL("../app/_lib/email.ts", import.meta.url), "utf8"),
@@ -433,6 +474,15 @@ test("notifies accepted creators in email, text, and profile", async () => {
   assert.match(acceptRoute, /sendCreatorAcceptedEmail/);
   assert.match(acceptRoute, /sendCreatorAcceptedSms/);
   assert.match(acceptRoute, /createCreatorAcceptedNotification/);
+  assert.match(dashboard, /claimCreatorInvite/);
+  assert.match(dashboard, /inviteToken/);
+  assert.match(inviteRoute, /sendCreatorAcceptedEmail/);
+  assert.match(inviteRoute, /createCreatorInvite/);
+  assert.match(inviteRoute, /applicationStatus !== "accepted"/);
+  assert.match(inviteRoute, /inviteEmail: email\.status/);
+  assert.match(email, /You've been accepted by Take a Seat/);
+  assert.match(email, /Click on this link to view and edit your profile/);
+  assert.match(email, /View and edit your profile/);
   assert.match(email, /CREATOR_PROFILE_EDITOR_URL\}\?invite=/);
   assert.match(email, /inviteToken\?: string/);
   assert.match(notifications, /application_accepted/);
@@ -520,6 +570,10 @@ test("server-renders Ella's profile page", async () => {
 
   const html = await response.text();
   assert.match(html, /<title>Take a Seat with Ella McLane<\/title>/i);
+  assert.match(
+    html,
+    /<a(?=[^>]*class="brand-mark")(?=[^>]*href="\/")(?=[^>]*aria-label="Take a Seat home")[^>]*>Take a Seat<\/a>/,
+  );
   assert.match(html, /Ella McLane/);
   assert.match(html, /@ellamclane2/);
   assert.match(html, /https:\/\/www\.instagram\.com\/ellamclane2\//);
@@ -834,5 +888,78 @@ test("creates Stripe Checkout destination charges with a platform fee", async ()
   assert.match(
     body.get("integration_identifier") ?? "",
     /^take_a_seat_checkout_[a-z]{8}$/,
+  );
+});
+
+test("requires a configured Stripe webhook secret", async () => {
+  const response = await dispatch("/api/stripe/webhook", {
+    body: JSON.stringify({ id: "evt_test", type: "ping" }),
+    headers: {
+      "content-type": "application/json",
+    },
+    method: "POST",
+  });
+
+  assert.equal(response.status, 500);
+  assert.deepEqual(await response.json(), {
+    detail: "stripe-webhook-secret",
+    status: "setup-needed",
+  });
+});
+
+test("rejects Stripe webhooks with an invalid signature", async () => {
+  await withEnv(
+    {
+      STRIPE_WEBHOOK_SECRET: "whsec_test_take_a_seat",
+    },
+    async () => {
+      const response = await dispatch("/api/stripe/webhook", {
+        body: JSON.stringify({ id: "evt_test", type: "ping" }),
+        headers: {
+          "content-type": "application/json",
+          "stripe-signature": "t=1789098782,v1=not-a-real-signature",
+        },
+        method: "POST",
+      });
+
+      assert.equal(response.status, 400);
+      assert.deepEqual(await response.json(), {
+        detail: "signature",
+        status: "invalid",
+      });
+    },
+  );
+});
+
+test("accepts signed Stripe webhook events", async () => {
+  await withEnv(
+    {
+      STRIPE_WEBHOOK_SECRET: "whsec_test_take_a_seat",
+    },
+    async () => {
+      const payload = JSON.stringify({
+        data: {
+          object: {
+            id: "evt_test",
+          },
+        },
+        id: "evt_test",
+        type: "ping",
+      });
+      const response = await dispatch("/api/stripe/webhook", {
+        body: payload,
+        headers: {
+          "content-type": "application/json",
+          "stripe-signature": signStripeWebhookPayload(
+            payload,
+            "whsec_test_take_a_seat",
+          ),
+        },
+        method: "POST",
+      });
+
+      assert.equal(response.status, 200);
+      assert.deepEqual(await response.json(), { received: true });
+    },
   );
 });

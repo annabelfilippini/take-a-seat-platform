@@ -80,7 +80,7 @@ Cloudflare production bindings are declared in `wrangler.deploy.jsonc`.
 - `/`: public homepage.
 - `/take-a-seat`: creator directory.
 - `/with/[slug]`: reusable public creator profile route.
-- `/with/ella`, `/with/annabel`, `/with/amber`: profile/test routes that still
+- `/with/ella`, `/with/annabel`: profile/test routes that still
   need consolidation into the reusable route over time.
 - `/sign-in`: shared Clerk phone sign-in.
 - `/creators/onboard`: creator application and setup entry.

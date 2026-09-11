@@ -45,16 +45,31 @@ export class StripeConnectError extends Error {
 }
 
 export function getRuntimeEnv(name: string) {
+  const globalEnv = (globalThis as Record<string, unknown>).env;
+  const cloudflareValue =
+    globalEnv && typeof globalEnv === "object"
+      ? (globalEnv as Record<string, unknown>)[name]
+      : undefined;
   const processValue = process.env[name];
-  return typeof processValue === "string" && processValue.trim()
-    ? processValue.trim()
-    : null;
+  const value =
+    typeof cloudflareValue === "string" ? cloudflareValue : processValue;
+  return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
 export function getStripeSecretKey() {
   const value = getRuntimeEnv("STRIPE_SECRET_KEY");
 
   if (!value || (!value.startsWith("sk_") && !value.startsWith("rk_"))) {
+    return null;
+  }
+
+  return value;
+}
+
+export function getStripeWebhookSecret() {
+  const value = getRuntimeEnv("STRIPE_WEBHOOK_SECRET");
+
+  if (!value || !value.startsWith("whsec_")) {
     return null;
   }
 

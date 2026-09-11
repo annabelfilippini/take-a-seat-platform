@@ -114,21 +114,21 @@ export async function sendCreatorAcceptedEmail({
     `${CREATOR_PROFILE_EDITOR_URL}?invite=${encodeURIComponent(inviteToken)}`,
   );
   const firstName = name.trim().split(/\s+/u)[0] || "there";
-  const subject = "Your Take a Seat application was accepted";
+  const subject = "You've been accepted by Take a Seat";
   const text = [
     `Hi ${firstName},`,
     "",
-    "Your Take a Seat application was accepted. You can now build your public profile, choose your offer, and set up the pieces we need before your page goes live.",
+    "You've been accepted by Take a Seat. Click on this link to view and edit your profile.",
     "",
-    `Build your profile: ${setupUrl}`,
+    `View and edit your profile: ${setupUrl}`,
     "Sign in with the email or phone number from your accepted application.",
     "",
     "Annabel",
   ].join("\n");
   const html = [
     `<p>Hi ${escapeHtml(firstName)},</p>`,
-    "<p>Your Take a Seat application was accepted. You can now build your public profile, choose your offer, and set up the pieces we need before your page goes live.</p>",
-    `<p><a href="${escapeHtml(setupUrl)}">Build your profile</a></p>`,
+    "<p>You've been accepted by Take a Seat. Click on this link to view and edit your profile.</p>",
+    `<p><a href="${escapeHtml(setupUrl)}">View and edit your profile</a></p>`,
     "<p>Sign in with the email or phone number from your accepted application.</p>",
     "<p>Annabel</p>",
   ].join("");

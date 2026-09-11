@@ -1,8 +1,8 @@
 # Influencer Onboarding
 
-Use Amber and Nikki as the first production templates. Each bookable creator
-needs profile copy, a Google Calendar connection, availability rules, and Stripe
-price IDs when paid checkout is enabled.
+Use Ella as the current launch profile. Each bookable creator needs profile
+copy, a Google Calendar connection, availability rules, and Stripe price IDs
+when paid checkout is enabled.
 
 Annabel has an internal test profile at `/with/annabel`. Use it to prove the
 creator setup path before inviting an outside creator.
@@ -101,11 +101,10 @@ npx wrangler secret put TWILIO_AUTH_TOKEN --config wrangler.deploy.jsonc
 npx wrangler secret put TWILIO_MESSAGING_SERVICE_SID --config wrangler.deploy.jsonc
 # Or use TWILIO_FROM_PHONE_NUMBER instead of TWILIO_MESSAGING_SERVICE_SID.
 npx wrangler secret put STRIPE_SECRET_KEY --config wrangler.deploy.jsonc
+npx wrangler secret put STRIPE_WEBHOOK_SECRET --config wrangler.deploy.jsonc
 npx wrangler secret put STRIPE_CONNECT_COUNTRY --config wrangler.deploy.jsonc
-npx wrangler secret put STRIPE_PRICE_AMBER_15 --config wrangler.deploy.jsonc
-npx wrangler secret put STRIPE_PRICE_AMBER_30 --config wrangler.deploy.jsonc
-npx wrangler secret put STRIPE_PRICE_NIKKI_15 --config wrangler.deploy.jsonc
-npx wrangler secret put STRIPE_PRICE_NIKKI_30 --config wrangler.deploy.jsonc
+npx wrangler secret put STRIPE_PRICE_ELLA_15 --config wrangler.deploy.jsonc
+npx wrangler secret put STRIPE_PRICE_ELLA_30 --config wrangler.deploy.jsonc
 npx wrangler secret put STRIPE_PRICE_ANNABEL_15 --config wrangler.deploy.jsonc
 npx wrangler secret put STRIPE_PRICE_ANNABEL_30 --config wrangler.deploy.jsonc
 ```
@@ -147,15 +146,14 @@ Current app keys:
 
 ```ini
 STRIPE_SECRET_KEY="sk_test_replace_me"
+STRIPE_WEBHOOK_SECRET="whsec_replace_me"
 STRIPE_CONNECT_COUNTRY="US"
 TAKE_A_SEAT_PLATFORM_FEE_BPS="1500"
 TWILIO_ACCOUNT_SID="AC_replace_me"
 TWILIO_AUTH_TOKEN="replace_me"
 TWILIO_MESSAGING_SERVICE_SID="MG_replace_me"
-STRIPE_PRICE_AMBER_15="price_replace_me"
-STRIPE_PRICE_AMBER_30="price_replace_me"
-STRIPE_PRICE_NIKKI_15="price_replace_me"
-STRIPE_PRICE_NIKKI_30="price_replace_me"
+STRIPE_PRICE_ELLA_15="price_replace_me"
+STRIPE_PRICE_ELLA_30="price_replace_me"
 STRIPE_PRICE_ANNABEL_15="price_replace_me"
 STRIPE_PRICE_ANNABEL_30="price_replace_me"
 ```
@@ -168,6 +166,8 @@ Paid booking model:
   Stripe account as `payment_intent_data[transfer_data][destination]`.
 - Collect Take a Seat's share through
   `payment_intent_data[application_fee_amount]`; the pilot default is 15%.
+- Confirm paid bookings from signed Stripe webhook events at
+  `/api/stripe/webhook`, not only from the customer return URL.
 - Keep guest bookings non-refundable in v1. If the creator or Take a Seat
   cannot honor the booking, process the refund manually in Stripe.
 

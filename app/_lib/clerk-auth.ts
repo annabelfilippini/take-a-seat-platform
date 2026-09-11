@@ -71,7 +71,14 @@ function getClerkSecretKey() {
 }
 
 function getRuntimeEnv(name: string) {
-  const value = process.env[name];
+  const globalEnv = (globalThis as Record<string, unknown>).env;
+  const cloudflareValue =
+    globalEnv && typeof globalEnv === "object"
+      ? (globalEnv as Record<string, unknown>)[name]
+      : undefined;
+  const processValue =
+    typeof process === "object" && process.env ? process.env[name] : undefined;
+  const value = typeof cloudflareValue === "string" ? cloudflareValue : processValue;
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 

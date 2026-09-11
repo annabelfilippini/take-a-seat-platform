@@ -125,7 +125,8 @@ Payments:
 - Creators use connected accounts.
 - Buyer checkout uses Stripe Checkout.
 - Destination charges are the intended first model.
-- A Stripe webhook is required before real paid bookings should be considered
+- A signed Stripe webhook at `/api/stripe/webhook` records successful Checkout
+  payments; configure and test it before real paid bookings are considered
   reliable.
 
 ## Data Ownership
@@ -156,7 +157,6 @@ Public:
 - `/with/[slug]`
 - `/with/ella`
 - `/with/annabel`
-- `/with/amber`
 - `/about`
 
 Auth:
@@ -257,6 +257,7 @@ Required or expected production secrets:
 - `GOOGLE_OAUTH_REDIRECT_URI`
 - `GOOGLE_TOKEN_ENCRYPTION_KEY`
 - `STRIPE_SECRET_KEY`
+- `STRIPE_WEBHOOK_SECRET` before testing paid booking webhooks
 - `STRIPE_CONNECT_COUNTRY`
 - Creator Stripe Price IDs such as `STRIPE_PRICE_ANNABEL_15`
 
@@ -287,8 +288,8 @@ Next:
    notifications first with SMS disabled.
 
 3. Finish integration reliability.
-   Add Stripe webhook handling, complete calendar conflict checks, and test a
-   full booking flow before taking real payments.
+   Configure and test the Stripe webhook, complete calendar conflict checks, and
+   test a full booking flow before taking real payments.
 
 ## Launch Gate
 
@@ -306,6 +307,6 @@ have:
   profile notification appears, and SMS is either verified through Twilio or
   intentionally deferred.
 - Stripe Connect test account onboarding completed.
-- Stripe webhook handling in place.
+- Stripe webhook handling configured and tested in Stripe.
 - Google Calendar OAuth and event creation tested.
 - One full test booking from public profile to paid checkout to calendar event.

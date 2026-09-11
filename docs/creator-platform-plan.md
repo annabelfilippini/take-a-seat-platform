@@ -183,12 +183,12 @@ For example, on a 45 GBP booking:
 
 ## Near-Term Decision
 
-The next build decision is whether to create a very small invite-only admin
-workflow for Amber and Nikki first, or build the reusable creator onboarding
-dashboard immediately.
+The next build decision is whether to keep polishing Ella's launch path first,
+or broaden the reusable creator onboarding dashboard for the next invite.
 
-Recommended path: build the reusable creator onboarding dashboard now, but keep
-the first release invite-only for Amber and Nikki.
+Recommended path: focus the first release on Ella, prove the reusable creator
+onboarding dashboard with her flow, and keep expansion invite-only until the
+booking system is reliable.
 
 ## Dashboard Decision Notes
 
