@@ -64,9 +64,9 @@ Source control:
 
 - Durable GitHub repo: `annabelfilippini/take-a-seat-platform`.
 - `origin` points to GitHub and is the source-of-truth remote.
+- Default branch: `main`.
 - Some local checkouts may still have a legacy `sites` remote, but GitHub and
   Cloudflare are the active source/deploy path.
-- Cleanup branch: `codex-take-a-seat-source-control-cleanup`.
 
 Code layout:
 
@@ -262,18 +262,15 @@ Completed:
   artifacts.
 - Moved shared components and domain helpers into `app/_components` and
   `app/_lib`.
+- Normalized GitHub so `main` is the default branch.
 
 Next:
 
-1. Normalize GitHub branches.
-   Make `main` the default GitHub branch once this cleanup branch is reviewed
-   and pushed.
-
-2. Verify Cloudflare and D1.
+1. Verify Cloudflare and D1.
    Confirm the intended D1 migrations are applied to the production database and
    that required secrets exist.
 
-3. Finish integration reliability.
+2. Finish integration reliability.
    Add Stripe webhook handling, complete calendar conflict checks, and test a
    full booking flow before taking real payments.
 

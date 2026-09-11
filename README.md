@@ -107,7 +107,7 @@ Do not deploy a launch-critical production update until these are handled:
    Calendar, and Stripe.
 3. Add Stripe webhooks before any real paid booking flow is treated as reliable.
 
-Already handled in the source-control cleanup branch:
+Already handled during repository cleanup:
 
 - Preserved the current state in the GitHub repo.
 - Removed duplicate scratch files such as `app/page 2.tsx`,
