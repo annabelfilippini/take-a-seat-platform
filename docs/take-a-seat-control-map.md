@@ -214,6 +214,8 @@ The creator backend is not cleanly separated yet:
 The public creator model is split:
 
 - Some creators are checked-in seed/static records in `app/_lib/creators.ts`.
+- Public browsing uses an explicit allowlist of published static marketplace
+  creators; concept and test profiles should stay off directory cards.
 - Published accepted creators can be loaded from D1.
 - This is acceptable for launch only if the distinction is documented as
   `seed creators` versus `published marketplace creators`.

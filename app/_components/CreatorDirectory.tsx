@@ -2,7 +2,7 @@
 
 /* eslint-disable @next/next/no-img-element */
 import { useMemo, useState } from "react";
-import { creators } from "../_lib/creators";
+import { publicMarketplaceCreators } from "../_lib/creators";
 
 const categories = [
   { label: "Top Experts", filter: "All", image: "/category-top-experts.png", position: "50% 34%" },
@@ -32,7 +32,7 @@ export function CreatorDirectory({
   const visibleCreators = useMemo(() => {
     const cleanQuery = query.trim().toLowerCase();
 
-    return creators.filter((creator) => {
+    return publicMarketplaceCreators.filter((creator) => {
       const matchesCategory = category === "All" || creator.category === category;
 
       const searchable = [

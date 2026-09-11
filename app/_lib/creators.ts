@@ -386,6 +386,12 @@ export const creators: Creator[] = [
   },
 ];
 
+const PUBLIC_MARKETPLACE_CREATOR_IDS = new Set(["ella"]);
+
+export const publicMarketplaceCreators = creators.filter((creator) =>
+  PUBLIC_MARKETPLACE_CREATOR_IDS.has(creator.id),
+);
+
 export function getCreatorById(id: string) {
   return creators.find((creator) => creator.id === id);
 }
