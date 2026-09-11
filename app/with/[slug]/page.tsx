@@ -1,4 +1,4 @@
-/* eslint-disable @next/next/no-img-element */
+/* eslint-disable @next/next/no-html-link-for-pages, @next/next/no-img-element */
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -78,9 +78,9 @@ export default async function CreatorProfilePage({
     <main className="platform-shell amber-profile-page">
       <div className="profile-announcement">{profile.announcement}</div>
       <header className="topbar profile-topbar">
-        <Link className="brand-mark" href="/" aria-label="Take a Seat home">
+        <a className="brand-mark" href="/" aria-label="Take a Seat home">
           Take a Seat
-        </Link>
+        </a>
         <nav className="profile-nav" aria-label={`${creator.name} profile navigation`}>
           {creator.tiktokUrl ? <a href={creator.tiktokUrl}>{creator.tiktokHandle}</a> : null}
           <a className="reserve-nav-button" href="#reserve">

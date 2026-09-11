@@ -1,6 +1,5 @@
-/* eslint-disable @next/next/no-img-element */
+/* eslint-disable @next/next/no-html-link-for-pages, @next/next/no-img-element */
 import type { Metadata } from "next";
-import Link from "next/link";
 import { AmberGallery } from "./AmberGallery";
 
 export const metadata: Metadata = {
@@ -44,9 +43,9 @@ export default function AmberProfile() {
         Four private seats open with Amber this month
       </div>
       <header className="topbar profile-topbar">
-        <Link className="brand-mark" href="/" aria-label="Take a Seat home">
+        <a className="brand-mark" href="/" aria-label="Take a Seat home">
           Take a Seat
-        </Link>
+        </a>
         <nav className="profile-nav" aria-label="Amber profile navigation">
           <a href="https://www.instagram.com/ambermaylowe/">@ambermaylowe</a>
           <a className="reserve-nav-button" href="#reserve">

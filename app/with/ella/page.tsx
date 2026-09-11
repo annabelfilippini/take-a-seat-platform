@@ -1,4 +1,4 @@
-/* eslint-disable @next/next/no-img-element */
+/* eslint-disable @next/next/no-html-link-for-pages, @next/next/no-img-element */
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getCreatorById } from "../../_lib/creators";
@@ -79,9 +79,9 @@ export default async function EllaProfile({ searchParams }: EllaProfileProps) {
         {profile?.announcement ?? "Profile preview for Ella's first Take a Seat mockup"}
       </div>
       <header className="topbar profile-topbar">
-        <Link className="brand-mark" href="/" aria-label="Take a Seat home">
+        <a className="brand-mark" href="/" aria-label="Take a Seat home">
           Take a Seat
-        </Link>
+        </a>
         <nav className="profile-nav" aria-label={`${creator.name} profile navigation`}>
           {creator.instagramUrl ? (
             <a href={creator.instagramUrl}>
