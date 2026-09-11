@@ -97,11 +97,8 @@ npx wrangler secret put GOOGLE_CLIENT_SECRET --config wrangler.deploy.jsonc
 npx wrangler secret put GOOGLE_OAUTH_REDIRECT_URI --config wrangler.deploy.jsonc
 npx wrangler secret put GOOGLE_TOKEN_ENCRYPTION_KEY --config wrangler.deploy.jsonc
 npx wrangler secret put STRIPE_SECRET_KEY --config wrangler.deploy.jsonc
-npx wrangler secret put STRIPE_CONNECT_COUNTRY --config wrangler.deploy.jsonc
-npx wrangler secret put STRIPE_PRICE_AMBER_15 --config wrangler.deploy.jsonc
-npx wrangler secret put STRIPE_PRICE_AMBER_30 --config wrangler.deploy.jsonc
-npx wrangler secret put STRIPE_PRICE_NIKKI_15 --config wrangler.deploy.jsonc
-npx wrangler secret put STRIPE_PRICE_NIKKI_30 --config wrangler.deploy.jsonc
+npx wrangler secret put STRIPE_PRICE_ELLA_15 --config wrangler.deploy.jsonc
+npx wrangler secret put STRIPE_PRICE_ELLA_30 --config wrangler.deploy.jsonc
 npx wrangler secret put STRIPE_PRICE_ANNABEL_15 --config wrangler.deploy.jsonc
 npx wrangler secret put STRIPE_PRICE_ANNABEL_30 --config wrangler.deploy.jsonc
 ```
@@ -129,10 +126,8 @@ Current app keys:
 STRIPE_SECRET_KEY="sk_test_replace_me"
 STRIPE_CONNECT_COUNTRY="US"
 TAKE_A_SEAT_PLATFORM_FEE_BPS="1500"
-STRIPE_PRICE_AMBER_15="price_replace_me"
-STRIPE_PRICE_AMBER_30="price_replace_me"
-STRIPE_PRICE_NIKKI_15="price_replace_me"
-STRIPE_PRICE_NIKKI_30="price_replace_me"
+STRIPE_PRICE_ELLA_15="price_replace_me"
+STRIPE_PRICE_ELLA_30="price_replace_me"
 STRIPE_PRICE_ANNABEL_15="price_replace_me"
 STRIPE_PRICE_ANNABEL_30="price_replace_me"
 ```

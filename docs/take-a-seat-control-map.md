@@ -268,7 +268,8 @@ Next:
 
 1. Verify Cloudflare and D1.
    Confirm the intended D1 migrations are applied to the production database and
-   that required secrets exist.
+   that required secrets exist. Latest pass:
+   `docs/production-readiness-2026-09-11.md`.
 
 2. Finish integration reliability.
    Add Stripe webhook handling, complete calendar conflict checks, and test a

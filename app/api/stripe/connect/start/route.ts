@@ -88,19 +88,20 @@ export async function GET(request: Request) {
 
   try {
     const existingConnection = await getCreatorStripeConnection(creatorId);
-    const account =
-      existingConnection ??
-      (await createConnectedAccount({
+    let stripeAccountId = existingConnection?.stripeAccountId;
+    let livemode = existingConnection?.livemode ?? false;
+
+    if (!existingConnection) {
+      const account = await createConnectedAccount({
         country,
         creatorId,
         displayName,
         secretKey,
-      }));
-    const stripeAccountId =
-      "stripeAccountId" in account ? account.stripeAccountId : account.id;
-    const livemode = Boolean("livemode" in account ? account.livemode : false);
+      });
 
-    if (!existingConnection) {
+      stripeAccountId = account.id;
+      livemode = account.livemode;
+
       await saveCreatorStripeConnection({
         accountCountry: country,
         creatorId,

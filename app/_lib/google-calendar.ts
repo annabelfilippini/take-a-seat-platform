@@ -228,6 +228,14 @@ async function decryptToken(value: string, secret: string) {
   return decoder.decode(plaintext);
 }
 
+async function getTokenEncryptionKey(secret: string) {
+  const digest = await crypto.subtle.digest("SHA-256", encoder.encode(secret));
+  return crypto.subtle.importKey("raw", digest, "AES-GCM", false, [
+    "encrypt",
+    "decrypt",
+  ]);
+}
+
 function buildEventDescription(booking: CustomerBooking) {
   return [
     "Take a Seat booking.",

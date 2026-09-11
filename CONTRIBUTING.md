@@ -36,6 +36,7 @@ Use this flow for GitHub and source control.
 Before merging:
 
 - The branch is up to date with `main`.
+- `npm run typecheck` passes.
 - `npm run lint` passes.
 - `npm test` passes, unless the PR explicitly explains why it could not run.
 - Relevant desktop and mobile browser QA has been done for customer-facing UI.

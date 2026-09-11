@@ -340,7 +340,7 @@ function buildAbsoluteUrl(request: Request, path: string) {
 }
 
 function getRuntimeEnv(name: string) {
-  const cloudflareValue = (env as Record<string, unknown>)[name];
+  const cloudflareValue = (env as unknown as Record<string, unknown>)[name];
   const processValue =
     typeof process === "object" && process.env ? process.env[name] : undefined;
   const value = typeof cloudflareValue === "string" ? cloudflareValue : processValue;
