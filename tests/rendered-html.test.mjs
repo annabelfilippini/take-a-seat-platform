@@ -194,6 +194,20 @@ test("server-renders the account sign-in entry", async () => {
   );
 });
 
+test("reads Clerk and admin auth settings from Cloudflare runtime env", async () => {
+  const [adminAuth, clerkAuth] = await Promise.all([
+    readFile(new URL("../app/_lib/admin-auth.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/_lib/clerk-auth.ts", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(adminAuth, /\(globalThis as Record<string, unknown>\)\.env/);
+  assert.match(adminAuth, /getRuntimeEnv\("TAKE_A_SEAT_ADMIN_PHONES"\)/);
+  assert.match(adminAuth, /getRuntimeEnv\("TAKE_A_SEAT_ADMIN_EMAILS"\)/);
+  assert.match(clerkAuth, /\(globalThis as Record<string, unknown>\)\.env/);
+  assert.match(clerkAuth, /getRuntimeEnv\("CLERK_SECRET_KEY"\)/);
+  assert.match(clerkAuth, /getRuntimeEnv\("NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY"\)/);
+});
+
 test("legacy creator auth paths redirect into current auth and creator dashboard routes", async () => {
   const signInResponse = await render("/creators/sign-in");
   assert.equal(signInResponse.status, 307);
