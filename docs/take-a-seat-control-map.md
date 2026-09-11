@@ -1,6 +1,6 @@
 # Take a Seat Control Map
 
-Last updated: 2026-09-10
+Last updated: 2026-09-11
 
 This is the working source of truth for Take a Seat while the product is being
 organized. It should stay short, current, and operational.
@@ -122,12 +122,17 @@ Calendar:
 Payments:
 
 - Stripe Connect is the chosen marketplace payment model.
-- Creators use connected accounts.
+- Creators use Express connected accounts with Stripe-hosted onboarding and the
+  Express dashboard.
 - Buyer checkout uses Stripe Checkout.
-- Destination charges are the intended first model.
-- A signed Stripe webhook at `/api/stripe/webhook` records successful Checkout
-  payments; configure and test it before real paid bookings are considered
-  reliable.
+- Destination charges are the intended first model: buyers purchase from Take a
+  Seat, creators are paid out individually, and Take a Seat keeps the platform
+  application fee.
+- Stripe test mode is configured with Ella 15 and 30 minute Price IDs and a
+  signed webhook endpoint at `/api/stripe/webhook` for successful Checkout
+  payment events.
+- Connect onboarding requires a creator contact email, and returned accounts
+  are only marked connected after Stripe reports transfer readiness as active.
 
 ## Data Ownership
 
@@ -257,9 +262,10 @@ Required or expected production secrets:
 - `GOOGLE_OAUTH_REDIRECT_URI`
 - `GOOGLE_TOKEN_ENCRYPTION_KEY`
 - `STRIPE_SECRET_KEY`
-- `STRIPE_WEBHOOK_SECRET` before testing paid booking webhooks
+- `STRIPE_WEBHOOK_SECRET`
 - `STRIPE_CONNECT_COUNTRY`
-- Creator Stripe Price IDs such as `STRIPE_PRICE_ANNABEL_15`
+- Creator Stripe Price IDs such as `STRIPE_PRICE_ELLA_15` and
+  `STRIPE_PRICE_ELLA_30`
 
 ## Recommended Cleanup Sequence
 
@@ -288,8 +294,9 @@ Next:
    notifications first with SMS disabled.
 
 3. Finish integration reliability.
-   Configure and test the Stripe webhook, complete calendar conflict checks, and
-   test a full booking flow before taking real payments.
+   Complete a Stripe Connect onboarding pass from an accepted creator profile,
+   test the signed Stripe webhook with a full checkout, complete calendar
+   conflict checks, and test a full booking flow before taking real payments.
 
 ## Launch Gate
 
@@ -306,7 +313,8 @@ have:
 - Accepted-creator notification rehearsal completed: branded email delivered,
   profile notification appears, and SMS is either verified through Twilio or
   intentionally deferred.
-- Stripe Connect test account onboarding completed.
-- Stripe webhook handling configured and tested in Stripe.
+- Stripe Connect test account onboarding completed from an accepted creator
+  profile.
+- Stripe webhook handling tested with a full Checkout event.
 - Google Calendar OAuth and event creation tested.
 - One full test booking from public profile to paid checkout to calendar event.

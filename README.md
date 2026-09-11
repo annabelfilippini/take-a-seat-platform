@@ -59,7 +59,8 @@ stay in ignored local env files or Cloudflare Worker secrets.
 - Auth: Clerk phone-code sign-in at `/sign-in`.
 - Email: Resend transactional email.
 - Calendar: Google Calendar OAuth groundwork.
-- Payments: Stripe Connect and Stripe Checkout groundwork.
+- Payments: Stripe Connect and Stripe Checkout groundwork, with test-mode
+  webhook and creator Price ID configuration.
 
 Cloudflare production bindings are declared in `wrangler.deploy.jsonc`.
 
@@ -106,7 +107,8 @@ Do not deploy a launch-critical production update until these are handled:
 1. Confirm D1 migrations are applied to the intended Cloudflare database.
 2. Confirm required Cloudflare Worker secrets exist for Clerk, Resend, Google
    Calendar, and Stripe.
-3. Add Stripe webhooks before any real paid booking flow is treated as reliable.
+3. Complete a full Stripe test booking, including Connect onboarding and webhook
+   delivery, before any real paid booking flow is treated as reliable.
 
 Already handled during repository cleanup:
 
