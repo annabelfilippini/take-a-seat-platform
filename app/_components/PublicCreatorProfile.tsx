@@ -89,9 +89,6 @@ export function PublicCreatorProfile({
             {profile.location ? <span>{profile.location}</span> : null}
           </p>
           <p>{profile.profileIntro}</p>
-          <a className="profile-primary-button" href="#reserve">
-            Book a seat
-          </a>
         </div>
 
         <PublicMediaGallery items={profile.mediaItems} name={profile.name} />

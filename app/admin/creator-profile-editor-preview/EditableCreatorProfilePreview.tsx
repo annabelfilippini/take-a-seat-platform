@@ -772,9 +772,6 @@ export function EditableCreatorProfilePreview({
             value={profile.profileIntro}
             onChange={(value) => update("profileIntro", value)}
           />
-          <a className="profile-primary-button" href="#reserve">
-            Book a seat
-          </a>
         </div>
 
         <EditableMediaGallery items={profile.mediaItems} name={profile.name} />

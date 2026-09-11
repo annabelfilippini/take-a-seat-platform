@@ -74,9 +74,6 @@ export default function AmberProfile() {
             Bring the links, the photos, or the wardrobe question. Amber will
             help you decide what actually earns a place.
           </p>
-          <a className="profile-primary-button" href="#reserve">
-            Reserve your seat
-          </a>
         </div>
 
         <AmberGallery />

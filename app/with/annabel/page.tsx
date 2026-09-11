@@ -61,9 +61,6 @@ export default function AnnabelProfile() {
             payouts, create test prices, and run a low-stakes booking through
             Checkout.
           </p>
-          <a className="profile-primary-button" href="#reserve">
-            Test a seat
-          </a>
         </div>
 
         <div className="test-profile-preview" aria-label="Annabel test profile preview">

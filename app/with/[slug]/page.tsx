@@ -121,9 +121,6 @@ export default async function CreatorProfilePage({
             {creator.location ? <span>{creator.location}</span> : null}
           </p>
           <p>{profile.intro}</p>
-          <a className="profile-primary-button" href="#reserve">
-            {primaryActionLabel}
-          </a>
         </div>
 
         <div

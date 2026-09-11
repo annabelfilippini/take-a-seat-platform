@@ -126,9 +126,6 @@ export default async function EllaProfile({ searchParams }: EllaProfileProps) {
             ) : null}
           </p>
           <p>{intro}</p>
-          <a className="profile-primary-button" href="#reserve">
-            Reserve your seat
-          </a>
         </div>
 
         <EllaGallery />
