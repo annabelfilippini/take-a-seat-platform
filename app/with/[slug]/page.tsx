@@ -185,8 +185,8 @@ export default async function CreatorProfilePage({
                 seats={creator.seats}
               />
               <p className="reserve-note">
-                Choose a call to see open times. Seats are non-refundable once
-                reserved.
+                You won&apos;t be charged unless the creator accepts your
+                appointment.
               </p>
             </>
           ) : (
@@ -227,7 +227,11 @@ function getBookingNotice(
   }
 
   if (status === "requested") {
-    return `Your request was sent. ${firstName} will review it and follow up with the next step.`;
+    return `Your request was sent. You won't be charged unless ${firstName} accepts your appointment.`;
+  }
+
+  if (status === "authorized") {
+    return `Your payment information was received. You won't be charged unless ${firstName} accepts your appointment.`;
   }
 
   if (status === "setup-needed") {

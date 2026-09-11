@@ -1,12 +1,37 @@
 import {
+  attachStripeCheckoutSession,
+  type BookingRequestInput,
   createBookingRequest,
-  getCustomerBooking,
   getBookingRequestInput,
   isBookingSlotAvailable,
 } from "../../../_lib/bookings";
 import { getBookableCreatorById } from "../../../_lib/creator-onboarding";
-import { getSeatById } from "../../../_lib/creators";
-import { notifyCreatorBookingRequested } from "../../../_lib/notifications";
+import { getSeatById, type Creator, type Seat } from "../../../_lib/creators";
+import {
+  getConnectedAccountTransferStatus,
+  getCreatorStripeConnection,
+  getRuntimeEnv,
+  getStripeSecretKey,
+  STRIPE_API_VERSION,
+} from "../../../_lib/stripe-connect";
+
+type StripeCheckoutSession = {
+  id: string;
+  url?: string;
+};
+
+type StripeCheckoutReadiness =
+  | {
+      applicationFeeAmount: number;
+      destinationAccountId: string;
+      ok: true;
+      priceId: string;
+      secretKey: string;
+    }
+  | {
+      detail: string;
+      ok: false;
+    };
 
 type BookingRequestPayload = {
   appointmentStartAt?: string;
@@ -150,21 +175,256 @@ export async function POST(request: Request) {
   }
 
   try {
+    const stripeReadiness = await getStripeCheckoutReadiness({
+      creator,
+      seat,
+    });
+
+    if (!stripeReadiness.ok) {
+      return redirectTo(
+        appendBookingStatus(
+          request,
+          returnTo,
+          "setup-needed",
+          stripeReadiness.detail,
+        ),
+      );
+    }
+
     const bookingId = await createBookingRequest({
       creator,
       input: bookingInput,
       seat,
     });
-    const booking = await getCustomerBooking(bookingId);
 
-    if (booking) {
-      await notifyCreatorBookingRequested({ booking, request }).catch(() => undefined);
+    const session = await createManualCaptureCheckoutSession({
+      applicationFeeAmount: stripeReadiness.applicationFeeAmount,
+      bookingId,
+      bookingInput,
+      creator,
+      destinationAccountId: stripeReadiness.destinationAccountId,
+      priceId: stripeReadiness.priceId,
+      request,
+      returnTo,
+      secretKey: stripeReadiness.secretKey,
+      seat,
+    });
+
+    if (session?.url) {
+      await attachStripeCheckoutSession(bookingId, session.id);
+      return redirectTo(session.url);
     }
 
     return redirectTo(
-      appendBookingStatus(request, returnTo, "requested", undefined, bookingId),
+      appendBookingStatus(request, returnTo, "setup-needed", "stripe", bookingId),
     );
   } catch {
     return redirectTo(appendBookingStatus(request, returnTo, "error", "booking-request"));
   }
+}
+
+async function getStripeCheckoutReadiness({
+  creator,
+  seat,
+}: {
+  creator: Creator;
+  seat: Seat;
+}): Promise<StripeCheckoutReadiness> {
+  const secretKey = getStripeSecretKey();
+  const priceId = getRuntimeEnv(seat.stripePriceEnv);
+  const platformFeeBps = getPlatformFeeBps();
+
+  if (!secretKey) {
+    return { detail: "stripe-secret", ok: false };
+  }
+
+  if (!priceId) {
+    return { detail: "stripe-price", ok: false };
+  }
+
+  if (platformFeeBps === null) {
+    return { detail: "platform-fee", ok: false };
+  }
+
+  let connection: Awaited<ReturnType<typeof getCreatorStripeConnection>>;
+
+  try {
+    connection = await getCreatorStripeConnection(creator.id);
+  } catch {
+    return { detail: "d1", ok: false };
+  }
+
+  if (!connection?.stripeAccountId) {
+    return { detail: "stripe-connect", ok: false };
+  }
+
+  if (!connection.connectedAt) {
+    return { detail: "stripe-onboarding", ok: false };
+  }
+
+  let transferStatus: string | null;
+
+  try {
+    transferStatus = await getConnectedAccountTransferStatus({
+      accountId: connection.stripeAccountId,
+      secretKey,
+    });
+  } catch {
+    return { detail: "stripe-transfers", ok: false };
+  }
+
+  if (transferStatus !== "active") {
+    return { detail: "stripe-transfers", ok: false };
+  }
+
+  return {
+    applicationFeeAmount: Math.round((seat.unitAmount * platformFeeBps) / 10000),
+    destinationAccountId: connection.stripeAccountId,
+    ok: true,
+    priceId,
+    secretKey,
+  };
+}
+
+async function createManualCaptureCheckoutSession({
+  applicationFeeAmount,
+  bookingId,
+  bookingInput,
+  creator,
+  destinationAccountId,
+  priceId,
+  request,
+  returnTo,
+  secretKey,
+  seat,
+}: {
+  applicationFeeAmount: number;
+  bookingId: string;
+  bookingInput: BookingRequestInput;
+  creator: Creator;
+  destinationAccountId: string;
+  priceId: string;
+  request: Request;
+  returnTo: string;
+  secretKey: string;
+  seat: Seat;
+}) {
+  const requestOrigin = new URL(request.url).origin;
+  const configuredOrigin =
+    getRuntimeEnv("NEXT_PUBLIC_SITE_URL") ?? getRuntimeEnv("PUBLIC_SITE_URL");
+  const publicOrigin = configuredOrigin
+    ? new URL(configuredOrigin).origin
+    : requestOrigin;
+  const successUrl = addBookingParams(
+    `${publicOrigin}/api/stripe/checkout/complete`,
+    "authorized",
+    true,
+    bookingId,
+  );
+  const cancelUrl = appendBookingStatus(
+    request,
+    `${publicOrigin}${returnTo}`,
+    "cancelled",
+    undefined,
+    bookingId,
+  );
+  const params = new URLSearchParams({
+    cancel_url: cancelUrl,
+    customer_email: bookingInput.customerEmail,
+    integration_identifier: buildStripeIntegrationIdentifier(),
+    mode: "payment",
+    success_url: successUrl,
+  });
+
+  params.set("client_reference_id", bookingId);
+  params.set("line_items[0][price]", priceId);
+  params.set("line_items[0][quantity]", "1");
+  params.set("metadata[appointment_start_at]", bookingInput.appointmentStartAt);
+  params.set("metadata[booking_id]", bookingId);
+  params.set("metadata[charge_pattern]", "manual_capture_destination_charge");
+  params.set("metadata[creator_id]", creator.id);
+  params.set("metadata[customer_email]", bookingInput.customerEmail);
+  params.set("metadata[customer_name]", bookingInput.customerName ?? "");
+  params.set("metadata[seat_id]", seat.id);
+  params.set("metadata[timezone]", bookingInput.timezone);
+  params.set(
+    "payment_intent_data[application_fee_amount]",
+    applicationFeeAmount.toString(),
+  );
+  params.set("payment_intent_data[capture_method]", "manual");
+  params.set("payment_intent_data[metadata][booking_id]", bookingId);
+  params.set("payment_intent_data[metadata][creator_id]", creator.id);
+  params.set("payment_intent_data[metadata][seat_id]", seat.id);
+  params.set(
+    "payment_intent_data[transfer_data][destination]",
+    destinationAccountId,
+  );
+
+  return postStripeCheckoutSession(params, secretKey);
+}
+
+async function postStripeCheckoutSession(
+  params: URLSearchParams,
+  secretKey: string,
+) {
+  const response = await fetch("https://api.stripe.com/v1/checkout/sessions", {
+    body: params,
+    headers: {
+      authorization: `Bearer ${secretKey}`,
+      "content-type": "application/x-www-form-urlencoded",
+      "stripe-version": STRIPE_API_VERSION,
+    },
+    method: "POST",
+  });
+
+  if (!response.ok) {
+    throw new Error(`Stripe Checkout failed with ${response.status}`);
+  }
+
+  return (await response.json()) as StripeCheckoutSession;
+}
+
+function addBookingParams(
+  path: string,
+  status: "authorized",
+  includeSessionId = false,
+  bookingId?: string,
+) {
+  const target = new URL(path);
+  target.searchParams.set("booking", status);
+
+  if (includeSessionId) {
+    target.searchParams.set("session_id", "{CHECKOUT_SESSION_ID}");
+  }
+
+  if (bookingId) {
+    target.searchParams.set("booking_id", bookingId);
+  }
+
+  return target.toString();
+}
+
+function buildStripeIntegrationIdentifier() {
+  const alphabet = "abcdefghijklmnopqrstuvwxyz";
+  const values = new Uint8Array(8);
+  crypto.getRandomValues(values);
+  const suffix = Array.from(values, (value) => alphabet[value % alphabet.length]).join("");
+
+  return `take_a_seat_hold_${suffix}`;
+}
+
+function getPlatformFeeBps() {
+  const rawValue = getRuntimeEnv("TAKE_A_SEAT_PLATFORM_FEE_BPS");
+
+  if (!rawValue || !/^\d+$/u.test(rawValue)) {
+    return null;
+  }
+
+  const feeBps = Number(rawValue);
+
+  if (!Number.isSafeInteger(feeBps) || feeBps < 0 || feeBps > 10000) {
+    return null;
+  }
+
+  return feeBps;
 }

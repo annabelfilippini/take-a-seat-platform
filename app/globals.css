@@ -2395,6 +2395,14 @@ img {
   grid-column: 1 / -1;
 }
 
+.customer-booking-disclaimer {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.45;
+  margin: 2px 0 0;
+}
+
 .customer-booking-form .seat-primary-button {
   margin-top: 4px;
 }

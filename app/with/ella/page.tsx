@@ -174,8 +174,7 @@ export default async function EllaProfile({ searchParams }: EllaProfileProps) {
             seats={creator.seats}
           />
           <p className="reserve-note">
-            Choose a call to see open times. Seats are non-refundable once
-            reserved.
+            You won&apos;t be charged unless Ella accepts your appointment.
           </p>
         </aside>
       </section>
@@ -213,8 +212,12 @@ function getBookingNotice(
     return "Payment was cancelled. You can choose another time when you are ready.";
   }
 
+  if (status === "authorized") {
+    return "Your payment information was received. You won't be charged unless Ella accepts your appointment.";
+  }
+
   if (status === "requested") {
-    return "Your request was sent. Ella will review it and follow up with the next step.";
+    return "Your request was sent. You won't be charged unless Ella accepts your appointment.";
   }
 
   return null;

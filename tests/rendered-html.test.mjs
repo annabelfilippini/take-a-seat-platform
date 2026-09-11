@@ -308,11 +308,12 @@ test("server-renders the admin creator profile editor preview", async () => {
     html,
     /href="\/api\/stripe\/connect\/start\?creatorId=onboard_annabel_mock_profile&amp;returnTo=%2Fcreators%2Fdashboard"/,
   );
-  assert.match(html, /Booking notifications/);
+  assert.match(html, /Request notifications/);
   assert.match(html, /name="booking-email-notifications"[^>]*checked/);
   assert.match(html, /name="booking-text-notifications"[^>]*checked/);
   assert.match(html, /name="booking-profile-notifications"[^>]*checked/);
-  assert.match(html, /No bookings yet/);
+  assert.match(html, /Requests and bookings/);
+  assert.match(html, /No requests or bookings yet/);
   assert.match(html, /aria-label="Upload profile picture"/);
   assert.match(html, /aria-label="Instagram URL"/);
   assert.match(html, /aria-label="TikTok URL"/);
@@ -384,6 +385,7 @@ test("server-renders candidate creator concept profiles", async () => {
 
 test("wires accepted creators to public profile publishing", async () => {
   const [
+    availabilityLib,
     schema,
     migration,
     aliasMigration,
@@ -391,10 +393,14 @@ test("wires accepted creators to public profile publishing", async () => {
     adminApplicationPage,
     creatorOnboarding,
     dynamicProfilePage,
+    bookingPage,
+    bookingApproveRoute,
+    bookingsLib,
     checkoutRoute,
     requestRoute,
     customerBookingFlow,
   ] = await Promise.all([
+    readFile(new URL("../app/_lib/availability.ts", import.meta.url), "utf8"),
     readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),
     readFile(
       new URL("../drizzle/0012_clammy_black_bird.sql", import.meta.url),
@@ -414,6 +420,9 @@ test("wires accepted creators to public profile publishing", async () => {
     ),
     readFile(new URL("../app/_lib/creator-onboarding.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/with/[slug]/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/bookings/[bookingId]/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/bookings/approve/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/_lib/bookings.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/api/stripe/checkout/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/api/bookings/request/route.ts", import.meta.url), "utf8"),
     readFile(
@@ -422,6 +431,8 @@ test("wires accepted creators to public profile publishing", async () => {
     ),
   ]);
 
+  assert.match(availabilityLib, /sourceAppointmentStartAt/);
+  assert.match(availabilityLib, /sourceTimezone/);
   assert.match(schema, /publicSlug:\s*text\("public_slug"\)/);
   assert.match(schema, /originalApplicationId:\s*text\("original_application_id"\)/);
   assert.match(schema, /publishedAt:\s*text\("published_at"\)/);
@@ -461,14 +472,39 @@ test("wires accepted creators to public profile publishing", async () => {
   assert.match(dynamicProfilePage, /getPublicCreatorBySlug/);
   assert.match(dynamicProfilePage, /<CustomerBookingFlow/);
   assert.match(dynamicProfilePage, /availabilityRules=\{creator\.availabilityRules\}/);
+  assert.match(dynamicProfilePage, /won&apos;t be charged unless the creator accepts/);
   assert.match(checkoutRoute, /getBookableCreatorById/);
   assert.match(requestRoute, /createBookingRequest/);
   assert.match(requestRoute, /isBookingSlotAvailable/);
-  assert.match(requestRoute, /notifyCreatorBookingRequested/);
   assert.match(checkoutRoute, /isBookingSlotAvailable/);
   assert.match(customerBookingFlow, /Find Availability/);
   assert.match(customerBookingFlow, /action="\/api\/bookings\/request"/);
-  assert.match(customerBookingFlow, /Send request/);
+  assert.match(customerBookingFlow, /selectedSlot\?\.sourceAppointmentStartAt/);
+  assert.match(customerBookingFlow, /selectedSlot\?\.sourceTimezone/);
+  assert.match(customerBookingFlow, /You won't be charged unless \$\{creatorName\} accepts/);
+  assert.match(customerBookingFlow, /Go to payment next/);
+  assert.match(bookingsLib, /accepted: "accepted"/);
+  assert.match(bookingsLib, /paymentAuthorized: "payment_authorized"/);
+  assert.match(bookingsLib, /markBookingPaymentAuthorized/);
+  assert.match(bookingApproveRoute, /booking\.status === "requested"/);
+  assert.match(bookingApproveRoute, /booking\.status === "payment_authorized"/);
+  assert.match(bookingApproveRoute, /capturePaymentIntent/);
+  assert.match(bookingApproveRoute, /\/payment_intents\/\$\{encodeURIComponent/);
+  assert.match(bookingApproveRoute, /await markBookingPaid\(/);
+  assert.match(requestRoute, /payment_intent_data\[capture_method\]/);
+  assert.match(requestRoute, /manual_capture_destination_charge/);
+  assert.match(requestRoute, /take_a_seat_hold_/);
+  assert.match(requestRoute, /attachStripeCheckoutSession/);
+  assert.ok(
+    requestRoute.indexOf("const stripeReadiness = await getStripeCheckoutReadiness") <
+      requestRoute.indexOf("const bookingId = await createBookingRequest"),
+  );
+  assert.doesNotMatch(bookingApproveRoute, /sendAcceptedBookingPaymentStep/);
+  assert.doesNotMatch(bookingApproveRoute, /sendCustomerBookingAcceptedPaymentEmail/);
+  assert.doesNotMatch(bookingApproveRoute, /params\.set\("payment_method_types/);
+  assert.match(bookingPage, /Accept this appointment/);
+  assert.match(bookingPage, /captures the customer&apos;s authorized Stripe payment/);
+  assert.match(bookingPage, /canSubmitCreatorApproval\(status: string\)/);
 });
 
 test("rejects manually submitted booking times outside creator availability", async () => {
@@ -539,6 +575,61 @@ test("rejects manually submitted booking times outside creator availability", as
   assert.equal(stripeFetchCalled, false);
 });
 
+test("returns a specific Stripe setup blocker before request checkout", async () => {
+  const previousSecret = process.env.STRIPE_SECRET_KEY;
+  const originalFetch = globalThis.fetch;
+  let stripeFetchCalled = false;
+
+  delete process.env.STRIPE_SECRET_KEY;
+  globalThis.fetch = async () => {
+    stripeFetchCalled = true;
+    return new Response("{}", { status: 500 });
+  };
+
+  try {
+    await withEnv(
+      {
+        STRIPE_PRICE_ELLA_15: "price_test_ella_15",
+        TAKE_A_SEAT_PLATFORM_FEE_BPS: "1500",
+        TAKE_A_SEAT_TEST_BOOKINGS: "true",
+      },
+      async () => {
+        const response = await dispatch("/api/bookings/request", {
+          body: new URLSearchParams({
+            appointmentStartAt: "2026-09-17T09:30",
+            creatorId: "ella",
+            customerEmail: "customer@example.com",
+            customerName: "Customer Example",
+            returnTo: "/with/ella",
+            seatId: "ella-15",
+            timezone: "America/New_York",
+          }),
+          headers: {
+            "content-type": "application/x-www-form-urlencoded",
+          },
+          method: "POST",
+        });
+
+        assert.equal(response.status, 303);
+        assert.match(
+          response.headers.get("location") ?? "",
+          /\/with\/ella\?booking=setup-needed&detail=stripe-secret$/,
+        );
+      },
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+
+    if (previousSecret === undefined) {
+      delete process.env.STRIPE_SECRET_KEY;
+    } else {
+      process.env.STRIPE_SECRET_KEY = previousSecret;
+    }
+  }
+
+  assert.equal(stripeFetchCalled, false);
+});
+
 test("notifies accepted creators in email, text, and profile", async () => {
   const [acceptRoute, dashboard, inviteRoute, email, notifications, editor] = await Promise.all([
     readFile(
@@ -580,6 +671,38 @@ test("notifies accepted creators in email, text, and profile", async () => {
   assert.match(editor, /getNotificationHref/);
   assert.match(editor, /notification\.type === "application_accepted"/);
   assert.match(editor, /CREATOR_PROFILE_EDITOR_URL/);
+});
+
+test("notifies creators when customers authorize a requested seat", async () => {
+  const [completeRoute, webhookRoute, email, notifications, editor] = await Promise.all([
+    readFile(
+      new URL("../app/api/stripe/checkout/complete/route.ts", import.meta.url),
+      "utf8",
+    ),
+    readFile(new URL("../app/api/stripe/webhook/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/_lib/email.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/_lib/notifications.ts", import.meta.url), "utf8"),
+    readFile(
+      new URL(
+        "../app/admin/creator-profile-editor-preview/EditableCreatorProfilePreview.tsx",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  ]);
+
+  assert.match(completeRoute, /markBookingPaymentAuthorized/);
+  assert.match(completeRoute, /notifyCreatorBookingRequested/);
+  assert.match(webhookRoute, /markBookingPaymentAuthorized/);
+  assert.match(webhookRoute, /notifyCreatorBookingRequested/);
+  assert.match(notifications, /BOOKING_REQUEST_NOTIFICATION_TYPE = "booking_requested"/);
+  assert.match(notifications, /createCreatorBookingRequestNotification/);
+  assert.match(notifications, /title: "New booking request"/);
+  assert.match(notifications, /sendCreatorBookingRequestEmail/);
+  assert.match(email, /export async function sendCreatorBookingRequestEmail/);
+  assert.match(email, /requested a Take a Seat call with you/);
+  assert.match(editor, /Requests and bookings/);
+  assert.match(editor, /No requests or bookings yet/);
 });
 
 test("puts the admin review link before long application details in email", async () => {
@@ -725,7 +848,7 @@ test("server-renders Ella's profile page", async () => {
   assert.doesNotMatch(html, /ella-reference-street-style\.jpg/);
   assert.doesNotMatch(html, /ella-reference-coast\.jpg/);
   assert.match(html, /Find Availability/);
-  assert.match(html, /Seats are non-refundable/);
+  assert.match(html, /You won&#x27;t be charged unless Ella accepts your appointment/);
   assert.doesNotMatch(html, /Choose a time and then Ella will get a short note/);
   assert.doesNotMatch(html, /Providence College/);
   assert.doesNotMatch(html, /Free cancellation/i);
@@ -1031,6 +1154,122 @@ test("creates Stripe Checkout destination charges with a platform fee", async ()
   assert.match(
     body.get("integration_identifier") ?? "",
     /^take_a_seat_checkout_[a-z]{8}$/,
+  );
+});
+
+test("sends public booking requests to Stripe Checkout for payment authorization", async () => {
+  const originalFetch = globalThis.fetch;
+  let stripeRequest;
+
+  globalThis.fetch = async (input, init) => {
+    const url = input.toString();
+
+    if (url.startsWith("https://api.stripe.com/v2/core/accounts/acct_test_ella")) {
+      return new Response(
+        JSON.stringify({
+          configuration: {
+            recipient: {
+              capabilities: {
+                stripe_balance: {
+                  stripe_transfers: {
+                    status: "active",
+                  },
+                },
+              },
+            },
+          },
+          id: "acct_test_ella",
+          livemode: false,
+        }),
+        {
+          headers: { "content-type": "application/json" },
+          status: 200,
+        },
+      );
+    }
+
+    stripeRequest = { input, init };
+
+    return new Response(
+      JSON.stringify({
+        id: "cs_test_authorize_take_a_seat",
+        url: "https://checkout.stripe.com/c/pay/cs_test_authorize_take_a_seat",
+      }),
+      {
+        headers: { "content-type": "application/json" },
+        status: 200,
+      },
+    );
+  };
+
+  try {
+    await withEnv(
+      {
+        STRIPE_PRICE_ELLA_15: "price_test_ella_15",
+        STRIPE_SECRET_KEY: "sk_test_take_a_seat",
+        TAKE_A_SEAT_TEST_BOOKINGS: "true",
+        TAKE_A_SEAT_TEST_STRIPE_CONNECTIONS: JSON.stringify([
+          {
+            accountCountry: "US",
+            connectedAt: "2026-09-01T00:00:00.000Z",
+            creatorId: "ella",
+            dashboard: "express",
+            id: 1,
+            livemode: false,
+            onboardingStartedAt: "2026-09-01T00:00:00.000Z",
+            stripeAccountId: "acct_test_ella",
+            updatedAt: "2026-09-01T00:00:00.000Z",
+          },
+        ]),
+        TAKE_A_SEAT_PLATFORM_FEE_BPS: "1500",
+      },
+      async () => {
+        const response = await dispatch("/api/bookings/request", {
+          body: new URLSearchParams({
+            appointmentStartAt: "2026-09-17T09:30",
+            creatorId: "ella",
+            customerEmail: "customer@example.com",
+            customerName: "Customer Example",
+            returnTo: "/with/ella",
+            seatId: "ella-15",
+            timezone: "America/New_York",
+          }),
+          headers: {
+            "content-type": "application/x-www-form-urlencoded",
+          },
+          method: "POST",
+        });
+
+        assert.equal(response.status, 303);
+        assert.equal(
+          response.headers.get("location"),
+          "https://checkout.stripe.com/c/pay/cs_test_authorize_take_a_seat",
+        );
+      },
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+
+  assert.ok(stripeRequest);
+  assert.equal(stripeRequest.input, "https://api.stripe.com/v1/checkout/sessions");
+
+  const body = stripeRequest.init.body;
+  assert.equal(body.get("mode"), "payment");
+  assert.equal(body.get("customer_email"), "customer@example.com");
+  assert.equal(body.get("line_items[0][price]"), "price_test_ella_15");
+  assert.match(body.get("client_reference_id") ?? "", /^booking_/);
+  assert.equal(body.get("metadata[charge_pattern]"), "manual_capture_destination_charge");
+  assert.equal(body.get("payment_intent_data[capture_method]"), "manual");
+  assert.equal(body.get("payment_intent_data[application_fee_amount]"), "750");
+  assert.equal(
+    body.get("payment_intent_data[transfer_data][destination]"),
+    "acct_test_ella",
+  );
+  assert.equal(body.get("payment_method_types[0]"), null);
+  assert.match(
+    body.get("integration_identifier") ?? "",
+    /^take_a_seat_hold_[a-z]{8}$/,
   );
 });
 

@@ -34,7 +34,7 @@ Creator backend:
 - Lets creators manage weekly availability and booking limits.
 - Lets creators connect Google Calendar.
 - Lets creators connect Stripe payouts.
-- Shows booking notifications and setup status.
+- Shows request, booking, and setup notifications.
 
 Admin:
 
@@ -120,16 +120,24 @@ Calendar:
 - OAuth routes exist, but launch booking flow still needs final reliability work.
 - Booking request and Stripe Checkout routes server-validate submitted times
   against creator availability before creating a booking.
+- Public creator profiles collect the request first, then send the customer to
+  Stripe Checkout to authorize payment. The customer is not charged unless the
+  creator accepts the appointment.
 
 Payments:
 
 - Stripe Connect is the chosen marketplace payment model.
 - Creators use Express connected accounts with Stripe-hosted onboarding and the
   Express dashboard.
-- Buyer checkout uses Stripe Checkout.
+- Buyer checkout uses Stripe Checkout immediately after the request form, with
+  manual capture so payment is held until creator acceptance.
 - Destination charges are the intended first model: buyers purchase from Take a
   Seat, creators are paid out individually, and Take a Seat keeps the platform
   application fee.
+- Request status flow is `requested` -> Stripe Checkout authorization ->
+  `payment_authorized` -> creator acceptance/capture -> `paid` -> calendar
+  confirmation. The creator request inbox should show actionable requests after
+  payment authorization.
 - Stripe test mode is configured with Ella 15 and 30 minute Price IDs and a
   signed webhook endpoint at `/api/stripe/webhook` for successful Checkout
   payment events.
@@ -147,7 +155,7 @@ D1 should own operational marketplace state:
 - Creator Stripe connections.
 - Creator availability rules.
 - Customer bookings.
-- Creator notification preferences and notifications.
+- Creator request, booking, and setup notification preferences and history.
 
 Checked-in static data should only own:
 
@@ -316,6 +324,11 @@ have:
 - Accepted-creator notification rehearsal completed: branded email delivered,
   profile notification appears, and SMS is either verified through Twilio or
   intentionally deferred.
+- Customer request notification rehearsal completed: creator email delivered
+  and the request appears in the creator dashboard.
+- Creator request acceptance rehearsal completed: creator can click “Accept
+  this appointment,” the customer receives a post-acceptance payment email, and
+  no customer payment is collected before acceptance.
 - Stripe Connect test account onboarding completed from an accepted creator
   profile.
 - Stripe webhook handling tested with a full Checkout event.

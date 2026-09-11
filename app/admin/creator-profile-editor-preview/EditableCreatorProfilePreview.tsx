@@ -1735,7 +1735,7 @@ function EditableSettingsPanel({
         <div className="creator-form-header">
           <div className="editable-section-heading">
             <span>Settings</span>
-            <h2>Booking notifications</h2>
+            <h2>Request notifications</h2>
           </div>
           <span className={saveStatus === "saved" ? "dashboard-status-complete" : "dashboard-status"}>
             {saveStatus === "saving"
@@ -1782,7 +1782,7 @@ function EditableSettingsPanel({
       <div className="editable-editor-panel">
         <div className="editable-section-heading">
           <span>Profile</span>
-          <h2>Notifications</h2>
+          <h2>Requests and bookings</h2>
         </div>
         {initialNotifications.length ? (
           <div className="creator-notification-list">
@@ -1799,7 +1799,7 @@ function EditableSettingsPanel({
             ))}
           </div>
         ) : (
-          <p className="creator-notification-empty">No bookings yet.</p>
+          <p className="creator-notification-empty">No requests or bookings yet.</p>
         )}
       </div>
     </div>

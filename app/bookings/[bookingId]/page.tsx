@@ -64,20 +64,16 @@ export default async function BookingPage({
         <article className="booking-card">
           <span>Booking</span>
           <h1 id="booking-heading">
-            {bookingStatus === "success"
-              ? "Your seat is requested."
-              : "Seat request"}
+            {getBookingHeading(booking.status, bookingStatus)}
           </h1>
           <p>
-            Add this time to your calendar now. The official invite is sent from
-            the creator after approval.
+            Stripe has the payment information for this request. The customer
+            is charged only if the creator accepts the appointment.
           </p>
 
           {calendarStatus ? (
             <p className="booking-notice">
-              {calendarStatus === "sent"
-                ? "Google Calendar invite sent."
-                : "Calendar invite needs the creator Google Calendar connection."}
+              {getCalendarNotice(calendarStatus)}
             </p>
           ) : null}
 
@@ -119,24 +115,20 @@ export default async function BookingPage({
         {canApprove ? (
           <aside className="creator-invite" aria-label="Approve booking">
             <span>Creator approval</span>
-            <h2>Send the official invite</h2>
+            <h2>Accept this appointment</h2>
             <p>
-              Approval creates the event on the creator&apos;s connected Google
-              Calendar and emails the customer as an attendee.
+              Accepting captures the customer&apos;s authorized Stripe payment
+              and confirms this appointment.
             </p>
             <form action="/api/bookings/approve" method="post">
               <input name="bookingId" type="hidden" value={booking.id} />
               <input name="returnTo" type="hidden" value={`/bookings/${booking.id}`} />
               <button
                 className="creator-apply-primary"
-                disabled={booking.status !== "paid"}
+                disabled={!canSubmitCreatorApproval(booking.status)}
                 type="submit"
               >
-                {booking.status === "approved"
-                  ? "Invite sent"
-                  : booking.status === "paid"
-                    ? "Approve and send"
-                    : "Waiting on payment"}
+                {getCreatorApprovalButtonLabel(booking.status)}
               </button>
             </form>
           </aside>
@@ -192,6 +184,70 @@ function getStatus(value: string | string[] | undefined) {
 
 function formatStatus(value: string) {
   return value.replace(/_/g, " ");
+}
+
+function getBookingHeading(status: string, bookingStatus: string | null) {
+  if (status === "approved") {
+    return "Appointment confirmed.";
+  }
+
+  if (status === "paid") {
+    return "Payment captured.";
+  }
+
+  if (status === "payment_authorized" || bookingStatus === "authorized") {
+    return "Payment authorized.";
+  }
+
+  if (status === "accepted") {
+    return "Seat request accepted.";
+  }
+
+  if (bookingStatus === "success") {
+    return "Your seat is requested.";
+  }
+
+  return "Seat request";
+}
+
+function getCalendarNotice(calendarStatus: string) {
+  if (calendarStatus === "accepted") {
+    return "Appointment accepted.";
+  }
+
+  if (calendarStatus === "sent") {
+    return "Google Calendar invite sent.";
+  }
+
+  return "Calendar invite needs the creator Google Calendar connection.";
+}
+
+function getCreatorApprovalButtonLabel(status: string) {
+  if (status === "approved") {
+    return "Invite sent";
+  }
+
+  if (status === "accepted") {
+    return "Accepted";
+  }
+
+  if (status === "requested") {
+    return "Waiting on payment authorization";
+  }
+
+  if (status === "payment_authorized") {
+    return "Accept this appointment";
+  }
+
+  if (status === "paid") {
+    return "Approve and send";
+  }
+
+  return "Waiting on customer payment";
+}
+
+function canSubmitCreatorApproval(status: string) {
+  return status === "payment_authorized" || status === "paid";
 }
 
 function requestUrlFromHeaders(requestHeaders: Headers, path: string) {

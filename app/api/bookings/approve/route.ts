@@ -3,8 +3,16 @@ import {
   canManageCreatorProfile,
 } from "../../../_lib/creator-onboarding";
 import { getSignedInClerkUser } from "../../../_lib/clerk-auth";
-import { getCustomerBooking } from "../../../_lib/bookings";
+import {
+  getCustomerBooking,
+  markBookingPaid,
+} from "../../../_lib/bookings";
 import { approveBookingAndSendGoogleInvite } from "../../../_lib/google-calendar";
+import {
+  getStripeSecretKey,
+  STRIPE_API_VERSION,
+} from "../../../_lib/stripe-connect";
+import { notifyCreatorBookingPaid } from "../../../_lib/notifications";
 
 function redirectWithStatus(
   request: Request,
@@ -52,13 +60,64 @@ export async function POST(request: Request) {
     return redirectWithStatus(request, safeReturnTo, "error", "creator-access");
   }
 
-  try {
-    await approveBookingAndSendGoogleInvite(booking.id);
-  } catch {
-    return redirectWithStatus(request, safeReturnTo, "setup-needed", "google-calendar");
+  if (booking.status === "requested") {
+    return redirectWithStatus(request, safeReturnTo, "error", "payment-required");
   }
 
-  return redirectWithStatus(request, safeReturnTo, "sent");
+  if (booking.status === "accepted" || booking.status === "approved") {
+    return redirectWithStatus(request, safeReturnTo, "accepted");
+  }
+
+  if (booking.status === "payment_authorized") {
+    if (!booking.stripePaymentIntentId || !booking.stripeCheckoutSessionId) {
+      return redirectWithStatus(request, safeReturnTo, "error", "payment-required");
+    }
+
+    const secretKey = getStripeSecretKey();
+
+    if (!secretKey) {
+      return redirectWithStatus(request, safeReturnTo, "setup-needed", "stripe-secret");
+    }
+
+    let paidBooking = null;
+
+    try {
+      await capturePaymentIntent(booking.stripePaymentIntentId, secretKey);
+      paidBooking = await markBookingPaid({
+        bookingId: booking.id,
+        stripeCheckoutSessionId: booking.stripeCheckoutSessionId,
+        stripePaymentIntentId: booking.stripePaymentIntentId,
+      });
+    } catch {
+      return redirectWithStatus(request, safeReturnTo, "setup-needed", "capture");
+    }
+
+    if (paidBooking) {
+      await notifyCreatorBookingPaid({ booking: paidBooking, request }).catch(
+        () => undefined,
+      );
+    }
+
+    try {
+      await approveBookingAndSendGoogleInvite(booking.id);
+    } catch {
+      return redirectWithStatus(request, safeReturnTo, "setup-needed", "google-calendar");
+    }
+
+    return redirectWithStatus(request, safeReturnTo, "sent");
+  }
+
+  if (booking.status === "paid") {
+    try {
+      await approveBookingAndSendGoogleInvite(booking.id);
+    } catch {
+      return redirectWithStatus(request, safeReturnTo, "setup-needed", "google-calendar");
+    }
+
+    return redirectWithStatus(request, safeReturnTo, "sent");
+  }
+
+  return redirectWithStatus(request, safeReturnTo, "error", "booking-status");
 }
 
 function getSafeReturnTo(value: string | null | undefined, fallback: string) {
@@ -67,4 +126,25 @@ function getSafeReturnTo(value: string | null | undefined, fallback: string) {
   }
 
   return value;
+}
+
+async function capturePaymentIntent(paymentIntentId: string, secretKey: string) {
+  const response = await fetch(
+    `https://api.stripe.com/v1/payment_intents/${encodeURIComponent(
+      paymentIntentId,
+    )}/capture`,
+    {
+      headers: {
+        authorization: `Bearer ${secretKey}`,
+        "content-type": "application/x-www-form-urlencoded",
+        "idempotency-key": `take-a-seat-capture-${paymentIntentId}`,
+        "stripe-version": STRIPE_API_VERSION,
+      },
+      method: "POST",
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(`Stripe capture failed with ${response.status}`);
+  }
 }

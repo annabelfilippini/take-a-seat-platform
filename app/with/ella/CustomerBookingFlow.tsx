@@ -71,7 +71,8 @@ export function CustomerBookingFlow({
     : [];
   const selectedSlot =
     selectedSlots.find((slot) => slot.id === selectedSlotId) ?? null;
-  const appointmentStartAt = selectedSlot?.appointmentStartAt ?? "";
+  const appointmentStartAt = selectedSlot?.sourceAppointmentStartAt ?? "";
+  const appointmentTimezone = selectedSlot?.sourceTimezone ?? viewerTimezone;
   const customerName = `${firstName.trim()} ${lastName.trim()}`.trim();
   const customerNote = [
     customerPhone.trim() ? `Phone: ${customerPhone.trim()}` : null,
@@ -235,7 +236,7 @@ export function CustomerBookingFlow({
                     type="hidden"
                     value={appointmentStartAt}
                   />
-                  <input name="timezone" type="hidden" value={viewerTimezone} />
+                  <input name="timezone" type="hidden" value={appointmentTimezone} />
                   <input name="customerName" type="hidden" value={customerName} />
                   <input name="customerNote" type="hidden" value={customerNote} />
                   <div className="customer-booking-fields">
@@ -296,8 +297,11 @@ export function CustomerBookingFlow({
                       />
                     </label>
                   </div>
+                  <p className="customer-booking-disclaimer">
+                    {`You won't be charged unless ${creatorName} accepts your appointment.`}
+                  </p>
                   <button className="seat-primary-button" type="submit">
-                    Send request
+                    Go to payment next
                   </button>
                 </form>
               ) : null}

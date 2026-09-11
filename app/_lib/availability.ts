@@ -10,6 +10,8 @@ export type ViewerAvailabilitySlot = {
   displayTime: string;
   id: string;
   localDate: string;
+  sourceAppointmentStartAt: string;
+  sourceTimezone: string;
   startsAtUtc: number;
 };
 
@@ -79,6 +81,8 @@ export function getViewerAvailability({
         displayTime: formatTimeInTimezone(instant, viewerTimezone),
         id: `${slot.date}-${slot.time}-${viewerTimezone}`,
         localDate,
+        sourceAppointmentStartAt: `${slot.date}T${slot.time}:00`,
+        sourceTimezone: slot.timezone,
         startsAtUtc: slot.startsAtUtc,
       };
     })

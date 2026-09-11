@@ -19,9 +19,11 @@ export type BookingRequestInput = {
 };
 
 const BOOKING_STATUS = {
+  accepted: "accepted",
   approved: "approved",
   checkoutStarted: "checkout_started",
   paid: "paid",
+  paymentAuthorized: "payment_authorized",
   requested: "requested",
 } as const;
 const CHECKOUT_SLOT_HOLD_MINUTES = 30;
@@ -232,6 +234,47 @@ export async function attachStripeCheckoutSession(
     .where(eq(customerBookings.id, bookingId));
 }
 
+export async function markBookingPaymentAuthorized({
+  bookingId,
+  stripeCheckoutSessionId,
+  stripePaymentIntentId,
+}: {
+  bookingId: string;
+  stripeCheckoutSessionId: string;
+  stripePaymentIntentId: string | null;
+}) {
+  const existingBooking = await getCustomerBooking(bookingId);
+
+  if (
+    !existingBooking ||
+    existingBooking.stripeCheckoutSessionId !== stripeCheckoutSessionId ||
+    existingBooking.status !== BOOKING_STATUS.requested
+  ) {
+    return null;
+  }
+
+  const { getDb } = await import("../../db");
+  const db = getDb();
+  const now = new Date().toISOString();
+
+  await db
+    .update(customerBookings)
+    .set({
+      status: BOOKING_STATUS.paymentAuthorized,
+      stripePaymentIntentId,
+      updatedAt: now,
+    })
+    .where(
+      and(
+        eq(customerBookings.id, bookingId),
+        eq(customerBookings.stripeCheckoutSessionId, stripeCheckoutSessionId),
+        eq(customerBookings.status, BOOKING_STATUS.requested),
+      ),
+    );
+
+  return getCustomerBooking(bookingId);
+}
+
 export async function markBookingPaid({
   bookingId,
   stripeCheckoutSessionId,
@@ -246,7 +289,7 @@ export async function markBookingPaid({
   if (
     !existingBooking ||
     existingBooking.stripeCheckoutSessionId !== stripeCheckoutSessionId ||
-    existingBooking.status !== BOOKING_STATUS.checkoutStarted
+    !canMarkBookingPaid(existingBooking.status)
   ) {
     return null;
   }
@@ -266,7 +309,33 @@ export async function markBookingPaid({
       and(
         eq(customerBookings.id, bookingId),
         eq(customerBookings.stripeCheckoutSessionId, stripeCheckoutSessionId),
-        eq(customerBookings.status, BOOKING_STATUS.checkoutStarted),
+      ),
+    );
+
+  return getCustomerBooking(bookingId);
+}
+
+export async function markBookingAccepted(bookingId: string) {
+  const existingBooking = await getCustomerBooking(bookingId);
+
+  if (!existingBooking || existingBooking.status !== BOOKING_STATUS.requested) {
+    return existingBooking;
+  }
+
+  const { getDb } = await import("../../db");
+  const db = getDb();
+  const now = new Date().toISOString();
+
+  await db
+    .update(customerBookings)
+    .set({
+      status: BOOKING_STATUS.accepted,
+      updatedAt: now,
+    })
+    .where(
+      and(
+        eq(customerBookings.id, bookingId),
+        eq(customerBookings.status, BOOKING_STATUS.requested),
       ),
     );
 
@@ -443,18 +512,33 @@ function addMinutesToLocalDateTime(value: string, minutes: number) {
 
 function isBlockingBooking(booking: CustomerBooking) {
   if (
-    booking.status === BOOKING_STATUS.requested ||
+    booking.status === BOOKING_STATUS.accepted ||
+    booking.status === BOOKING_STATUS.paymentAuthorized ||
     booking.status === BOOKING_STATUS.paid ||
     booking.status === BOOKING_STATUS.approved
   ) {
     return true;
   }
 
-  if (booking.status !== BOOKING_STATUS.checkoutStarted) {
+  if (
+    booking.status !== BOOKING_STATUS.checkoutStarted &&
+    !(
+      booking.status === BOOKING_STATUS.requested &&
+      booking.stripeCheckoutSessionId
+    )
+  ) {
     return false;
   }
 
   return Date.parse(booking.createdAt) > Date.now() - CHECKOUT_SLOT_HOLD_MINUTES * 60_000;
+}
+
+function canMarkBookingPaid(status: string) {
+  return (
+    status === BOOKING_STATUS.accepted ||
+    status === BOOKING_STATUS.checkoutStarted ||
+    status === BOOKING_STATUS.paymentAuthorized
+  );
 }
 
 function intervalsOverlap(

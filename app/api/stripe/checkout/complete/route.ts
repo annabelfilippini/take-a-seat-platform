@@ -1,5 +1,11 @@
-import { markBookingPaid } from "../../../../_lib/bookings";
-import { notifyCreatorBookingPaid } from "../../../../_lib/notifications";
+import {
+  markBookingPaid,
+  markBookingPaymentAuthorized,
+} from "../../../../_lib/bookings";
+import {
+  notifyCreatorBookingPaid,
+  notifyCreatorBookingRequested,
+} from "../../../../_lib/notifications";
 import {
   getStripeSecretKey,
   STRIPE_API_VERSION,
@@ -48,26 +54,33 @@ export async function GET(request: Request) {
   try {
     const session = await retrieveCheckoutSession(sessionId, secretKey);
 
-    if (session.payment_status !== "paid") {
-      return redirectTo(
-        request,
-        `/bookings/${encodeURIComponent(bookingId)}`,
-        "pending",
-        "payment",
-      );
-    }
+    const paymentIntentId = getPaymentIntentId(session);
+    const booking =
+      session.payment_status === "paid"
+        ? await markBookingPaid({
+            bookingId,
+            stripeCheckoutSessionId: session.id,
+            stripePaymentIntentId: paymentIntentId,
+          })
+        : await markBookingPaymentAuthorized({
+            bookingId,
+            stripeCheckoutSessionId: session.id,
+            stripePaymentIntentId: paymentIntentId,
+          });
 
-    const booking = await markBookingPaid({
-      bookingId,
-      stripeCheckoutSessionId: session.id,
-      stripePaymentIntentId: getPaymentIntentId(session),
-    });
-
-    if (booking) {
+    if (booking && booking.status === "paid") {
       await notifyCreatorBookingPaid({ booking, request }).catch(() => undefined);
     }
 
-    return redirectTo(request, `/bookings/${encodeURIComponent(bookingId)}`, "success");
+    if (booking && booking.status === "payment_authorized") {
+      await notifyCreatorBookingRequested({ booking, request }).catch(() => undefined);
+    }
+
+    return redirectTo(
+      request,
+      `/bookings/${encodeURIComponent(bookingId)}`,
+      booking?.status === "paid" ? "success" : "authorized",
+    );
   } catch {
     return redirectTo(
       request,

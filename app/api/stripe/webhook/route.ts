@@ -1,5 +1,8 @@
-import { markBookingPaid } from "../../../_lib/bookings";
-import { notifyCreatorBookingPaid } from "../../../_lib/notifications";
+import { markBookingPaid, markBookingPaymentAuthorized } from "../../../_lib/bookings";
+import {
+  notifyCreatorBookingPaid,
+  notifyCreatorBookingRequested,
+} from "../../../_lib/notifications";
 import { getStripeWebhookSecret } from "../../../_lib/stripe-connect";
 
 const STRIPE_SIGNATURE_TOLERANCE_SECONDS = 300;
@@ -71,16 +74,26 @@ export async function POST(request: Request) {
       );
     }
 
-    if (session.payment_status === "paid") {
-      const booking = await markBookingPaid({
-        bookingId,
-        stripeCheckoutSessionId: session.id,
-        stripePaymentIntentId: getPaymentIntentId(session),
-      });
+    const paymentIntentId = getPaymentIntentId(session);
+    const booking =
+      session.payment_status === "paid"
+        ? await markBookingPaid({
+            bookingId,
+            stripeCheckoutSessionId: session.id,
+            stripePaymentIntentId: paymentIntentId,
+          })
+        : await markBookingPaymentAuthorized({
+            bookingId,
+            stripeCheckoutSessionId: session.id,
+            stripePaymentIntentId: paymentIntentId,
+          });
 
-      if (booking) {
-        await notifyCreatorBookingPaid({ booking, request }).catch(() => undefined);
-      }
+    if (booking?.status === "paid") {
+      await notifyCreatorBookingPaid({ booking, request }).catch(() => undefined);
+    }
+
+    if (booking?.status === "payment_authorized") {
+      await notifyCreatorBookingRequested({ booking, request }).catch(() => undefined);
     }
   }
 
