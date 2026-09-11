@@ -91,11 +91,16 @@ Cloudflare production bindings are declared in `wrangler.deploy.jsonc`.
 
 ## Cleanup Priorities
 
-Do not deploy the current dirty worktree until these are handled:
+Do not deploy a launch-critical production update until these are handled:
 
-1. Commit or otherwise preserve the current state in a real source-of-truth repo.
-2. Separate the creator backend route from the admin preview route.
-3. Remove or archive duplicate scratch files such as `app/page 2.tsx` and
-   `app/globals 2.css`.
-4. Confirm D1 migrations are applied to the intended Cloudflare database.
-5. Add Stripe webhooks before any real paid booking flow is treated as reliable.
+1. Separate the creator backend route from the admin preview route.
+2. Confirm D1 migrations are applied to the intended Cloudflare database.
+3. Confirm required Cloudflare Worker secrets exist for Clerk, Resend, Google
+   Calendar, and Stripe.
+4. Add Stripe webhooks before any real paid booking flow is treated as reliable.
+
+Already handled in the source-control cleanup branch:
+
+- Preserved the current state in the GitHub repo.
+- Removed duplicate scratch files such as `app/page 2.tsx`,
+  `app/globals 2.css`, and `tests/rendered-html.test 2.mjs` after comparison.

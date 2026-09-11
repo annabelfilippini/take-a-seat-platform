@@ -62,9 +62,10 @@ App/runtime:
 
 Source control:
 
-- Current branch: `main`.
-- Current configured remote is a Sites-style remote named `sites`.
-- A durable GitHub repo should be added before this becomes launch-critical.
+- Durable GitHub repo: `annabelfilippini/take-a-seat-platform`.
+- `origin` points to GitHub and is the source-of-truth remote.
+- `sites` is retained as the legacy ChatGPT/Sites remote for history/tooling.
+- Cleanup branch: `codex-take-a-seat-source-control-cleanup`.
 
 Database:
 
@@ -189,17 +190,20 @@ The docs are mid-migration:
 - `docs/creator-platform-plan.md` is the longer product/integration plan.
 - `docs/influencer-onboarding.md` is a practical setup checklist.
 
-The worktree has duplicate scratch files:
+Duplicate scratch files were compared and removed after the worktree was
+preserved in GitHub source control:
 
-- `app/BookingPlatform 2.tsx`
-- `app/globals 2.css`
-- `app/globals 3.css`
-- `app/layout 2.tsx`
-- `app/page 2.tsx`
-- `tests/rendered-html.test 2.mjs`
-
-Do not delete these blindly. Compare or archive them after the main worktree is
-safe in source control.
+- `app/BookingPlatform 2.tsx`: old client-side marketplace prototype replaced
+  by the current server-rendered homepage, creator directory, and profile
+  routes.
+- `app/globals 2.css`, `app/globals 3.css`: starter/old prototype CSS replaced
+  by the current full stylesheet.
+- `app/layout 2.tsx`, `app/page 2.tsx`: starter/Sites preview shell replaced by
+  the branded Take a Seat layout and homepage.
+- `public/favicon 2.svg`: old starter favicon replaced by the active branded
+  favicon.
+- `tests/rendered-html.test 2.mjs`: starter preview tests replaced by the
+  current route and integration smoke tests.
 
 ## Environment Map
 
@@ -215,6 +219,10 @@ Production:
   required secrets.
 - Non-secret public/config values can live in Wrangler vars.
 - Secret values should be set as Cloudflare Worker secrets.
+- Before deploying, confirm D1 migrations have been applied to
+  `take-a-seat-platform-db` with `wrangler.deploy.jsonc`.
+- Before inviting creators or testing live booking paths, confirm required
+  Worker secrets exist in Cloudflare; do not rely on local `.dev.vars`.
 
 Required or expected production secrets:
 
@@ -230,31 +238,23 @@ Required or expected production secrets:
 
 ## Recommended Cleanup Sequence
 
-1. Preserve the current worktree.
-   Add a durable GitHub remote or otherwise make sure the current state is not
-   only local/Sites-hosted.
+Completed:
 
-2. Decide what gets committed.
-   Review uncommitted files, group them into sensible commits, and do not deploy
-   until the dirty worktree is understood.
+- Preserved the current worktree in the GitHub repo.
+- Cleaned operational docs into this control map plus focused supporting docs.
+- Removed obsolete duplicate scratch files after comparison.
 
-3. Clean the docs.
-   Keep this control map current, keep README operational, and move long plans
-   into `docs/`.
+Next:
 
-4. Separate creator and admin routes.
+1. Separate creator and admin routes.
    Move the creator self-service backend toward a creator-owned route while
    keeping admin approval under `/admin`.
 
-5. Clean duplicate scratch files.
-   Compare the `2` and `3` suffixed files, then archive or remove them once the
-   real files are confirmed.
-
-6. Verify Cloudflare and D1.
+2. Verify Cloudflare and D1.
    Confirm the intended D1 migrations are applied to the production database and
    that required secrets exist.
 
-7. Finish integration reliability.
+3. Finish integration reliability.
    Add Stripe webhook handling, complete calendar conflict checks, and test a
    full booking flow before taking real payments.
 
