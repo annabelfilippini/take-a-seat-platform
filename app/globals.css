@@ -1812,6 +1812,40 @@ img {
   scroll-snap-align: start;
 }
 
+.amber-gallery-link {
+  background: #241d18;
+  color: var(--cream);
+  display: block;
+  height: 100%;
+  position: relative;
+  text-decoration: none;
+}
+
+.amber-gallery-link::after {
+  background: linear-gradient(
+    180deg,
+    rgba(31, 29, 26, 0) 42%,
+    rgba(31, 29, 26, 0.56) 100%
+  );
+  content: "";
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+}
+
+.amber-gallery-caption {
+  bottom: 0;
+  font-size: 11px;
+  font-weight: 800;
+  left: 0;
+  line-height: 1.2;
+  padding: 16px;
+  position: absolute;
+  right: 0;
+  text-transform: uppercase;
+  z-index: 1;
+}
+
 .amber-hero-gallery img,
 .amber-hero-gallery iframe,
 .amber-hero-gallery video {

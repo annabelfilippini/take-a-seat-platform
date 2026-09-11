@@ -1,46 +1,28 @@
 "use client";
 
+/* eslint-disable @next/next/no-img-element */
 import { useRef } from "react";
 
-const galleryVideos = [
+const galleryItems = [
   {
-    id: "7665329691254951198",
-    title: "Ella McLane styling video on TikTok",
+    alt: "Ella McLane in a sundress near the coast",
+    href: "https://www.tiktok.com/@ellamclane/video/7665329691254951198",
+    image: "/ella-reference-sundress.jpg",
+    title: "Sundress styling",
   },
   {
-    id: "7661987130444418334",
-    title: "Ella McLane outfit video on TikTok",
+    alt: "Ella McLane street style outfit reference",
+    href: "https://www.tiktok.com/@ellamclane/video/7661987130444418334",
+    image: "/ella-reference-street-style.jpg",
+    title: "Everyday outfit polish",
   },
   {
-    id: "7657164268663557407",
-    title: "Ella McLane classic style video on TikTok",
-  },
-  {
-    id: "7668294958515784990",
-    title: "Ella McLane elevated styling video on TikTok",
-  },
-  {
-    id: "7667925672676838687",
-    title: "Ella McLane outfit inspiration video on TikTok",
+    alt: "Ella McLane coastal outfit inspiration",
+    href: "https://www.tiktok.com/@ellamclane/video/7657164268663557407",
+    image: "/ella-reference-coast.jpg",
+    title: "Coastal classics",
   },
 ];
-
-const tiktokPlayerOptions = [
-  "autoplay=1",
-  "muted=1",
-  "loop=1",
-  "controls=0",
-  "play_button=0",
-  "volume_control=0",
-  "fullscreen_button=0",
-  "progress_bar=0",
-  "timestamp=0",
-  "music_info=0",
-  "description=0",
-  "rel=0",
-  "native_context_menu=0",
-  "closed_caption=0",
-].join("&");
 
 export function EllaGallery() {
   const trackRef = useRef<HTMLDivElement>(null);
@@ -73,15 +55,18 @@ export function EllaGallery() {
         </svg>
       </button>
       <div className="amber-gallery-track" ref={trackRef}>
-        {galleryVideos.map((video) => (
-          <span className="amber-gallery-frame" key={video.id}>
-            <iframe
-              allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
-              allowFullScreen
-              loading="lazy"
-              src={`https://www.tiktok.com/player/v1/${video.id}?${tiktokPlayerOptions}`}
-              title={video.title}
-            />
+        {galleryItems.map((item) => (
+          <span className="amber-gallery-frame" key={item.image}>
+            <a
+              aria-label={`Open ${item.title} on TikTok`}
+              className="amber-gallery-link"
+              href={item.href}
+              rel="noreferrer"
+              target="_blank"
+            >
+              <img alt={item.alt} src={item.image} />
+              <span className="amber-gallery-caption">{item.title}</span>
+            </a>
           </span>
         ))}
       </div>
