@@ -175,9 +175,11 @@ For example, on a 45 GBP booking:
 7. Build pricing editor.
 8. Build public slot picker on creator profiles.
 9. Create Stripe Checkout Sessions for selected slots.
-10. Add Stripe webhook handling for successful payments.
-11. Create Google Calendar events after successful payment.
-12. Add creator/admin-led refund and reschedule rules.
+10. Configure accepted-creator notifications with Resend email, profile
+    notifications, and Twilio SMS or an explicit email-only launch decision.
+11. Add Stripe webhook handling for successful payments.
+12. Create Google Calendar events after successful payment.
+13. Add creator/admin-led refund and reschedule rules.
 
 ## Near-Term Decision
 

@@ -59,15 +59,18 @@ export default async function AdminApplicationPage({
   const profileStatus = getStatus(searchParams?.profile);
   const smsStatus = getStatus(searchParams?.sms);
   const acceptDetail = getStatus(searchParams?.detail);
+  const emailDetail = getStatus(searchParams?.emailDetail);
+  const smsDetail = getStatus(searchParams?.smsDetail);
   const suggestedPublicId =
     await getAvailableCreatorPublicIdSuggestion(application);
   const acceptMessage =
     acceptStatus === "accepted"
-      ? `Accepted. Email ${
-          emailStatus === "sent" ? "sent" : "not sent"
-        }. Text ${smsStatus === "sent" ? "sent" : "not sent"}. Profile ${
-          profileStatus === "sent" ? "notified" : "not updated"
-        }.`
+      ? [
+          "Accepted.",
+          getNotificationStatus("Email", emailStatus, emailDetail),
+          getNotificationStatus("Text", smsStatus, smsDetail),
+          `Profile ${profileStatus === "sent" ? "notified" : "not updated"}.`,
+        ].join(" ")
       : getAcceptErrorMessage(acceptDetail);
 
   return (
@@ -229,6 +232,34 @@ function getAcceptErrorMessage(detail: string | null) {
   }
 
   return `Application update failed${detail ? `: ${detail}` : ""}.`;
+}
+
+function getNotificationStatus(
+  label: "Email" | "Text",
+  status: string | null,
+  detail: string | null,
+) {
+  if (status === "sent") {
+    return `${label} sent.`;
+  }
+
+  const reason = getNotificationSkipReason(detail);
+  return `${label} not sent${reason ? `: ${reason}` : ""}.`;
+}
+
+function getNotificationSkipReason(detail: string | null) {
+  switch (detail) {
+    case "missing-account":
+      return "Twilio account is not configured";
+    case "missing-from":
+      return "sender is not configured";
+    case "missing-key":
+      return "API key is not configured";
+    case "request-failed":
+      return "provider request failed";
+    default:
+      return null;
+  }
 }
 
 function splitLines(value: string | null) {

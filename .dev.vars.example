@@ -25,6 +25,13 @@ RESEND_API_KEY="re_replace_me"
 TAKE_A_SEAT_EMAIL_FROM="Take a Seat <applications@takeaseatwith.com>"
 TAKE_A_SEAT_APPLICATION_RECIPIENT="annabelflip1@gmail.com"
 TAKE_A_SEAT_ADMIN_EMAILS="annabelflip1@gmail.com"
+# Optional SMS delivery through Twilio. Without these, text notifications are
+# skipped and the admin acceptance page reports the missing setup.
+TWILIO_ACCOUNT_SID="AC_replace_me"
+TWILIO_AUTH_TOKEN="replace_me"
+TWILIO_MESSAGING_SERVICE_SID="MG_replace_me"
+# Use either TWILIO_MESSAGING_SERVICE_SID or TWILIO_FROM_PHONE_NUMBER.
+TWILIO_FROM_PHONE_NUMBER="+15555550123"
 # Optional comma-separated phone allowlist for local/admin Clerk phone sign-in.
 TAKE_A_SEAT_ADMIN_PHONES="13035550000"
 # Optional local-only admin bypass for development. Keep false outside localhost.

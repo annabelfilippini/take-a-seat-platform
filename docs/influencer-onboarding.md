@@ -96,6 +96,10 @@ npx wrangler secret put GOOGLE_CLIENT_ID --config wrangler.deploy.jsonc
 npx wrangler secret put GOOGLE_CLIENT_SECRET --config wrangler.deploy.jsonc
 npx wrangler secret put GOOGLE_OAUTH_REDIRECT_URI --config wrangler.deploy.jsonc
 npx wrangler secret put GOOGLE_TOKEN_ENCRYPTION_KEY --config wrangler.deploy.jsonc
+npx wrangler secret put TWILIO_ACCOUNT_SID --config wrangler.deploy.jsonc
+npx wrangler secret put TWILIO_AUTH_TOKEN --config wrangler.deploy.jsonc
+npx wrangler secret put TWILIO_MESSAGING_SERVICE_SID --config wrangler.deploy.jsonc
+# Or use TWILIO_FROM_PHONE_NUMBER instead of TWILIO_MESSAGING_SERVICE_SID.
 npx wrangler secret put STRIPE_SECRET_KEY --config wrangler.deploy.jsonc
 npx wrangler secret put STRIPE_CONNECT_COUNTRY --config wrangler.deploy.jsonc
 npx wrangler secret put STRIPE_PRICE_AMBER_15 --config wrangler.deploy.jsonc
@@ -109,6 +113,22 @@ npx wrangler secret put STRIPE_PRICE_ANNABEL_30 --config wrangler.deploy.jsonc
 Keep real secrets out of source and load them through Worker secrets. The
 platform fee is not a secret; configure it in `wrangler.deploy.jsonc` as
 `TAKE_A_SEAT_PLATFORM_FEE_BPS`.
+
+## Accepted Creator Notifications
+
+When an admin accepts a creator application, Take a Seat should create the
+invite, send the accepted email, attempt the accepted SMS, and create the
+in-profile notification. SMS delivery depends on Twilio runtime secrets. If
+Twilio is not configured, the admin acceptance result should clearly say the
+text was skipped and why.
+
+Before inviting real creators, rehearse one accepted application with a test
+recipient and confirm:
+
+- the creator receives the accepted email with the profile setup link
+- the creator receives the accepted text, unless SMS is intentionally deferred
+- the creator dashboard shows the application accepted notification
+- the admin acceptance page reports the delivery status accurately
 
 ## Stripe Setup
 
@@ -129,6 +149,9 @@ Current app keys:
 STRIPE_SECRET_KEY="sk_test_replace_me"
 STRIPE_CONNECT_COUNTRY="US"
 TAKE_A_SEAT_PLATFORM_FEE_BPS="1500"
+TWILIO_ACCOUNT_SID="AC_replace_me"
+TWILIO_AUTH_TOKEN="replace_me"
+TWILIO_MESSAGING_SERVICE_SID="MG_replace_me"
 STRIPE_PRICE_AMBER_15="price_replace_me"
 STRIPE_PRICE_AMBER_30="price_replace_me"
 STRIPE_PRICE_NIKKI_15="price_replace_me"

@@ -103,6 +103,14 @@ Email:
 - Current branded sender: `Take a Seat <applications@takeaseatwith.com>`.
 - Application recipient/admin email is configured through runtime values.
 
+SMS:
+
+- Twilio is the intended SMS provider for accepted-creator and booking texts.
+- Text notifications are skipped unless Twilio account/auth credentials plus a
+  Messaging Service SID or sender phone number are configured.
+- The admin acceptance result should show whether email/text/profile
+  notifications were sent or skipped.
+
 Calendar:
 
 - Google Calendar OAuth is the chosen scheduling integration.
@@ -241,6 +249,9 @@ Required or expected production secrets:
 
 - `CLERK_SECRET_KEY`
 - `RESEND_API_KEY`
+- `TWILIO_ACCOUNT_SID`
+- `TWILIO_AUTH_TOKEN`
+- `TWILIO_MESSAGING_SERVICE_SID` or `TWILIO_FROM_PHONE_NUMBER`
 - `GOOGLE_CLIENT_ID`
 - `GOOGLE_CLIENT_SECRET`
 - `GOOGLE_OAUTH_REDIRECT_URI`
@@ -270,7 +281,12 @@ Next:
    Confirm the intended D1 migrations are applied to the production database and
    that required secrets exist.
 
-2. Finish integration reliability.
+2. Configure accepted-creator notifications.
+   Decide whether launch requires SMS, then either configure Twilio secrets and
+   send a real accepted-creator test text, or explicitly launch email/profile
+   notifications first with SMS disabled.
+
+3. Finish integration reliability.
    Add Stripe webhook handling, complete calendar conflict checks, and test a
    full booking flow before taking real payments.
 
@@ -286,6 +302,9 @@ have:
 - Creator profile setup working outside an admin-labeled preview route.
 - D1 migrations applied.
 - Resend branded emails verified after deployment.
+- Accepted-creator notification rehearsal completed: branded email delivered,
+  profile notification appears, and SMS is either verified through Twilio or
+  intentionally deferred.
 - Stripe Connect test account onboarding completed.
 - Stripe webhook handling in place.
 - Google Calendar OAuth and event creation tested.

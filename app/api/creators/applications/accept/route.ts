@@ -68,7 +68,9 @@ export async function POST(request: Request) {
     }
 
     let emailStatus: "sent" | "skipped" = "skipped";
+    let emailDetail: string | null = null;
     let smsStatus: "sent" | "skipped" = "skipped";
+    let smsDetail: string | null = null;
     let profileNotificationStatus: "sent" | "skipped" = "skipped";
     let invite:
       | Awaited<ReturnType<typeof createCreatorInvite>>
@@ -86,6 +88,7 @@ export async function POST(request: Request) {
         request,
       });
       emailStatus = email.status;
+      emailDetail = email.status === "skipped" ? email.reason : null;
     }
 
     if (profile.phone) {
@@ -96,6 +99,7 @@ export async function POST(request: Request) {
         to: profile.phone,
       });
       smsStatus = sms.status;
+      smsDetail = sms.status === "skipped" ? sms.reason : null;
     }
 
     await createCreatorAcceptedNotification({
@@ -107,8 +111,10 @@ export async function POST(request: Request) {
     return redirectTo(request, `/admin/applications/${profile.id}`, {
       accept: "accepted",
       email: emailStatus,
+      ...(emailDetail ? { emailDetail } : {}),
       profile: profileNotificationStatus,
       sms: smsStatus,
+      ...(smsDetail ? { smsDetail } : {}),
     });
   } catch (error) {
     if (error instanceof CreatorPublishError) {
