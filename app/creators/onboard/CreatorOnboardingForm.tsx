@@ -129,7 +129,6 @@ function ApplicationForm({
       <input name="location" type="hidden" value="" />
       <input name="name" type="hidden" value={name} />
       <input name="offer" type="hidden" value="Private creator calls" />
-      <input name="profileDetails" type="hidden" value={expertise} />
       <input name="profileIntro" type="hidden" value={generated.profileIntro} />
       <input name="reviewSubmittedAt" type="hidden" value="true" />
       <input name="seat15Description" type="hidden" value={generated.seat15Description} />
@@ -221,6 +220,7 @@ function ApplicationForm({
       <label>
         <span>Expertise</span>
         <textarea
+          name="profileDetails"
           onChange={(event) => setExpertise(event.target.value)}
           placeholder="Tell us what people already come to you for, what kind of advice you give, and what a useful 1:1 call with you would help them decide."
           required

@@ -30,7 +30,7 @@ export default async function AdminApplicationPage({
   const adminEmail = await getSignedInAdminEmail();
 
   if (!adminEmail) {
-    return <AdminLocked creatorId={params.creatorId} />;
+    return <AdminLocked creatorId={params.creatorId} searchParams={searchParams} />;
   }
 
   let application;
@@ -225,8 +225,14 @@ function AdminMissingApplication({ creatorId }: { creatorId: string }) {
   );
 }
 
-async function AdminLocked({ creatorId }: { creatorId: string }) {
-  const returnTo = `/admin/applications/${encodeURIComponent(creatorId)}`;
+async function AdminLocked({
+  creatorId,
+  searchParams,
+}: {
+  creatorId: string;
+  searchParams?: AdminApplicationPageProps["searchParams"];
+}) {
+  const returnTo = getAdminApplicationReturnTo(creatorId, searchParams);
   const signInHref = await getAdminSignInHref(returnTo);
 
   return (
@@ -241,6 +247,30 @@ async function AdminLocked({ creatorId }: { creatorId: string }) {
       </section>
     </main>
   );
+}
+
+function getAdminApplicationReturnTo(
+  creatorId: string,
+  searchParams: AdminApplicationPageProps["searchParams"],
+) {
+  const params = new URLSearchParams();
+
+  for (const [key, value] of Object.entries(searchParams ?? {})) {
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        if (typeof item === "string") {
+          params.append(key, item);
+        }
+      }
+    } else if (typeof value === "string") {
+      params.set(key, value);
+    }
+  }
+
+  const query = params.toString();
+  const path = `/admin/applications/${encodeURIComponent(creatorId)}`;
+
+  return query ? `${path}?${query}` : path;
 }
 
 function getStatus(value: string | string[] | undefined) {

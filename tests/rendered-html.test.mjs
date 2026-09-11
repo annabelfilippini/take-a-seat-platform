@@ -615,6 +615,22 @@ test("does not render the generic 404 for an emailed application link", async ()
   assert.doesNotMatch(html, /This page could not be found/);
 });
 
+test("preserves admin application status params through sign-in", async () => {
+  const response = await render(
+    "/admin/applications/annabel-filippini?accept=accepted&email=sent&profile=sent&sms=skipped&smsDetail=missing-account",
+  );
+
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
+
+  const html = await response.text();
+  assert.match(html, /Sign in as/);
+  assert.match(
+    html,
+    /href="\/sign-in\?redirect_url=%2Fadmin%2Fapplications%2Fannabel-filippini%3Faccept%3Daccepted%26email%3Dsent%26profile%3Dsent%26sms%3Dskipped%26smsDetail%3Dmissing-account"/,
+  );
+});
+
 test("removes starter metadata and preview dependencies", async () => {
   const [page, layout, packageJson, css] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
@@ -748,6 +764,7 @@ test("server-renders creator onboarding form", async () => {
   assert.match(html, /Instagram handle/);
   assert.match(html, /TikTok handle/);
   assert.match(html, /Expertise/);
+  assert.match(html, /<textarea(?=[^>]*name="profileDetails")/);
   assert.match(html, /Submit application/);
   assert.doesNotMatch(html, /Continue/);
   assert.doesNotMatch(html, /Social handle/);
