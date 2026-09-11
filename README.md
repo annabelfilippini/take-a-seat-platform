@@ -75,10 +75,10 @@ Cloudflare production bindings are declared in `wrangler.deploy.jsonc`.
   need consolidation into the reusable route over time.
 - `/sign-in`: shared Clerk phone sign-in.
 - `/creators/onboard`: creator application and setup entry.
-- `/creators/dashboard`: currently redirects to the profile editor preview.
+- `/creators/dashboard`: creator-owned profile, availability, payouts, and
+  notifications dashboard for accepted creators.
 - `/admin/applications`: admin creator application queue.
-- `/admin/creator-profile-editor-preview`: current shared admin/creator profile
-  editor prototype.
+- `/admin/creator-profile-editor-preview`: admin-only profile editor preview.
 
 ## Important Docs
 
@@ -93,14 +93,14 @@ Cloudflare production bindings are declared in `wrangler.deploy.jsonc`.
 
 Do not deploy a launch-critical production update until these are handled:
 
-1. Separate the creator backend route from the admin preview route.
-2. Confirm D1 migrations are applied to the intended Cloudflare database.
-3. Confirm required Cloudflare Worker secrets exist for Clerk, Resend, Google
+1. Confirm D1 migrations are applied to the intended Cloudflare database.
+2. Confirm required Cloudflare Worker secrets exist for Clerk, Resend, Google
    Calendar, and Stripe.
-4. Add Stripe webhooks before any real paid booking flow is treated as reliable.
+3. Add Stripe webhooks before any real paid booking flow is treated as reliable.
 
 Already handled in the source-control cleanup branch:
 
 - Preserved the current state in the GitHub repo.
 - Removed duplicate scratch files such as `app/page 2.tsx`,
   `app/globals 2.css`, and `tests/rendered-html.test 2.mjs` after comparison.
+- Separated the creator dashboard URL from the admin profile editor preview.

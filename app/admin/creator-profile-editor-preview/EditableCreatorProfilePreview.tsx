@@ -1324,7 +1324,7 @@ function EditableAvailabilityPanel({
           className="seat-secondary-button compact-form-button"
           href={`/api/google-calendar/oauth/start?creatorId=${encodeURIComponent(
             creatorId,
-          )}&returnTo=/admin/creator-profile-editor-preview`}
+          )}&returnTo=${CREATOR_PROFILE_EDITOR_URL}`}
         >
           {calendarConnected ? "Calendar connected" : "Connect calendar"}
         </a>

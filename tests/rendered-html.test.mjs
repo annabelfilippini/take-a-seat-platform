@@ -185,7 +185,7 @@ test("server-renders the account sign-in entry", async () => {
   );
 });
 
-test("legacy creator auth paths redirect into current auth and editor routes", async () => {
+test("legacy creator auth paths redirect into current auth and creator dashboard routes", async () => {
   const signInResponse = await render("/creators/sign-in");
   assert.equal(signInResponse.status, 307);
   assert.ok(
@@ -199,11 +199,13 @@ test("legacy creator auth paths redirect into current auth and editor routes", a
   );
 
   const dashboardResponse = await render("/creators/dashboard");
-  assert.equal(dashboardResponse.status, 307);
-  assert.match(
-    dashboardResponse.headers.get("location") ?? "",
-    /\/admin\/creator-profile-editor-preview$/,
-  );
+  assert.equal(dashboardResponse.status, 200);
+  const dashboardHtml = await dashboardResponse.text();
+  assert.match(dashboardHtml, /<title>Creator Dashboard \| Take a Seat<\/title>/i);
+  assert.match(dashboardHtml, /Creator dashboard/);
+  assert.match(dashboardHtml, /Sign in with your creator phone/);
+  assert.match(dashboardHtml, /redirect_url=%2Fcreators%2Fdashboard/);
+  assert.doesNotMatch(dashboardHtml, /Creator Profile Editor Preview/);
 
   const retiredSetupResponse = await render(
     "/creators/onboard/accepted?creatorId=onboard_test",
@@ -211,7 +213,7 @@ test("legacy creator auth paths redirect into current auth and editor routes", a
   assert.equal(retiredSetupResponse.status, 307);
   assert.match(
     retiredSetupResponse.headers.get("location") ?? "",
-    /\/admin\/creator-profile-editor-preview$/,
+    /\/creators\/dashboard$/,
   );
 });
 

@@ -170,12 +170,12 @@ API:
 
 The creator backend is not cleanly separated yet:
 
-- `/creators/dashboard` currently redirects to
-  `/admin/creator-profile-editor-preview`.
-- `app/creator-destination.ts` ignores the creator id and always returns the
-  admin preview editor.
-- The profile editor component serves both admin preview and accepted creator
-  access.
+- `/creators/dashboard` now owns the accepted-creator profile editor URL and no
+  longer redirects through `/admin/creator-profile-editor-preview`.
+- `/admin/creator-profile-editor-preview` is admin-only and uses the same editor
+  component only as an internal preview.
+- The shared editor component still needs a cleaner package boundary over time;
+  creator self-service should continue to live under `/creators`.
 
 The public creator model is split:
 
@@ -243,18 +243,16 @@ Completed:
 - Preserved the current worktree in the GitHub repo.
 - Cleaned operational docs into this control map plus focused supporting docs.
 - Removed obsolete duplicate scratch files after comparison.
+- Separated `/creators/dashboard` from the admin preview URL while preserving
+  the existing editor component.
 
 Next:
 
-1. Separate creator and admin routes.
-   Move the creator self-service backend toward a creator-owned route while
-   keeping admin approval under `/admin`.
-
-2. Verify Cloudflare and D1.
+1. Verify Cloudflare and D1.
    Confirm the intended D1 migrations are applied to the production database and
    that required secrets exist.
 
-3. Finish integration reliability.
+2. Finish integration reliability.
    Add Stripe webhook handling, complete calendar conflict checks, and test a
    full booking flow before taking real payments.
 
