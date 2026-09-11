@@ -39,6 +39,7 @@ Useful commands:
 npm install
 npm run dev
 npm run build
+npm run typecheck
 npm test
 ```
 
@@ -98,6 +99,8 @@ Cloudflare production bindings are declared in `wrangler.deploy.jsonc`.
   plan.
 - `docs/influencer-onboarding.md`: practical creator launch checklist and
   runtime setup notes.
+- `docs/production-readiness-2026-09-11.md`: latest production readiness pass
+  with current blockers.
 
 ## Cleanup Priorities
 

@@ -13,7 +13,7 @@ function profileStatusResponse(
   request: Request,
   status: string,
   detail?: string,
-  returnTo?: string,
+  returnTo?: string | null,
   extraParams: Record<string, string> = {},
 ) {
   if (wantsJson(request)) {
@@ -34,7 +34,7 @@ function redirectWithProfileStatus(
   request: Request,
   status: string,
   detail?: string,
-  returnTo?: string,
+  returnTo?: string | null,
   extraParams: Record<string, string> = {},
 ) {
   const target = new URL(getSafeReturnTo(returnTo, "/creators/onboard"), request.url);
@@ -58,7 +58,7 @@ function wantsJson(request: Request) {
   return request.headers.get("accept")?.includes("application/json") ?? false;
 }
 
-function getSafeReturnTo(value: string | null, fallback: string) {
+function getSafeReturnTo(value: string | null | undefined, fallback: string) {
   if (!value || !value.startsWith("/") || value.startsWith("//")) {
     return fallback;
   }

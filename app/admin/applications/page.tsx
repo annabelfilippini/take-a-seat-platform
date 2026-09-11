@@ -5,7 +5,10 @@ import {
   getAdminSignInHref,
   getSignedInAdminEmail,
 } from "../../_lib/admin-auth";
-import { listCreatorApplications } from "../../_lib/creator-onboarding";
+import {
+  listCreatorApplications,
+  type CreatorOnboardingProfile,
+} from "../../_lib/creator-onboarding";
 
 export const metadata: Metadata = {
   title: "Creator Applications | Take a Seat",
@@ -25,7 +28,7 @@ export default async function AdminApplicationsPage({
     return <AdminLocked />;
   }
 
-  let applications = [];
+  let applications: CreatorOnboardingProfile[] = [];
   let setupError = false;
 
   try {

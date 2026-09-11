@@ -16,12 +16,22 @@
     "TAKE_A_SEAT_ADMIN_EMAILS": "annabelflip1@gmail.com",
     "TAKE_A_SEAT_APPLICATION_RECIPIENT": "annabelflip1@gmail.com",
     "TAKE_A_SEAT_EMAIL_FROM": "Take a Seat <applications@takeaseatwith.com>",
-    "TAKE_A_SEAT_PLATFORM_FEE_BPS": "1500"
+    "TAKE_A_SEAT_PLATFORM_FEE_BPS": "1500",
+    "STRIPE_CONNECT_COUNTRY": "US"
   },
   "secrets": {
     "required": [
       "CLERK_SECRET_KEY",
-      "RESEND_API_KEY"
+      "GOOGLE_CLIENT_ID",
+      "GOOGLE_CLIENT_SECRET",
+      "GOOGLE_OAUTH_REDIRECT_URI",
+      "GOOGLE_TOKEN_ENCRYPTION_KEY",
+      "RESEND_API_KEY",
+      "STRIPE_SECRET_KEY",
+      "STRIPE_PRICE_ANNABEL_15",
+      "STRIPE_PRICE_ANNABEL_30",
+      "STRIPE_PRICE_ELLA_15",
+      "STRIPE_PRICE_ELLA_30"
     ]
   },
   "no_bundle": true,

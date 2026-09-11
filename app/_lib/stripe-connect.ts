@@ -33,6 +33,13 @@ type StripeApiError = {
   status: number;
 };
 
+type StripeErrorPayload = {
+  error?: {
+    code?: string;
+    message?: string;
+  };
+};
+
 export class StripeConnectError extends Error {
   code?: string;
   status: number;
@@ -284,13 +291,10 @@ async function stripeJson<T>(
     },
     method: "POST",
   });
-  const payload = (await response.json().catch(() => null)) as
-    | { error?: { code?: string; message?: string } }
-    | T
-    | null;
+  const payload = (await response.json().catch(() => null)) as T | StripeErrorPayload | null;
 
   if (!response.ok) {
-    const error = payload && "error" in payload ? payload.error : null;
+    const error = getStripeError(payload);
     throw new StripeConnectError({
       code: error?.code,
       message: error?.message ?? "Stripe Connect request failed.",
@@ -309,13 +313,10 @@ async function stripeGet<T>(path: string, secretKey: string) {
     },
     method: "GET",
   });
-  const payload = (await response.json().catch(() => null)) as
-    | { error?: { code?: string; message?: string } }
-    | T
-    | null;
+  const payload = (await response.json().catch(() => null)) as T | StripeErrorPayload | null;
 
   if (!response.ok) {
-    const error = payload && "error" in payload ? payload.error : null;
+    const error = getStripeError(payload);
     throw new StripeConnectError({
       code: error?.code,
       message: error?.message ?? "Stripe Connect request failed.",
@@ -324,4 +325,18 @@ async function stripeGet<T>(path: string, secretKey: string) {
   }
 
   return payload as T;
+}
+
+function getStripeError(payload: unknown) {
+  if (
+    payload &&
+    typeof payload === "object" &&
+    "error" in payload &&
+    typeof payload.error === "object" &&
+    payload.error
+  ) {
+    return payload.error as StripeErrorPayload["error"];
+  }
+
+  return null;
 }

@@ -52,7 +52,7 @@
 
 ## Verification
 
-- Run `npm run lint` after code changes.
+- Run `npm run typecheck` and `npm run lint` after code changes.
 - Run `npm test` before presenting a meaningful repo change.
 - For customer-facing UI changes, also open the affected flow in a real browser
   viewport and verify the primary interactive state.

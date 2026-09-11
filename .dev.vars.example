@@ -30,13 +30,9 @@ TAKE_A_SEAT_ADMIN_PHONES="13035550000"
 # Optional local-only admin bypass for development. Keep false outside localhost.
 TAKE_A_SEAT_DEV_ADMIN_ENABLED="false"
 
-# Stripe Price IDs for Amber's bookable seats.
-STRIPE_PRICE_AMBER_15="price_replace_me"
-STRIPE_PRICE_AMBER_30="price_replace_me"
-
-# Nikki B. launch keys.
-STRIPE_PRICE_NIKKI_15="price_replace_me"
-STRIPE_PRICE_NIKKI_30="price_replace_me"
+# Ella checkout test keys.
+STRIPE_PRICE_ELLA_15="price_replace_me"
+STRIPE_PRICE_ELLA_30="price_replace_me"
 
 # Annabel internal checkout test keys.
 STRIPE_PRICE_ANNABEL_15="price_replace_me"
