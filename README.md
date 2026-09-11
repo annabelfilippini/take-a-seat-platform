@@ -93,6 +93,7 @@ Cloudflare production bindings are declared in `wrangler.deploy.jsonc`.
 
 - `docs/take-a-seat-control-map.md`: source of truth for product, architecture,
   environments, roles, and cleanup.
+- `CONTRIBUTING.md`: GitHub branch, commit, PR, review, and deploy flow.
 - `docs/creator-platform-plan.md`: longer creator marketplace and integrations
   plan.
 - `docs/influencer-onboarding.md`: practical creator launch checklist and
