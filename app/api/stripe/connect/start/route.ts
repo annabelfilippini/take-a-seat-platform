@@ -1,5 +1,6 @@
 import {
   createCreatorOnboardingProfile,
+  getCreatorApplication,
   getCreatorOnboardingInput,
   getCreatorOnboardingProfileId,
 } from "../../../../_lib/creator-onboarding";
@@ -59,6 +60,7 @@ export async function GET(request: Request) {
   const onboardingProfileId = getCreatorOnboardingProfileId(url);
   let creatorId = creator?.id ?? onboardingProfileId;
   let displayName = creator?.name ?? input?.name ?? "Take a Seat creator";
+  let contactEmail = input?.email ?? null;
 
   if (!creatorId && !input) {
     return redirectWithStripeStatus(request, returnTo, "error", "profile-required");
@@ -87,10 +89,26 @@ export async function GET(request: Request) {
   const country = getConnectCountry();
 
   try {
+    if (!contactEmail) {
+      const profile = await getCreatorApplication(creatorId);
+      contactEmail = profile?.email ?? null;
+      displayName = profile?.name ?? displayName;
+    }
+
+    if (!contactEmail) {
+      return redirectWithStripeStatus(
+        request,
+        returnTo,
+        "error",
+        "creator-email-required",
+      );
+    }
+
     const existingConnection = await getCreatorStripeConnection(creatorId);
     const account =
       existingConnection ??
       (await createConnectedAccount({
+        contactEmail,
         country,
         creatorId,
         displayName,

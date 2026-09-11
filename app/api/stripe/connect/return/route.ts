@@ -3,6 +3,9 @@ import {
   markStripeConnected,
 } from "../../../../_lib/creator-onboarding";
 import {
+  getConnectedAccountTransferStatus,
+  getCreatorStripeConnection,
+  getStripeSecretKey,
   markCreatorStripeReturned,
 } from "../../../../_lib/stripe-connect";
 
@@ -45,11 +48,56 @@ export async function GET(request: Request) {
     return redirectWithStripeStatus(request, returnTo, "error", "profile-required");
   }
 
+  const secretKey = getStripeSecretKey();
+
+  if (!secretKey) {
+    return redirectWithStripeStatus(request, returnTo, "setup-needed", "stripe-secret");
+  }
+
   try {
-    await Promise.all([
-      markCreatorStripeReturned(creatorId),
-      markStripeConnected(creatorId),
-    ]);
+    await markCreatorStripeReturned(creatorId);
+  } catch {
+    return redirectWithStripeStatus(request, returnTo, "setup-needed", "d1");
+  }
+
+  let stripeAccountId: string | null = null;
+
+  try {
+    const connection = await getCreatorStripeConnection(creatorId);
+    stripeAccountId = connection?.stripeAccountId ?? null;
+  } catch {
+    return redirectWithStripeStatus(request, returnTo, "setup-needed", "d1");
+  }
+
+  if (!stripeAccountId) {
+    return redirectWithStripeStatus(request, returnTo, "setup-needed", "stripe-connect");
+  }
+
+  try {
+    const transferStatus = await getConnectedAccountTransferStatus({
+      accountId: stripeAccountId,
+      secretKey,
+    });
+
+    if (transferStatus !== "active") {
+      return redirectWithStripeStatus(
+        request,
+        returnTo,
+        "setup-needed",
+        "stripe-transfers",
+      );
+    }
+  } catch {
+    return redirectWithStripeStatus(
+      request,
+      returnTo,
+      "setup-needed",
+      "stripe-transfers",
+    );
+  }
+
+  try {
+    await markStripeConnected(creatorId);
   } catch {
     return redirectWithStripeStatus(request, returnTo, "setup-needed", "d1");
   }

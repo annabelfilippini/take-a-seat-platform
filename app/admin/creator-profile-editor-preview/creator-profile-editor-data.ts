@@ -38,6 +38,7 @@ export type EditableCreatorProfile = {
   seat30DurationMinutes: number | string;
   seat30Enabled: boolean;
   seat30PriceAmount: number | string;
+  stripeConnectedAt?: string | null;
   tiktokHandle: string;
   tiktokUrl: string;
   timezone: string;
@@ -105,6 +106,7 @@ export const annabelMockProfile: EditableCreatorProfile = {
   seat30DurationMinutes: 30,
   seat30Enabled: true,
   seat30PriceAmount: 80,
+  stripeConnectedAt: null,
   tiktokHandle: "",
   tiktokUrl: "",
   timezone: "America/Los_Angeles",
@@ -144,6 +146,7 @@ export function getEditableCreatorProfile(
     seat30DurationMinutes: profile.seat30DurationMinutes,
     seat30Enabled: profile.seat30Enabled,
     seat30PriceAmount: getEditablePriceAmount(profile.seat30PriceAmount),
+    stripeConnectedAt: profile.stripeConnectedAt,
     tiktokHandle: profile.tiktokHandle,
     tiktokUrl: getSocialUrl(profile.tiktokHandle, "tiktok"),
     timezone: profile.timezone,

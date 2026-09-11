@@ -59,6 +59,7 @@ type EditableProfileState = {
   seat30DurationMinutes: EditableDurationValue;
   seat30Enabled: boolean;
   seat30PriceAmount: EditablePriceValue;
+  stripeConnectedAt?: string | null;
   tiktokHandle: string;
   tiktokUrl: string;
   timezone: string;
@@ -1617,7 +1618,10 @@ function EditablePaymentsPanel({
   profile: EditableProfileState;
   onEditProfile: () => void;
 }) {
-  const [stripeConnected, setStripeConnected] = useState(false);
+  const stripeConnected = Boolean(profile.stripeConnectedAt);
+  const stripeConnectHref = `/api/stripe/connect/start?creatorId=${encodeURIComponent(
+    profile.id,
+  )}&returnTo=${encodeURIComponent(CREATOR_PROFILE_EDITOR_URL)}`;
 
   return (
     <div className="editable-editor-panel editable-wide-editor-panel">
@@ -1655,13 +1659,12 @@ function EditablePaymentsPanel({
       </dl>
 
       <div className="creator-connect-actions">
-        <button
+        <a
           className="seat-primary-button"
-          onClick={() => setStripeConnected((current) => !current)}
-          type="button"
+          href={stripeConnectHref}
         >
           {stripeConnected ? "Update Stripe" : "Connect Stripe"}
-        </button>
+        </a>
         <button className="seat-secondary-button" onClick={onEditProfile} type="button">
           Edit prices in Profile
         </button>

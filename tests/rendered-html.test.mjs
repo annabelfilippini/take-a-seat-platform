@@ -290,6 +290,10 @@ test("server-renders the admin creator profile editor preview", async () => {
   assert.match(html, />Save availability<\/button>/);
   assert.match(html, /Stripe payouts/);
   assert.match(html, /Connect Stripe/);
+  assert.match(
+    html,
+    /href="\/api\/stripe\/connect\/start\?creatorId=onboard_annabel_mock_profile&amp;returnTo=%2Fcreators%2Fdashboard"/,
+  );
   assert.match(html, /Booking notifications/);
   assert.match(html, /name="booking-email-notifications"[^>]*checked/);
   assert.match(html, /name="booking-text-notifications"[^>]*checked/);
@@ -764,6 +768,41 @@ test("asks for Stripe setup before starting Connect onboarding", async () => {
   assert.match(
     response.headers.get("location") ?? "",
     /\/creators\/onboard\?stripe=setup-needed&detail=stripe-secret/,
+  );
+
+  const [startRoute, stripeConnect] = await Promise.all([
+    readFile(new URL("../app/api/stripe/connect/start/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/_lib/stripe-connect.ts", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(startRoute, /getCreatorApplication\(creatorId\)/);
+  assert.match(startRoute, /"creator-email-required"/);
+  assert.match(startRoute, /contactEmail,/);
+  assert.match(stripeConnect, /contact_email:\s*contactEmail/);
+});
+
+test("checks Stripe transfer readiness before marking Connect returned accounts connected", async () => {
+  const response = await render(
+    "/api/stripe/connect/return?creatorId=onboard_test&returnTo=/creators/onboard",
+  );
+  assert.equal(response.status, 303);
+  assert.match(
+    response.headers.get("location") ?? "",
+    /\/creators\/onboard\?stripe=setup-needed&detail=stripe-secret/,
+  );
+
+  const returnRoute = await readFile(
+    new URL("../app/api/stripe/connect/return/route.ts", import.meta.url),
+    "utf8",
+  );
+  assert.match(returnRoute, /getCreatorStripeConnection\(creatorId\)/);
+  assert.match(returnRoute, /getConnectedAccountTransferStatus\(\{/);
+  assert.match(returnRoute, /transferStatus !== "active"/);
+  assert.match(returnRoute, /"setup-needed",\s*"stripe-transfers"/);
+  assert.match(returnRoute, /await markStripeConnected\(creatorId\)/);
+  assert.ok(
+    returnRoute.indexOf("const transferStatus = await getConnectedAccountTransferStatus") <
+      returnRoute.indexOf("await markStripeConnected"),
   );
 });
 

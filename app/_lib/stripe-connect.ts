@@ -187,11 +187,13 @@ export async function markCreatorStripeReturned(creatorId: string) {
 }
 
 export async function createConnectedAccount({
+  contactEmail,
   country,
   creatorId,
   displayName,
   secretKey,
 }: {
+  contactEmail: string;
   country: string;
   creatorId: string;
   displayName: string;
@@ -212,6 +214,7 @@ export async function createConnectedAccount({
           },
         },
       },
+      contact_email: contactEmail,
       dashboard: "express",
       defaults: {
         responsibilities: {
