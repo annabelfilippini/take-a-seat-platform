@@ -1,6 +1,9 @@
 import { headers } from "next/headers";
 import { getSignedInClerkUserFromHeaders } from "./clerk-auth";
-import { getCreatorDashboardAccount } from "./creator-onboarding";
+import {
+  claimCreatorInvite,
+  getCreatorDashboardAccount,
+} from "./creator-onboarding";
 import {
   getCreatorNotificationPreferences,
   listCreatorNotifications,
@@ -8,6 +11,7 @@ import {
 
 export async function getSignedInCreatorEditorAccount(
   requestPath = "/creators/dashboard",
+  inviteToken?: string | null,
 ) {
   const requestHeaders = await headers();
   const mutableHeaders = new Headers(requestHeaders);
@@ -21,6 +25,10 @@ export async function getSignedInCreatorEditorAccount(
   }
 
   try {
+    if (inviteToken) {
+      await claimCreatorInvite(inviteToken, user);
+    }
+
     const account = await getCreatorDashboardAccount(user);
 
     if (!("profile" in account)) {

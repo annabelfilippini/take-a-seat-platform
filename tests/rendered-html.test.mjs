@@ -230,6 +230,16 @@ test("legacy creator auth paths redirect into current auth and creator dashboard
   assert.match(dashboardHtml, /redirect_url=%2Fcreators%2Fdashboard/);
   assert.doesNotMatch(dashboardHtml, /Creator Profile Editor Preview/);
 
+  const invitedDashboardResponse = await render(
+    "/creators/dashboard?invite=test_invite_token",
+  );
+  assert.equal(invitedDashboardResponse.status, 200);
+  const invitedDashboardHtml = await invitedDashboardResponse.text();
+  assert.match(
+    invitedDashboardHtml,
+    /redirect_url=%2Fcreators%2Fdashboard%3Finvite%3Dtest_invite_token/,
+  );
+
   const retiredSetupResponse = await render(
     "/creators/onboard/accepted?creatorId=onboard_test",
   );
@@ -440,11 +450,12 @@ test("wires accepted creators to public profile publishing", async () => {
 });
 
 test("notifies accepted creators in email, text, and profile", async () => {
-  const [acceptRoute, inviteRoute, email, notifications, editor] = await Promise.all([
+  const [acceptRoute, dashboard, inviteRoute, email, notifications, editor] = await Promise.all([
     readFile(
       new URL("../app/api/creators/applications/accept/route.ts", import.meta.url),
       "utf8",
     ),
+    readFile(new URL("../app/_lib/creator-dashboard.ts", import.meta.url), "utf8"),
     readFile(
       new URL("../app/api/creators/applications/invite/route.ts", import.meta.url),
       "utf8",
@@ -463,6 +474,8 @@ test("notifies accepted creators in email, text, and profile", async () => {
   assert.match(acceptRoute, /sendCreatorAcceptedEmail/);
   assert.match(acceptRoute, /sendCreatorAcceptedSms/);
   assert.match(acceptRoute, /createCreatorAcceptedNotification/);
+  assert.match(dashboard, /claimCreatorInvite/);
+  assert.match(dashboard, /inviteToken/);
   assert.match(inviteRoute, /sendCreatorAcceptedEmail/);
   assert.match(inviteRoute, /createCreatorInvite/);
   assert.match(inviteRoute, /applicationStatus !== "accepted"/);
@@ -557,6 +570,10 @@ test("server-renders Ella's profile page", async () => {
 
   const html = await response.text();
   assert.match(html, /<title>Take a Seat with Ella McLane<\/title>/i);
+  assert.match(
+    html,
+    /<a(?=[^>]*class="brand-mark")(?=[^>]*href="\/")(?=[^>]*aria-label="Take a Seat home")[^>]*>Take a Seat<\/a>/,
+  );
   assert.match(html, /Ella McLane/);
   assert.match(html, /@ellamclane2/);
   assert.match(html, /https:\/\/www\.instagram\.com\/ellamclane2\//);
