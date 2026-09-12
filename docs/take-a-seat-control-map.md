@@ -139,8 +139,9 @@ Payments:
   `payment_authorized` -> creator acceptance/capture -> `paid` -> calendar
   confirmation. The creator request inbox should show actionable requests after
   payment authorization.
-- Stripe test mode is configured with Ella 15 and 30 minute Price IDs and a
-  signed webhook endpoint at `/api/stripe/webhook` for successful Checkout
+- Stripe Checkout can use existing seed/demo Price IDs when configured, or
+  inline Checkout price data from accepted creators' saved seat prices. A signed
+  webhook endpoint lives at `/api/stripe/webhook` for successful Checkout
   payment events.
 - Connect onboarding requires a creator contact email, and returned accounts
   are only marked connected after Stripe reports transfer readiness as active.
@@ -280,8 +281,8 @@ Required or expected production secrets:
 - `STRIPE_SECRET_KEY`
 - `STRIPE_WEBHOOK_SECRET`
 - `STRIPE_CONNECT_COUNTRY`
-- Creator Stripe Price IDs such as `STRIPE_PRICE_ELLA_15` and
-  `STRIPE_PRICE_ELLA_30`
+- Optional seed/demo creator Stripe Price IDs such as `STRIPE_PRICE_ELLA_15`
+  and `STRIPE_PRICE_ELLA_30`
 
 ## Recommended Cleanup Sequence
 

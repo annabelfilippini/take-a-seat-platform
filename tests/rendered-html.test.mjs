@@ -591,6 +591,7 @@ test("wires accepted creators to public profile publishing", async () => {
   assert.match(customerBookingFlow, /action="\/api\/bookings\/request"/);
   assert.match(customerBookingFlow, /selectedSlot\?\.sourceAppointmentStartAt/);
   assert.match(customerBookingFlow, /selectedSlot\?\.sourceTimezone/);
+  assert.match(customerBookingFlow, /What do you want to talk about with \{creatorName\}\?/);
   assert.match(customerBookingFlow, /You won't be charged unless \$\{creatorName\} accepts/);
   assert.match(customerBookingFlow, /Go to payment next/);
   assert.match(bookingsLib, /accepted: "accepted"/);
@@ -1051,8 +1052,14 @@ test("starts Google Calendar OAuth for a creator", async () => {
         "http://localhost:3000/api/google-calendar/oauth/callback",
     },
     async () => {
-      const response = await render(
+      const response = await dispatch(
         "/api/google-calendar/oauth/start?creatorId=ella&returnTo=/creators/onboard",
+        {
+          headers: {
+            accept: "text/html",
+            "oai-authenticated-user-email": "annabelflip1@gmail.com",
+          },
+        },
       );
       assert.equal(response.status, 303);
 
@@ -1081,6 +1088,30 @@ test("starts Google Calendar OAuth for a creator", async () => {
         /https:\/\/www\.googleapis\.com\/auth\/calendar\.events\.owned/,
       );
       assert.match(response.headers.get("set-cookie") ?? "", /HttpOnly/);
+    },
+  );
+});
+
+test("requires creator access before starting Google Calendar OAuth", async () => {
+  await withEnv(
+    {
+      GOOGLE_CLIENT_ID: "test-client.apps.googleusercontent.com",
+      GOOGLE_CLIENT_SECRET: "test-client-secret",
+      GOOGLE_OAUTH_REDIRECT_URI:
+        "http://localhost:3000/api/google-calendar/oauth/callback",
+    },
+    async () => {
+      const response = await dispatch(
+        "/api/google-calendar/oauth/start?creatorId=ella&returnTo=/creators/dashboard",
+        {
+          headers: { accept: "text/html" },
+        },
+      );
+      assert.equal(response.status, 303);
+      assert.match(
+        response.headers.get("location") ?? "",
+        /\/creators\/dashboard\?calendar=setup-needed&detail=creator-auth/,
+      );
     },
   );
 });
@@ -1115,15 +1146,40 @@ test("asks for Stripe setup before starting Connect onboarding", async () => {
     /\/creators\/onboard\?stripe=setup-needed&detail=stripe-secret/,
   );
 
-  const [startRoute, stripeConnect] = await Promise.all([
+  const [startRoute, returnRoute, stripeConnect] = await Promise.all([
     readFile(new URL("../app/api/stripe/connect/start/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/stripe/connect/return/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/_lib/stripe-connect.ts", import.meta.url), "utf8"),
   ]);
 
   assert.match(startRoute, /getCreatorApplication\(creatorId\)/);
+  assert.match(startRoute, /getCreatorIntegrationAccess\(request, creatorId\)/);
+  assert.doesNotMatch(startRoute, /createCreatorOnboardingProfile/);
+  assert.match(returnRoute, /getCreatorIntegrationAccess\(request, creatorId\)/);
   assert.match(startRoute, /"creator-email-required"/);
   assert.match(startRoute, /contactEmail,/);
   assert.match(stripeConnect, /contact_email:\s*contactEmail/);
+});
+
+test("requires creator access before starting Stripe Connect onboarding", async () => {
+  await withEnv(
+    {
+      STRIPE_SECRET_KEY: "sk_test_take_a_seat",
+    },
+    async () => {
+      const response = await dispatch(
+        "/api/stripe/connect/start?creatorId=ella&returnTo=/creators/dashboard",
+        {
+          headers: { accept: "text/html" },
+        },
+      );
+      assert.equal(response.status, 303);
+      assert.match(
+        response.headers.get("location") ?? "",
+        /\/creators\/dashboard\?stripe=setup-needed&detail=creator-auth/,
+      );
+    },
+  );
 });
 
 test("checks Stripe transfer readiness before marking Connect returned accounts connected", async () => {
@@ -1199,7 +1255,6 @@ test("creates Stripe Checkout destination charges with a platform fee", async ()
   try {
     await withEnv(
       {
-        STRIPE_PRICE_ELLA_15: "price_test_ella_15",
         STRIPE_SECRET_KEY: "sk_test_take_a_seat",
         TAKE_A_SEAT_TEST_BOOKINGS: "true",
         TAKE_A_SEAT_TEST_STRIPE_CONNECTIONS: JSON.stringify([
@@ -1254,7 +1309,13 @@ test("creates Stripe Checkout destination charges with a platform fee", async ()
   const body = stripeRequest.init.body;
   assert.equal(body.get("mode"), "payment");
   assert.equal(body.get("customer_email"), "customer@example.com");
-  assert.equal(body.get("line_items[0][price]"), "price_test_ella_15");
+  assert.equal(body.get("line_items[0][price]"), null);
+  assert.equal(body.get("line_items[0][price_data][currency]"), "usd");
+  assert.equal(
+    body.get("line_items[0][price_data][product_data][name]"),
+    "15 minutes with Ella McLane",
+  );
+  assert.equal(body.get("line_items[0][price_data][unit_amount]"), "5000");
   assert.match(body.get("client_reference_id") ?? "", /^booking_/);
   assert.match(body.get("metadata[booking_id]") ?? "", /^booking_/);
   assert.equal(body.get("metadata[appointment_start_at]"), "2026-09-17T09:30:00");

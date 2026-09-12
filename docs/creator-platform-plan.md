@@ -216,6 +216,7 @@ price. Take a Seat should generate the description beneath each length from the
 creator's detailed intake, then approve it before publishing.
 
 Annabel's test profile at `/with/annabel` is the first internal QA path for this
-dashboard shape. Before using it for real payments, add Annabel's Stripe Price
-IDs, finish Stripe-hosted onboarding, save availability, and add webhooks so
-paid bookings create calendar events from Stripe's confirmed payment event.
+dashboard shape. Before using it for real payments, finish Stripe-hosted
+onboarding, save availability, confirm inline Checkout pricing or optional
+seed/demo Price IDs, and add webhooks so paid bookings create calendar events
+from Stripe's confirmed payment event.

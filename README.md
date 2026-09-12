@@ -63,7 +63,7 @@ stay in ignored local env files or Cloudflare Worker secrets.
 - Email: Resend transactional email.
 - Calendar: Google Calendar OAuth groundwork.
 - Payments: Stripe Connect and Stripe Checkout groundwork, with test-mode
-  webhook and creator Price ID configuration.
+  webhook handling and inline Checkout pricing for accepted creators.
 
 Cloudflare production bindings are declared in `wrangler.deploy.jsonc`.
 

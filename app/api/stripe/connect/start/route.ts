@@ -1,9 +1,8 @@
 import {
-  createCreatorOnboardingProfile,
   getCreatorApplication,
-  getCreatorOnboardingInput,
   getCreatorOnboardingProfileId,
 } from "../../../../_lib/creator-onboarding";
+import { getCreatorIntegrationAccess } from "../../../../_lib/creator-access";
 import { getCreatorById } from "../../../../_lib/creators";
 import {
   buildStripeReturnUrl,
@@ -56,34 +55,20 @@ export async function GET(request: Request) {
     return redirectWithStripeStatus(request, returnTo, "setup-needed", "stripe-secret");
   }
 
-  const input = getCreatorOnboardingInput(url);
   const onboardingProfileId = getCreatorOnboardingProfileId(url);
-  let creatorId = creator?.id ?? onboardingProfileId;
-  let displayName = creator?.name ?? input?.name ?? "Take a Seat creator";
-  let contactEmail = input?.email ?? null;
-
-  if (!creatorId && !input) {
-    return redirectWithStripeStatus(request, returnTo, "error", "profile-required");
-  }
-
-  if (!creatorId && input) {
-    try {
-      creatorId = await createCreatorOnboardingProfile(input, onboardingProfileId);
-      displayName = input.name;
-    } catch {
-      return redirectWithStripeStatus(request, returnTo, "setup-needed", "d1");
-    }
-  } else if (creatorId && input && creatorId.startsWith("onboard_")) {
-    try {
-      creatorId = await createCreatorOnboardingProfile(input, creatorId);
-      displayName = input.name;
-    } catch {
-      return redirectWithStripeStatus(request, returnTo, "setup-needed", "d1");
-    }
-  }
+  const creatorId = creator?.id ?? onboardingProfileId;
+  let displayName = creator?.name ?? "Take a Seat creator";
+  let contactEmail = null;
 
   if (!creatorId) {
     return redirectWithStripeStatus(request, returnTo, "error", "profile-required");
+  }
+
+  const access = await getCreatorIntegrationAccess(request, creatorId);
+
+  if (access.status !== "allowed") {
+    const status = access.detail === "creator-auth" ? "setup-needed" : "error";
+    return redirectWithStripeStatus(request, returnTo, status, access.detail);
   }
 
   const country = getConnectCountry();

@@ -38,7 +38,8 @@ TAKE_A_SEAT_ADMIN_PHONES="13035550000"
 # Optional local-only admin bypass for development. Keep false outside localhost.
 TAKE_A_SEAT_DEV_ADMIN_ENABLED="false"
 
-# Stripe Price IDs for Ella's bookable seats.
+# Optional Stripe Price IDs for seed/demo profiles. Accepted marketplace
+# creators can use inline Checkout price data from their saved seat prices.
 STRIPE_PRICE_ELLA_15="price_replace_me"
 STRIPE_PRICE_ELLA_30="price_replace_me"
 

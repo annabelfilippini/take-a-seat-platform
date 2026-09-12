@@ -1,4 +1,4 @@
-import { getSeatById } from "../../../_lib/creators";
+import { getSeatById, type Seat } from "../../../_lib/creators";
 import {
   attachStripeCheckoutSession,
   createCheckoutBooking,
@@ -158,7 +158,9 @@ async function createStripeCheckoutSession(
   request: Request,
   secretKey: string,
   payload: Required<Pick<CheckoutPayload, "creatorId" | "seatId">>,
-  priceId: string,
+  priceId: string | null,
+  creatorName: string,
+  seat: Seat,
   destinationAccountId: string,
   applicationFeeAmount: number,
   returnTo: string,
@@ -189,8 +191,7 @@ async function createStripeCheckoutSession(
   params.set("client_reference_id", bookingId);
   params.set("metadata[appointment_start_at]", bookingInput.appointmentStartAt);
   params.set("metadata[booking_id]", bookingId);
-  params.set("line_items[0][price]", priceId);
-  params.set("line_items[0][quantity]", "1");
+  setStripeLineItemParams(params, creatorName, seat, priceId);
   params.set("metadata[customer_email]", bookingInput.customerEmail);
   params.set("metadata[customer_name]", bookingInput.customerName ?? "");
   params.set("metadata[timezone]", bookingInput.timezone);
@@ -281,7 +282,7 @@ export async function POST(request: Request) {
     );
   }
 
-  if (!priceId) {
+  if (!priceId && !canUseInlineStripePrice(seat)) {
     return redirectTo(
       appendBookingStatus(request, returnTo, "setup-needed", "stripe-price"),
     );
@@ -353,6 +354,8 @@ export async function POST(request: Request) {
         seatId: seat.id,
       },
       priceId,
+      creator.name,
+      seat,
       connection.stripeAccountId,
       applicationFeeAmount,
       returnTo,
@@ -374,4 +377,36 @@ export async function POST(request: Request) {
       appendBookingStatus(request, returnTo, "error", "stripe-session"),
     );
   }
+}
+
+function setStripeLineItemParams(
+  params: URLSearchParams,
+  creatorName: string,
+  seat: Seat,
+  priceId: string | null,
+) {
+  if (priceId) {
+    params.set("line_items[0][price]", priceId);
+  } else {
+    params.set("line_items[0][price_data][currency]", getSeatCurrency(seat));
+    params.set(
+      "line_items[0][price_data][product_data][name]",
+      `${seat.name} with ${creatorName}`,
+    );
+    params.set("line_items[0][price_data][unit_amount]", String(seat.unitAmount));
+  }
+
+  params.set("line_items[0][quantity]", "1");
+}
+
+function canUseInlineStripePrice(seat: Seat) {
+  return (
+    Number.isSafeInteger(seat.unitAmount) &&
+    seat.unitAmount > 0 &&
+    /^[a-z]{3}$/u.test(getSeatCurrency(seat))
+  );
+}
+
+function getSeatCurrency(seat: Seat) {
+  return (seat.currency ?? "usd").trim().toLowerCase();
 }

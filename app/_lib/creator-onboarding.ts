@@ -1152,6 +1152,7 @@ function createPublishedSeat(
   const minutes = durationMinutes || duration;
 
   return {
+    currency: (profile.currency || "USD").toLowerCase(),
     description:
       description || `A ${minutes} minute private call with ${profile.name}.`,
     format: "Private video call",
