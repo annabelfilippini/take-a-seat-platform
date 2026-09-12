@@ -106,6 +106,10 @@ Auth:
   admin phones.
 - Creator access is based on accepted creator profile identity and creator
   account links in D1.
+- If an invitation matches a signed-in creator who already owns a profile from
+  an earlier application, the dashboard opens that existing profile. Duplicate
+  applications do not replace ownership or publish another card. A wrong-account
+  invitation shows account switching without a Continue link back into the error.
 
 Email:
 

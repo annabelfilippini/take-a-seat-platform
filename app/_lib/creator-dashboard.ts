@@ -1,5 +1,5 @@
 import { headers } from "next/headers";
-import { getSignedInClerkUserFromHeaders } from "./clerk-auth";
+import { getSignedInClerkUserFromHeaders, type TakeASeatClerkUser } from "./clerk-auth";
 import {
   claimCreatorInvite,
   getCreatorDashboardAccount,
@@ -25,14 +25,11 @@ export async function getSignedInCreatorEditorAccount(
       return null;
     }
 
-    if (inviteToken) {
-      const claim = await claimCreatorInvite(inviteToken, user);
-      if (["identity-mismatch", "needs-identity", "account-mismatch"].includes(claim.status)) {
-        return { accessError: "This account does not match the accepted application. Sign out below and use the email address you applied with." };
-      }
-    }
+    const account = await getCreatorDashboardAccountFromInvite(user, inviteToken);
 
-    const account = await getCreatorDashboardAccount(user);
+    if ("accessError" in account) {
+      return account;
+    }
 
     if (!("profile" in account)) {
       return { accessError: "No accepted creator profile is linked to this account. Use the email address from your accepted application, or contact Take a Seat for help." };
@@ -74,6 +71,22 @@ export async function getSignedInCreatorEditorAccount(
   } catch {
     return { accessError: "We could not load your profile right now. Please try again shortly. Your saved profile has not been changed." };
   }
+}
+
+export async function getCreatorDashboardAccountFromInvite(
+  user: TakeASeatClerkUser,
+  inviteToken?: string | null,
+) {
+  if (inviteToken) {
+    const claim = await claimCreatorInvite(inviteToken, user);
+    if (claim.status === "identity-mismatch" || claim.status === "needs-identity") {
+      return { accessError: "This account does not match the accepted application. Sign out below and use the email address you applied with." };
+    }
+    // A matching recipient may already own a profile from an earlier application.
+    // Resolve their existing ownership; never transfer it to the duplicate invite.
+  }
+
+  return getCreatorDashboardAccount(user);
 }
 
 function requestUrlFromHeaders(requestHeaders: Headers, path: string) {

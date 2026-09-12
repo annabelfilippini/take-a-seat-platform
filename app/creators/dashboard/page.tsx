@@ -83,6 +83,7 @@ function CreatorDashboardAccess({
             codeHeading="Enter your verification code."
             redirectUrl={redirectUrl}
             routeByAccount={!inviteToken}
+            showSignedInContinue={!accessError}
             submitLabel="Send verification code"
           />
         ) : (

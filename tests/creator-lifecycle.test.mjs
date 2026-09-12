@@ -164,3 +164,35 @@ test("Clerk refresh redirects, forwards cookies, and authenticates the first ret
     return new Response("Saved");
   }, async () => { throw new Error("Never redirect a submitted form"); });
 });
+
+test("duplicate acceptance links return the matching creator to their existing profile", async () => {
+  const { getCreatorDashboardAccountFromInvite } = await import("../app/_lib/creator-dashboard.ts");
+  const insert = sqlite.prepare("INSERT INTO creator_onboarding_profiles (id, name, email, instagram_platform, bio, application_status, public_slug) VALUES (?, ?, ?, ?, ?, 'accepted', ?)");
+  insert.run("invite-original", "Existing Creator", "duplicate@example.com", "test", "Saved original", "invite-original");
+  insert.run("invite-duplicate", "Duplicate Creator", "duplicate@example.com", "test", "Unfinished duplicate", "invite-duplicate");
+  insert.run("invite-stranger", "Other Creator", "other@example.com", "test", "Other profile", "invite-stranger");
+  const owner = { userId: "user_duplicate", email: "duplicate@example.com", phone: null, sessionId: "session_duplicate" };
+  const stranger = { userId: "user_other", email: "other@example.com", phone: null, sessionId: "session_other" };
+  const originalInvite = await domain.createCreatorInvite(await domain.getCreatorApplication("invite-original"));
+  assert.equal((await domain.claimCreatorInvite(originalInvite.token, owner)).status, "claimed");
+  const otherInvite = await domain.createCreatorInvite(await domain.getCreatorApplication("invite-stranger"));
+  assert.equal((await domain.claimCreatorInvite(otherInvite.token, stranger)).status, "claimed");
+  const duplicate = await domain.createCreatorInvite(await domain.getCreatorApplication("invite-duplicate"));
+  assert.equal((await domain.claimCreatorInvite(duplicate.token, owner)).status, "account-mismatch");
+  const before = sqlite.prepare("SELECT * FROM creator_accounts WHERE clerk_user_id = ?").get(owner.userId);
+  const duplicateBefore = await domain.getCreatorApplication("invite-duplicate");
+  for (let visit = 0; visit < 2; visit++) {
+    const account = await getCreatorDashboardAccountFromInvite(owner, duplicate.token);
+    assert.equal(account.profile.id, "invite-original");
+    assert.equal(account.profile.bio, "Saved original");
+    assert.equal(await domain.canManageCreatorProfile("invite-duplicate", owner), false);
+  }
+  assert.deepEqual(sqlite.prepare("SELECT * FROM creator_accounts WHERE clerk_user_id = ?").get(owner.userId), before);
+  assert.deepEqual(await domain.getCreatorApplication("invite-duplicate"), duplicateBefore);
+  assert.equal((await domain.getCreatorInvitePreview(duplicate.token)).usedAt, null);
+  // An unrelated creator must still be asked to switch identities, even with an account.
+  assert.match((await getCreatorDashboardAccountFromInvite(stranger, duplicate.token)).accessError, /does not match/);
+  assert.match((await getCreatorDashboardAccountFromInvite({ ...owner, email: null }, duplicate.token)).accessError, /does not match/);
+  assert.equal((await getCreatorDashboardAccountFromInvite(owner, originalInvite.token)).profile.id, "invite-original");
+  assert.equal((await getCreatorDashboardAccountFromInvite(owner)).profile.id, "invite-original");
+});
