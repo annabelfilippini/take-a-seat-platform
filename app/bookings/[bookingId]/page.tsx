@@ -39,7 +39,6 @@ export default async function BookingPage({
   }
 
   const calendarStatus = getStatus(searchParams?.calendar);
-  const bookingStatus = getStatus(searchParams?.booking);
   const canApprove = await canApproveBooking(booking);
   const googleCalendarHref = getGoogleCalendarTemplateUrl(booking);
   const calendarFileHref = `/api/bookings/${encodeURIComponent(
@@ -66,11 +65,10 @@ export default async function BookingPage({
         <article className="booking-card">
           <span>Booking</span>
           <h1 id="booking-heading">
-            {getBookingHeading(booking.status, bookingStatus)}
+            {getBookingHeading(booking.status)}
           </h1>
           <p>
-            Stripe has the payment information for this request. The customer
-            is charged only if the creator accepts the appointment.
+            {getPaymentDescription(booking.status)}
           </p>
 
           {calendarStatus ? (
@@ -98,14 +96,14 @@ export default async function BookingPage({
             </div>
           </dl>
 
-          <div className="creator-connect-actions">
+          {booking.status === "approved" ? <div className="creator-connect-actions">
             <a className="seat-primary-button" href={googleCalendarHref}>
               Add to Google Calendar
             </a>
             <a className="seat-secondary-button" href={calendarFileHref}>
               Download calendar file
             </a>
-          </div>
+          </div> : null}
 
           {booking.googleCalendarHtmlLink ? (
             <a className="booking-profile-link" href={booking.googleCalendarHtmlLink}>
@@ -188,7 +186,9 @@ function formatStatus(value: string) {
   return value.replace(/_/g, " ");
 }
 
-function getBookingHeading(status: string, bookingStatus: string | null) {
+function getBookingHeading(status: string) {
+  if (status === "checkout_expired") return "Checkout expired.";
+  if (status === "payment_canceled") return "Payment authorization ended.";
   if (status === "approved") {
     return "Appointment confirmed.";
   }
@@ -197,16 +197,12 @@ function getBookingHeading(status: string, bookingStatus: string | null) {
     return "Payment captured.";
   }
 
-  if (status === "payment_authorized" || bookingStatus === "authorized") {
+  if (status === "payment_authorized") {
     return "Payment authorized.";
   }
 
   if (status === "accepted") {
     return "Seat request accepted.";
-  }
-
-  if (bookingStatus === "success") {
-    return "Your seat is requested.";
   }
 
   return "Seat request";
@@ -257,4 +253,20 @@ function requestUrlFromHeaders(requestHeaders: Headers, path: string) {
   const protocol = requestHeaders.get("x-forwarded-proto") ?? "https";
 
   return `${protocol}://${host}${path}`;
+}
+
+function getPaymentDescription(status: string) {
+  if (status === "payment_canceled" || status === "checkout_expired") {
+    return "This request is no longer active. Your payment has not been captured. Please start a new booking request.";
+  }
+  if (status === "approved") {
+    return "Your payment has been captured and your appointment is confirmed.";
+  }
+  if (status === "paid") {
+    return "Your payment has been captured. Your appointment is confirmed when the creator's calendar invite is sent.";
+  }
+  if (status === "payment_authorized") {
+    return "Your payment is authorized. You are charged only if the creator accepts before the authorization expires.";
+  }
+  return "Payment authorization is still required. This appointment is not confirmed.";
 }

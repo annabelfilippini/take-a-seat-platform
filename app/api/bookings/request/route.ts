@@ -336,6 +336,7 @@ async function createManualCaptureCheckoutSession({
     success_url: successUrl,
   });
 
+  params.set("expires_at", String(Math.floor(Date.now() / 1000) + 30 * 60));
   params.set("client_reference_id", bookingId);
   setStripeLineItemParams(params, creator, seat, priceId);
   params.set("metadata[appointment_start_at]", bookingInput.appointmentStartAt);
@@ -372,6 +373,7 @@ async function postStripeCheckoutSession(
       authorization: `Bearer ${secretKey}`,
       "content-type": "application/x-www-form-urlencoded",
       "stripe-version": STRIPE_API_VERSION,
+      "idempotency-key": `take-a-seat-checkout-${params.get("client_reference_id")}`,
     },
     method: "POST",
   });

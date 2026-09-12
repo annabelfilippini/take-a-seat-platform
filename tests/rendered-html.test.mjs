@@ -616,10 +616,10 @@ test("wires accepted creators to public profile publishing", async () => {
   assert.match(dynamicProfilePage, /<CustomerBookingFlow/);
   assert.match(dynamicProfilePage, /availabilityRules=\{creator\.availabilityRules\}/);
   assert.match(dynamicProfilePage, /won&apos;t be charged unless the creator accepts/);
-  assert.match(checkoutRoute, /getBookableCreatorById/);
+  assert.match(requestRoute, /getBookableCreatorById/);
   assert.match(requestRoute, /createBookingRequest/);
   assert.match(requestRoute, /isBookingSlotAvailable/);
-  assert.match(checkoutRoute, /isBookingSlotAvailable/);
+  assert.match(checkoutRoute, /export \{ POST \} from "..\/..\/bookings\/request\/route"/);
   assert.match(customerBookingFlow, /Find Availability/);
   assert.match(customerBookingFlow, /action="\/api\/bookings\/request"/);
   assert.match(customerBookingFlow, /selectedSlot\?\.sourceAppointmentStartAt/);
@@ -1405,6 +1405,9 @@ test("creates Stripe Checkout destination charges with a platform fee", async ()
 
   const body = stripeRequest.init.body;
   assert.equal(body.get("mode"), "payment");
+  assert.equal(body.get("payment_intent_data[capture_method]"), "manual");
+  assert.ok(Math.abs(Number(body.get("expires_at")) - Math.floor(Date.now() / 1000) - 1800) < 10);
+  assert.equal(new Headers(stripeRequest.init.headers).get("idempotency-key"), `take-a-seat-checkout-${body.get("client_reference_id")}`);
   assert.equal(body.get("customer_email"), "customer@example.com");
   assert.equal(body.get("line_items[0][price]"), null);
   assert.equal(body.get("line_items[0][price_data][currency]"), "usd");
@@ -1419,7 +1422,7 @@ test("creates Stripe Checkout destination charges with a platform fee", async ()
   assert.equal(body.get("metadata[customer_email]"), "customer@example.com");
   assert.equal(body.get("metadata[customer_name]"), "Customer Example");
   assert.equal(body.get("metadata[timezone]"), "America/New_York");
-  assert.equal(body.get("metadata[charge_pattern]"), "destination_charge");
+  assert.equal(body.get("metadata[charge_pattern]"), "manual_capture_destination_charge");
   assert.match(body.get("payment_intent_data[metadata][booking_id]") ?? "", /^booking_/);
   assert.equal(body.get("payment_intent_data[application_fee_amount]"), "750");
   assert.equal(
@@ -1429,7 +1432,7 @@ test("creates Stripe Checkout destination charges with a platform fee", async ()
   assert.equal(body.get("payment_method_types[0]"), null);
   assert.match(
     body.get("integration_identifier") ?? "",
-    /^take_a_seat_checkout_[a-z]{8}$/,
+    /^take_a_seat_hold_[a-z]{8}$/,
   );
 });
 
@@ -1532,6 +1535,9 @@ test("sends public booking requests to Stripe Checkout for payment authorization
 
   const body = stripeRequest.init.body;
   assert.equal(body.get("mode"), "payment");
+  assert.equal(body.get("payment_intent_data[capture_method]"), "manual");
+  assert.ok(Math.abs(Number(body.get("expires_at")) - Math.floor(Date.now() / 1000) - 1800) < 10);
+  assert.equal(new Headers(stripeRequest.init.headers).get("idempotency-key"), `take-a-seat-checkout-${body.get("client_reference_id")}`);
   assert.equal(body.get("customer_email"), "customer@example.com");
   assert.equal(body.get("line_items[0][price]"), "price_test_ella_15");
   assert.match(body.get("client_reference_id") ?? "", /^booking_/);

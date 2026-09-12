@@ -62,12 +62,6 @@ export async function GET(request: Request) {
     return redirectWithStripeStatus(request, returnTo, status, access.detail);
   }
 
-  try {
-    await markCreatorStripeReturned(creatorId);
-  } catch {
-    return redirectWithStripeStatus(request, returnTo, "setup-needed", "d1");
-  }
-
   let stripeAccountId: string | null = null;
 
   try {
@@ -105,6 +99,7 @@ export async function GET(request: Request) {
   }
 
   try {
+    await markCreatorStripeReturned(creatorId);
     await markStripeConnected(creatorId);
   } catch {
     return redirectWithStripeStatus(request, returnTo, "setup-needed", "d1");

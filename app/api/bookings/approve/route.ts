@@ -147,4 +147,8 @@ async function capturePaymentIntent(paymentIntentId: string, secretKey: string) 
   if (!response.ok) {
     throw new Error(`Stripe capture failed with ${response.status}`);
   }
+  const intent = await response.json() as { id?: string; status?: string };
+  if (intent.id !== paymentIntentId || intent.status !== "succeeded") {
+    throw new Error("Stripe has not confirmed capture");
+  }
 }

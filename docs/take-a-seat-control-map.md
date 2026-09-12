@@ -142,6 +142,10 @@ Calendar:
 
 Payments:
 
+- Launch status: live Connect setup is incomplete and no live creator account or
+  webhook is configured. See `docs/stripe-launch-readiness-2026-09-12.md` for the
+  verified audit, prepared repairs, required event subscriptions, and launch gates.
+
 - Stripe Connect is the chosen marketplace payment model.
 - Creators use Express connected accounts with Stripe-hosted onboarding and the
   Express dashboard.
@@ -156,8 +160,9 @@ Payments:
   payment authorization.
 - Stripe Checkout can use existing seed/demo Price IDs when configured, or
   inline Checkout price data from accepted creators' saved seat prices. A signed
-  webhook endpoint lives at `/api/stripe/webhook` for successful Checkout
-  payment events.
+  webhook endpoint lives at `/api/stripe/webhook` for Checkout completion/expiry
+  and PaymentIntent authorization, capture, and cancellation. Both checkout entry
+  routes use manual capture. Canceled/expired payments close unpaid requests.
 - Connect onboarding requires a creator contact email, and returned accounts
   are only marked connected after Stripe reports transfer readiness as active.
 
