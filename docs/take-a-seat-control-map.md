@@ -89,10 +89,12 @@ Database:
 
 Auth:
 
-- Clerk is the intended account system.
+- Clerk production instance: `ins_3JFOtf1Vw17O6o6hLdO7c5SwEAz`.
+- Frontend API: `clerk.takeaseatwith.com`; account portal: `accounts.takeaseatwith.com`.
 - Shared sign-in route: `/sign-in`.
 - Sign-in defaults to an email verification code using the application email.
-  Phone-code sign-in remains available for existing phone accounts.
+  Production uses email codes only. Phone-code requires a paid Clerk feature and
+  is hidden unless `TAKE_A_SEAT_PHONE_SIGN_IN_ENABLED=true` and Clerk supports it.
 - Clerk identities must have a verified primary email or phone before they can
   claim an accepted D1 profile. Later sign-ins return to `/creators/dashboard`.
 - Clerk and admin configuration read Cloudflare Worker bindings directly.
@@ -365,11 +367,11 @@ have:
   ownership, publishing, repeat login, and email transport failure handling.
 - Legacy trusted identity headers no longer grant admin access. Production admin
   access requires a verified Clerk identity on the allowlist.
-- Production inspection found `0014_great_omega_flight.sql` pending (three nullable
-  image-position columns). Apply it and `0015_majestic_stryfe.sql` (the profile-save
-  timestamp) before deploying this code.
-- Production currently uses Clerk development keys; no production instance is
-  configured in the linked Clerk project. Clerk CLI account OAuth needs renewal.
-- Automated browser attempts hit Clerk/Turnstile bot detection before OTP send.
-  Live email delivery and a complete real-user OTP/profile save rehearsal remain
-  required after approved production setup and deployment. Do not label them tested.
+- Production D1 now includes `0014_great_omega_flight.sql` (image positioning)
+  and `0015_majestic_stryfe.sql` (the profile-save timestamp), applied on 2026-09-12.
+- Production Clerk was created with email verification; account OAuth is restored.
+  All five CNAME records resolve and Clerk email DNS is verified. A real email
+  arrived in the existing creator's application inbox and its code completed
+  production sign-up. The verified identity is prepared for the existing D1 link.
+- A complete application/acceptance/profile-save rehearsal through the deployed
+  custom UI remains required. Portal verification alone does not prove that flow.

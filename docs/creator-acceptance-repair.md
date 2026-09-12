@@ -8,8 +8,8 @@ creator sign-in, profile editing, and publication on save.
 - Application emails identify the specific review page; applicants receive receipts.
 - Acceptance atomically prepares a private creator profile and reserves its URL.
   It sends a setup link to the application email and reports failed delivery.
-- Email verification is the default sign-in method. Phone verification remains
-  available for existing phone accounts. Wrong-account and service failures show
+- Email verification is the production sign-in method. Phone verification is
+  opt-in only when supported by the Clerk plan. Wrong-account and service failures show
   recovery text, and failed sends never fabricate a successful code request.
 - The Worker handles Clerk session refresh redirects and cookies instead of
   treating a refresh request as signed out. Configuration reads Worker bindings.
@@ -30,20 +30,28 @@ creator sign-in, profile editing, and publication on save.
   Phone fallback, empty-input validation, and category filtering exercised.
 - Production secret names exist for Clerk and Resend. No secret values were exposed.
 - A disposable Clerk development test account was created and removed.
+- With Annabel's explicit localhost approval, the protected editor was checked
+  at desktop and mobile sizes. A location edit persisted after reload and was
+  restored. The availability date picker fits both viewports.
+- The final Cloudflare deployment dry-run passes. Clerk account OAuth was
+  reconnected successfully; production readiness reports `not_started`.
+- Production Clerk was then created with email-code-only authentication after
+  cloning the development phone-code configuration failed its subscription gate.
+  All five DNS records were added in Cloudflare without proxying. Clerk reports
+  DNS and email readiness complete. A real production verification email arrived
+  in Annabel's application inbox, and its code completed account-portal sign-up.
 
 ## Remaining before claiming live completion
 
-- Finish the privileged creator editor browser check. Automatic approval review
-  blocked the localhost-only admin preview route; explicit approval is pending.
 - Complete actual OTP verification in a browser. Automated attempts were blocked
   by Clerk/Turnstile before code delivery. No real inbox or SMS delivery is proven.
-- Configure production Clerk rather than using the development instance. The
-  linked project has no production instance configured, and Clerk CLI account
-  OAuth is expired. Re-authentication and production domain setup are needed.
-- Apply migrations `0014_great_omega_flight.sql` and `0015_majestic_stryfe.sql`
-  to production before deploying this code. Both are applied locally.
-- Obtain Annabel's explicit production-deploy approval per AGENTS.md and
-  CONTRIBUTING.md; no production deployment occurred during this repair.
+- Switch the Worker to the prepared production Clerk keys together, preserving
+  unrelated secrets. The new production account has a verified application email.
+- Migrations `0014_great_omega_flight.sql` and `0015_majestic_stryfe.sql`
+  are applied to both local and production D1.
+- Annabel explicitly approved production Clerk setup, preservation of the
+  existing creator account link, both migrations, and deployment after verification
+  on 2026-09-12. No further approval is needed for that scope.
 - After deployment, run one controlled application through receipt, acceptance
   email, first verification, profile save, public card, sign-out, and repeat login.
 - The repo-wide optional TypeScript check has existing Calendar/Stripe typing
@@ -57,3 +65,8 @@ adds one nullable timestamp; it does not delete applications. Existing accepted
 D1 profiles need a save to publish under the new rule. Static seed cards remain.
 This repair is based on the existing profile-editing branch and should follow its
 PR into main, with production deployment from a clean, committed checkout.
+
+Switching Clerk environments changes user IDs. Before changing live keys, map
+the existing D1 creator account to the same verified identity in production Clerk.
+Preserve its creator ID and related profile/calendar/payment records. Do not
+relax profile ownership checks or delete the account to force a fresh claim.

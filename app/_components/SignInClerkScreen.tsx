@@ -9,6 +9,7 @@ import {
 } from "../_lib/creator-destination";
 
 type SignInClerkScreenProps = {
+  allowPhoneSignIn?: boolean;
   allowSignUpIfMissing?: boolean;
   className?: string;
   codeDescription?: string;
@@ -29,6 +30,7 @@ type AuthStep = "phone" | "code";
 const codeSendCooldownMs = 30_000;
 
 export function SignInClerkScreen({
+  allowPhoneSignIn = false,
   allowSignUpIfMissing = false,
   className = "account-auth-widget",
   codeDescription,
@@ -385,9 +387,9 @@ export function SignInClerkScreen({
               value={method === "email" ? email : phone}
             />
           </label>
-          <button className="phone-auth-text-button" type="button" disabled={submitting} onClick={() => { setMethod(method === "email" ? "phone" : "email"); setError(""); }}>
+          {allowPhoneSignIn ? <button className="phone-auth-text-button" type="button" disabled={submitting} onClick={() => { setMethod(method === "email" ? "phone" : "email"); setError(""); }}>
             {method === "email" ? "Use a phone number instead" : "Use an email address instead"}
-          </button>
+          </button> : null}
           {error ? <p className="phone-auth-error" role="alert">{error}</p> : null}
           <button
             className="phone-auth-submit"

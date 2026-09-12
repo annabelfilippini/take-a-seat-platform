@@ -59,7 +59,8 @@ stay in ignored local env files or Cloudflare Worker secrets.
 
 - App/runtime: vinext on Cloudflare Workers.
 - Database: Cloudflare D1 via Drizzle schema in `db/schema.ts`.
-- Auth: Clerk email-code sign-in (with phone-code fallback) at `/sign-in`.
+- Auth: Clerk production email-code sign-in at `/sign-in`. Phone sign-in is
+  hidden unless explicitly enabled in both Clerk and the Worker configuration.
 - Email: Resend transactional email.
 - Calendar: Google Calendar OAuth groundwork.
 - Payments: Stripe Connect and Stripe Checkout groundwork, with test-mode

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { PageHeader } from "../_components/PageHeader";
-import { getClerkPublishableKey } from "../_lib/clerk-auth";
+import { getClerkPublishableKey, isPhoneSignInEnabled } from "../_lib/clerk-auth";
 import { SignInClerkScreen } from "../_components/SignInClerkScreen";
 
 export const metadata: Metadata = {
@@ -28,6 +28,7 @@ export default function SignInPage({ searchParams }: SignInPageProps) {
         <h1 className="visually-hidden">Sign in with your application email.</h1>
         {clerkPublishableKey ? (
           <SignInClerkScreen
+            allowPhoneSignIn={isPhoneSignInEnabled()}
             allowSignUpIfMissing={allowSignUpIfMissing}
             codeHeading="Enter your verification code."
             description="Use the email address from your accepted creator application."
@@ -37,7 +38,7 @@ export default function SignInPage({ searchParams }: SignInPageProps) {
             submitLabel="Next"
           />
         ) : (
-          <StaticPhoneNumberForm />
+          <StaticEmailForm />
         )}
       </section>
     </main>
@@ -60,19 +61,19 @@ function isCreatorDashboardRedirect(value: string | undefined) {
   return Boolean(value?.startsWith("/creators/dashboard"));
 }
 
-function StaticPhoneNumberForm() {
+function StaticEmailForm() {
   return (
     <div className="account-auth-widget">
       <form className="phone-auth-form">
         <label>
-          <span>Phone number</span>
+          <span>Email address</span>
           <input
-            autoComplete="tel"
+            autoComplete="email"
             disabled
-            inputMode="tel"
-            name="phone"
-            placeholder="+1 555 000 0000"
-            type="tel"
+            inputMode="email"
+            name="email"
+            placeholder="you@example.com"
+            type="email"
           />
         </label>
         <button className="phone-auth-submit" disabled type="button">

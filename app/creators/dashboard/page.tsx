@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { SignInClerkScreen } from "../../_components/SignInClerkScreen";
-import { getClerkPublishableKey } from "../../_lib/clerk-auth";
+import { getClerkPublishableKey, isPhoneSignInEnabled } from "../../_lib/clerk-auth";
 import { getSignedInCreatorEditorAccount } from "../../_lib/creator-dashboard";
 import { EditableCreatorProfilePreview } from "../../admin/creator-profile-editor-preview/EditableCreatorProfilePreview";
 import { getEditableCreatorProfile } from "../../admin/creator-profile-editor-preview/creator-profile-editor-data";
@@ -77,6 +77,7 @@ function CreatorDashboardAccess({
         {accessError ? <p role="alert">{accessError}</p> : null}
         {clerkPublishableKey ? (
           <SignInClerkScreen
+            allowPhoneSignIn={isPhoneSignInEnabled()}
             allowSignUpIfMissing
             className="creator-phone-auth-widget"
             codeHeading="Enter your verification code."
@@ -85,7 +86,7 @@ function CreatorDashboardAccess({
             submitLabel="Send verification code"
           />
         ) : (
-          <CreatorDashboardStaticPhoneForm />
+          <CreatorDashboardStaticEmailForm />
         )}
         <a className="admin-back-link" href="/creators/onboard">
           Apply to inspire
@@ -95,19 +96,19 @@ function CreatorDashboardAccess({
   );
 }
 
-function CreatorDashboardStaticPhoneForm() {
+function CreatorDashboardStaticEmailForm() {
   return (
     <div className="creator-phone-auth-widget">
       <form className="phone-auth-form">
         <label>
-          <span>Phone number</span>
+          <span>Email address</span>
           <input
-            autoComplete="tel"
+            autoComplete="email"
             disabled
-            inputMode="tel"
-            name="phone"
-            placeholder="+1 555 000 0000"
-            type="tel"
+            inputMode="email"
+            name="email"
+            placeholder="you@example.com"
+            type="email"
           />
         </label>
         <button className="phone-auth-submit" disabled type="button">

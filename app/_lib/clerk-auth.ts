@@ -20,6 +20,10 @@ export function isClerkConfigured() {
   return Boolean(getClerkPublishableKey() && getClerkSecretKey());
 }
 
+export function isPhoneSignInEnabled() {
+  return getRuntimeEnv("TAKE_A_SEAT_PHONE_SIGN_IN_ENABLED") === "true";
+}
+
 export async function getSignedInClerkUser(
   request: Request,
 ): Promise<TakeASeatClerkUser | null> {

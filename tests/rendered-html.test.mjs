@@ -203,8 +203,8 @@ test("server-renders the account sign-in entry", async () => {
   assert.match(html, /Sign in with your application email/);
   assert.match(html, /account-auth-shell-minimal/);
   assert.doesNotMatch(html, /Enter your mobile number/);
-  assert.match(html, /Phone number/);
-  assert.match(html, /\+1 555 000 0000/);
+  assert.match(html, /Email address/);
+  assert.match(html, /you@example.com/);
   assert.match(html, /Next/);
   assert.doesNotMatch(html, /Your account starts here/);
   assert.doesNotMatch(html, /Creator dashboard/);
@@ -274,7 +274,7 @@ test("legacy creator auth paths redirect into current auth and creator dashboard
   assert.match(dashboardHtml, /<title>Creator Dashboard \| Take a Seat<\/title>/i);
   assert.match(dashboardHtml, /Creator dashboard/);
   assert.match(dashboardHtml, /Sign in to build your profile/);
-  assert.match(dashboardHtml, /Phone number/);
+  assert.match(dashboardHtml, /Email address/);
   assert.match(dashboardHtml, /Send verification code/);
   assert.doesNotMatch(dashboardHtml, /Sign in with phone/);
   assert.doesNotMatch(dashboardHtml, /redirect_url=%2Fcreators%2Fdashboard/);
