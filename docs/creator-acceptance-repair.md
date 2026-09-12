@@ -34,26 +34,41 @@ creator sign-in, profile editing, and publication on save.
   at desktop and mobile sizes. A location edit persisted after reload and was
   restored. The availability date picker fits both viewports.
 - The final Cloudflare deployment dry-run passes. Clerk account OAuth was
-  reconnected successfully; production readiness reports `not_started`.
+  reconnected successfully.
 - Production Clerk was then created with email-code-only authentication after
   cloning the development phone-code configuration failed its subscription gate.
   All five DNS records were added in Cloudflare without proxying. Clerk reports
-  DNS and email readiness complete. A real production verification email arrived
+  DNS, certificates, and email readiness complete. A real production verification email arrived
   in Annabel's application inbox, and its code completed account-portal sign-up.
 
-## Remaining before claiming live completion
+## Production verification completed (2026-09-12)
 
-- Complete actual OTP verification in a browser. Automated attempts were blocked
-  by Clerk/Turnstile before code delivery. No real inbox or SMS delivery is proven.
-- Switch the Worker to the prepared production Clerk keys together, preserving
-  unrelated secrets. The new production account has a verified application email.
+- PRs #6 and #7 are merged into `main`. Worker version
+  `fcdcc8b6-0223-4c0f-b055-fb916a330da5` serves 100% of production traffic.
+- The Worker switched to production Clerk public and secret keys together,
+  preserving unrelated secrets. The existing creator account was mapped to its
+  verified production identity without changing its profile or related records.
 - Migrations `0014_great_omega_flight.sql` and `0015_majestic_stryfe.sql`
   are applied to both local and production D1.
 - Annabel explicitly approved production Clerk setup, preservation of the
   existing creator account link, both migrations, and deployment after verification
   on 2026-09-12. No further approval is needed for that scope.
-- After deployment, run one controlled application through receipt, acceptance
-  email, first verification, profile save, public card, sign-out, and repeat login.
+- With separate explicit approval for the live test and cleanup, submitted one
+  controlled application through the public form. The admin review email and
+  applicant receipt arrived. Acceptance through the actual admin UI sent the
+  setup email, and its link opened the correct private starter profile.
+- The production custom sign-in UI sent actual email codes and completed
+  verification. Saving an edited location published the test profile on its
+  public route, homepage, and directory. Signing out and verifying a fresh code
+  returned to the same editor with the saved location intact.
+- Cleanup returned the test record to private draft status and removed only its
+  temporary ownership link. The application remains private. The test public
+  route now returns 404, both card lists exclude it, and the original creator
+  ownership link is preserved. No SMS verification is claimed; production uses
+  email codes.
+
+## Verification limitation
+
 - The repo-wide optional TypeScript check has existing Calendar/Stripe typing
   errors and missing Cloudflare runtime type declarations. Build/lint/test are
   the configured checks; a passing build is not a passing repo-wide typecheck.
@@ -63,10 +78,10 @@ creator sign-in, profile editing, and publication on save.
 Keep the existing database records and static seed profiles. The new migration
 adds one nullable timestamp; it does not delete applications. Existing accepted
 D1 profiles need a save to publish under the new rule. Static seed cards remain.
-This repair is based on the existing profile-editing branch and should follow its
-PR into main, with production deployment from a clean, committed checkout.
+The repair followed the existing profile-editing PR into main and was deployed
+from a clean, committed checkout.
 
-Switching Clerk environments changes user IDs. Before changing live keys, map
+Switching Clerk environments changes user IDs. For any future switch, map
 the existing D1 creator account to the same verified identity in production Clerk.
 Preserve its creator ID and related profile/calendar/payment records. Do not
 relax profile ownership checks or delete the account to force a fresh claim.

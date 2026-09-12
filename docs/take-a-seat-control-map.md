@@ -372,6 +372,12 @@ have:
 - Production Clerk was created with email verification; account OAuth is restored.
   All five CNAME records resolve and Clerk email DNS is verified. A real email
   arrived in the existing creator's application inbox and its code completed
-  production sign-up. The verified identity is prepared for the existing D1 link.
-- A complete application/acceptance/profile-save rehearsal through the deployed
-  custom UI remains required. Portal verification alone does not prove that flow.
+  production sign-up. The existing D1 ownership link now uses that verified
+  production identity; its creator and related records were preserved.
+- Production repair deployed from merged, committed code on 2026-09-12.
+  A separately approved live rehearsal passed submission, both application
+  emails, admin acceptance, setup email/link, custom email-code sign-in,
+  private-before-save, publication on save, and returning login to saved edits.
+- The test card was removed from public view and its temporary ownership link
+  cleared. Its application remains a private draft. See
+  `docs/creator-acceptance-repair.md` for release evidence and verification limits.
