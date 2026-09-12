@@ -5,7 +5,7 @@ import { PageHeader } from "../_components/PageHeader";
 export const metadata: Metadata = {
   title: "Our Mission | Take a Seat",
   description:
-    "Take a Seat is your big older sister for getting dressed: private style advice from creators whose taste you already trust.",
+    "Take a Seat is a platform built to make you feel cute, confident, and inspired through private advice from creators you already trust.",
 };
 
 export default function AboutPage() {
@@ -15,13 +15,9 @@ export default function AboutPage() {
 
       <section className="about-mission" aria-labelledby="mission-heading">
         <h1 id="mission-heading">
-          Take a Seat is your big older sister for getting dressed.
+          A platform built to make you feel cute, confident, and inspired.
         </h1>
-        <p>
-          For the nights out, vacations, Nuuly carts, closet spirals, and
-          last-minute &quot;is this cute?&quot; moments, book a private seat with
-          someone whose taste you already trust.
-        </p>
+        <p>Come take a seat with us.</p>
       </section>
 
       <section className="about-story" aria-labelledby="story-heading">
@@ -30,39 +26,43 @@ export default function AboutPage() {
         </div>
         <div className="about-story-copy">
           <article>
-            <h3>The question was already there.</h3>
+            <h3>Influencers know the good stuff.</h3>
             <p>
-              People already ask creators what to wear, what to buy, what to
-              pack, and whether the thing sitting in their cart is actually
-              worth it. The useful answer needs context: your closet, your
-              plans, your budget, and the exact vibe you are trying to get
-              right.
+              Influencers are at the forefront when it comes to new brands,
+              trends, different skincare products, outfits, and all the little
+              things worth trying. Their knowledge lives in their heads, and
+              while a lot of it is shared with fans, it is not always catered
+              to an individual.
             </p>
           </article>
           <article>
-            <h3>A comment thread cannot see the outfit.</h3>
+            <h3>Your question deserves context.</h3>
             <p>
-              A private seat lets you show the dress, the screenshots, the
-              suitcase, the pieces you own but never wear together, or the
-              vacation board that somehow became twenty different aesthetics.
-              The creator brings the eye you came for. Take a Seat keeps the
-              booking details out of the way.
+              Take a Seat is an opportunity to engage with influencers, pick
+              their brain about what you are interested in, or ask for advice
+              on whatever it may be. Tell them where you are going and what you
+              are doing, and they can help you feel comfortable and look cute.
+              They can help you pair clothes you never knew went together and
+              make new outfits from pieces you had but never executed properly.
             </p>
           </article>
           <article>
-            <h3>Confidence is the whole point.</h3>
+            <h3>Cute is the mission.</h3>
             <p>
-              We are not here to make everyone dress the same. We are here for
-              the moment when you want to feel cute, but your brain has fully
-              left the chat. One good seat should feel like an older-sister
-              second opinion: honest, specific, and immediately useful.
+              Isn&apos;t the goal in life to look cute so you feel confident
+              and more yourself? That&apos;s what we thought too :). Take a Seat
+              lets you have a moment with the people you already trust the
+              most. Meet 1:1 with the people whose knowledge you already look
+              up to, lean on them to be your fashion committee, makeup
+              committee, or whatever committee you need, and leave feeling cute
+              and confident.
             </p>
           </article>
         </div>
       </section>
 
       <section className="about-final-cta" aria-label="Start with Take a Seat">
-        <h2>Bring the outfit. Leave feeling cute.</h2>
+        <h2>Meet your committee.</h2>
         <div className="about-cta-actions">
           <Link href="/#browse">Find a Seat</Link>
           <Link href="/creators/onboard">Apply to Inspire</Link>
