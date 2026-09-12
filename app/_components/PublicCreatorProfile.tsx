@@ -56,9 +56,6 @@ export function PublicCreatorProfile({
         </a>
         <nav className="profile-nav" aria-label={`${profile.name} profile navigation`}>
           <Link href="/creators/onboard">Apply</Link>
-          <a className="reserve-nav-button" href="#reserve">
-            Reserve
-          </a>
           <Link className="profile-sign-in-link" href="/sign-in">
             Sign In
           </Link>

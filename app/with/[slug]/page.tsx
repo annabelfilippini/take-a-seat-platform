@@ -71,7 +71,6 @@ export default async function CreatorProfilePage({
     profile.waitlistSubject,
   )}`;
   const isBookable = creator.status === "booking" && creator.seats.length > 0;
-  const primaryActionLabel = isBookable ? "Reserve your seat" : "Request this creator";
   const bookingNotice = getBookingNotice(searchParams, creator.name);
 
   return (
@@ -83,9 +82,6 @@ export default async function CreatorProfilePage({
         </a>
         <nav className="profile-nav" aria-label={`${creator.name} profile navigation`}>
           {creator.tiktokUrl ? <a href={creator.tiktokUrl}>{creator.tiktokHandle}</a> : null}
-          <a className="reserve-nav-button" href="#reserve">
-            {primaryActionLabel}
-          </a>
           <Link className="profile-sign-in-link" href="/sign-in">
             Sign In
           </Link>

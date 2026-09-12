@@ -88,9 +88,6 @@ export default async function EllaProfile({ searchParams }: EllaProfileProps) {
               {creator.instagramHandle ?? creator.name}
             </a>
           ) : null}
-          <a className="reserve-nav-button" href="#reserve">
-            Reserve your seat
-          </a>
           <Link className="profile-sign-in-link" href="/sign-in">
             Sign In
           </Link>

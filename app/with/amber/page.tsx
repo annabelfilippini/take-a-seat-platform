@@ -48,9 +48,6 @@ export default function AmberProfile() {
         </a>
         <nav className="profile-nav" aria-label="Amber profile navigation">
           <a href="https://www.instagram.com/ambermaylowe/">@ambermaylowe</a>
-          <a className="reserve-nav-button" href="#reserve">
-            Reserve your seat
-          </a>
         </nav>
       </header>
 
