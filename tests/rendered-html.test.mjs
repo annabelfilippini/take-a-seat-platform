@@ -193,8 +193,9 @@ test("server-renders the account sign-in entry", async () => {
   const html = await response.text();
   assert.match(html, /<title>Sign In \| Take a Seat<\/title>/i);
   assert.match(html, /Sign in with your phone/);
-  assert.match(html, /Enter your mobile number/);
-  assert.match(html, /Mobile phone/);
+  assert.match(html, /account-auth-shell-minimal/);
+  assert.doesNotMatch(html, /Enter your mobile number/);
+  assert.match(html, /Phone number/);
   assert.match(html, /\+1 555 000 0000/);
   assert.match(html, /Next/);
   assert.doesNotMatch(html, /Your account starts here/);

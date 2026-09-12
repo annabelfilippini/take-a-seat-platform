@@ -1,5 +1,7 @@
 "use client";
 
+import { useId, useState } from "react";
+
 type PageHeaderProps = {
   ctaLabel?: string;
   navLabel: string;
@@ -13,14 +15,32 @@ export function PageHeader({
   searchQuery = "",
   showCreatorSearch = false,
 }: PageHeaderProps) {
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const navId = useId();
+
   return (
-    <header className="about-topbar">
+    <header className={`about-topbar${isMobileMenuOpen ? " mobile-nav-open" : ""}`}>
       <form action="/" className="nav-action-form" method="get">
         <button className="about-brand" type="submit" aria-label="Take a Seat home">
           Take a Seat
         </button>
       </form>
-      <nav className="about-nav" aria-label={navLabel}>
+      <div className="page-header-mobile-actions">
+        {showCreatorSearch ? <HeaderSearchForm searchQuery={searchQuery} /> : null}
+        <button
+          aria-controls={navId}
+          aria-expanded={isMobileMenuOpen}
+          aria-label="Open navigation"
+          className="mobile-nav-toggle"
+          onClick={() => setIsMobileMenuOpen((open) => !open)}
+          type="button"
+        >
+          <span aria-hidden="true" />
+          <span aria-hidden="true" />
+          <span aria-hidden="true" />
+        </button>
+      </div>
+      <nav className="about-nav" id={navId} aria-label={navLabel}>
         <form action="/creators/onboard" className="nav-action-form" method="get">
           <button type="submit">Apply to Inspire</button>
         </form>
@@ -28,28 +48,7 @@ export function PageHeader({
           <button type="submit">Our Mission</button>
         </form>
         {showCreatorSearch ? (
-          <form
-            action="/take-a-seat"
-            className={`nav-action-form hero-search-control header-search-control${
-              searchQuery ? " header-search-control-active" : ""
-            }`}
-            method="get"
-          >
-            <span>Search creators</span>
-            <input
-              aria-label="Search creators"
-              defaultValue={searchQuery}
-              name="q"
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.preventDefault();
-                  event.currentTarget.form?.requestSubmit();
-                }
-              }}
-              placeholder="Search creators"
-              type="search"
-            />
-          </form>
+          <HeaderSearchForm searchQuery={searchQuery} />
         ) : (
           <form action="/take-a-seat" className="nav-action-form" method="get">
             <button className="about-nav-button" type="submit">
@@ -64,5 +63,32 @@ export function PageHeader({
         </form>
       </nav>
     </header>
+  );
+}
+
+function HeaderSearchForm({ searchQuery }: { searchQuery: string }) {
+  return (
+    <form
+      action="/take-a-seat"
+      className={`nav-action-form hero-search-control header-search-control${
+        searchQuery ? " header-search-control-active" : ""
+      }`}
+      method="get"
+    >
+      <span>Search creators</span>
+      <input
+        aria-label="Search creators"
+        defaultValue={searchQuery}
+        name="q"
+        onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            event.currentTarget.form?.requestSubmit();
+          }
+        }}
+        placeholder="Search creators"
+        type="search"
+      />
+    </form>
   );
 }
