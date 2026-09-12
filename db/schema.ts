@@ -37,6 +37,7 @@ export const creatorOnboardingProfiles = sqliteTable("creator_onboarding_profile
   publicSlug: text("public_slug"),
   originalApplicationId: text("original_application_id"),
   publishedAt: text("published_at"),
+  profileSavedAt: text("profile_saved_at"),
   applicationStatus: text("application_status").notNull().default("draft"),
   reviewSubmittedAt: text("review_submitted_at"),
   calendarConnectedAt: text("calendar_connected_at"),

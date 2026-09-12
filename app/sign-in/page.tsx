@@ -5,7 +5,7 @@ import { SignInClerkScreen } from "../_components/SignInClerkScreen";
 
 export const metadata: Metadata = {
   title: "Sign In | Take a Seat",
-  description: "Sign in to Take a Seat with a texted phone code.",
+  description: "Sign in to your Take a Seat profile with a verification code.",
 };
 
 type SignInPageProps = {
@@ -15,16 +15,25 @@ type SignInPageProps = {
 export default function SignInPage({ searchParams }: SignInPageProps) {
   const clerkPublishableKey = getClerkPublishableKey();
   const redirectUrl = getSafeRedirectUrl(searchParams?.redirect_url);
+  const allowSignUpIfMissing = true;
+  const routeByAccount =
+    !redirectUrl ||
+    (isCreatorDashboardRedirect(redirectUrl) && !redirectUrl.includes("invite="));
+  const postAuthRedirectUrl = routeByAccount ? "/creators/dashboard" : redirectUrl;
 
   return (
     <main className="account-auth-page">
       <PageHeader ctaLabel="Find a Seat" navLabel="Sign in navigation" />
-      <section className="account-auth-shell account-auth-shell-minimal" aria-label="Phone number sign-in">
-        <h1 className="visually-hidden">Sign in with your phone.</h1>
+      <section className="account-auth-shell account-auth-shell-minimal" aria-label="Creator sign-in">
+        <h1 className="visually-hidden">Sign in with your application email.</h1>
         {clerkPublishableKey ? (
           <SignInClerkScreen
+            allowSignUpIfMissing={allowSignUpIfMissing}
             codeHeading="Enter your verification code."
-            redirectUrl={redirectUrl}
+            description="Use the email address from your accepted creator application."
+            heading="Creator sign-in"
+            redirectUrl={postAuthRedirectUrl}
+            routeByAccount={routeByAccount}
             submitLabel="Next"
           />
         ) : (
@@ -40,11 +49,15 @@ function getSafeRedirectUrl(value: string | string[] | undefined) {
     return undefined;
   }
 
-  if (!value.startsWith("/") || value.startsWith("//")) {
+  if (!value.startsWith("/") || value.startsWith("//") || value.includes("\\")) {
     return undefined;
   }
 
   return value;
+}
+
+function isCreatorDashboardRedirect(value: string | undefined) {
+  return Boolean(value?.startsWith("/creators/dashboard"));
 }
 
 function StaticPhoneNumberForm() {

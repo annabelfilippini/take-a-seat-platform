@@ -1,6 +1,6 @@
 "use client";
 
-import { useAuth } from "@clerk/react";
+import { useAuth, useClerk } from "@clerk/react";
 import { useSignIn, useSignUp } from "@clerk/react/legacy";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -9,15 +9,18 @@ import {
 } from "../_lib/creator-destination";
 
 type SignInClerkScreenProps = {
+  allowSignUpIfMissing?: boolean;
   className?: string;
   codeDescription?: string;
   codeHeading?: string;
   description?: string;
   eyebrow?: string;
   heading?: string;
+  initialEmail?: string | null;
   initialPhone?: string | null;
   phoneLabel?: string;
   redirectUrl?: string;
+  routeByAccount?: boolean;
   submitLabel?: string;
 };
 
@@ -26,15 +29,18 @@ type AuthStep = "phone" | "code";
 const codeSendCooldownMs = 30_000;
 
 export function SignInClerkScreen({
+  allowSignUpIfMissing = false,
   className = "account-auth-widget",
   codeDescription,
   codeHeading,
   description,
   eyebrow,
   heading,
+  initialEmail,
   initialPhone,
   phoneLabel = "Phone number",
   redirectUrl,
+  routeByAccount = false,
   submitLabel = "Send code",
 }: SignInClerkScreenProps) {
   const {
@@ -51,6 +57,9 @@ export function SignInClerkScreen({
     isLoaded: isAuthLoaded,
     isSignedIn,
   } = useAuth();
+  const { signOut } = useClerk();
+  const [method, setMethod] = useState<"email" | "phone">("email");
+  const [email, setEmail] = useState(initialEmail ?? "");
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
   const [flow, setFlow] = useState<AuthFlow>("sign-in");
@@ -60,14 +69,24 @@ export function SignInClerkScreen({
   const [sendCooldownUntil, setSendCooldownUntil] = useState(0);
   const [step, setStep] = useState<AuthStep>("phone");
   const [submitting, setSubmitting] = useState(false);
+  const [requestStalled, setRequestStalled] = useState(false);
   const codeInputRef = useRef<HTMLInputElement>(null);
-  const ready = isSignInLoaded && isSignUpLoaded && isAuthLoaded;
+  const ready =
+    isSignInLoaded &&
+    isAuthLoaded &&
+    (!allowSignUpIfMissing || isSignUpLoaded);
   const hasExplicitRedirect = Boolean(redirectUrl);
   const targetUrl = redirectUrl ?? "/take-a-seat";
   const cooldownRemainingSeconds = getCooldownRemainingSeconds(
     sendCooldownUntil,
     cooldownNow,
   );
+
+  useEffect(() => {
+    if (!submitting) return;
+    const timeout = window.setTimeout(() => setRequestStalled(true), 20_000);
+    return () => window.clearTimeout(timeout);
+  }, [submitting]);
 
   useEffect(() => {
     if (step === "code") {
@@ -96,21 +115,23 @@ export function SignInClerkScreen({
   async function startPhoneCode(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!ready || !signIn || !signUp) {
+    if (!ready || !signIn || (allowSignUpIfMissing && !signUp)) {
       return;
     }
 
     if (isSignedIn) {
       setError("");
       setSendCooldownUntil(0);
-      await redirectAfterAuth(targetUrl, hasExplicitRedirect);
+      await redirectAfterAuth(targetUrl, hasExplicitRedirect, routeByAccount);
       return;
     }
 
-    const { error: phoneError, phoneNumber } = normalizePhoneForClerk(phone);
+    const { error: phoneError, phoneNumber } = method === "phone"
+      ? normalizePhoneForClerk(phone)
+      : { phoneNumber: email.trim().toLowerCase(), error: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) ? undefined : "Enter a valid email address." };
 
     if (!phoneNumber) {
-      setError("Enter your phone number.");
+      setError(method === "email" ? "Enter your email address." : "Enter your phone number.");
       return;
     }
 
@@ -120,58 +141,60 @@ export function SignInClerkScreen({
     }
 
     if (cooldownRemainingSeconds > 0) {
-      setSentToPhone(phoneNumber);
-      setStep("code");
+
       setError(
-        `Clerk is pausing new code sends for about ${cooldownRemainingSeconds} more seconds. If a code already arrived, enter the latest one here.`,
+        `Please wait about ${cooldownRemainingSeconds} more seconds before requesting another code.`,
       );
       return;
     }
 
+    setRequestStalled(false);
     setSubmitting(true);
     setError("");
     setSentToPhone(phoneNumber);
-    setSendCooldownUntil(Date.now() + codeSendCooldownMs);
 
     try {
       const result = await signIn.create({
         identifier: phoneNumber,
-        signUpIfMissing: true,
-        strategy: "phone_code",
       });
 
       if (result.status === "complete" && result.createdSessionId) {
         await setSignInActive({ session: result.createdSessionId });
-        await redirectAfterAuth(targetUrl, hasExplicitRedirect);
+        await redirectAfterAuth(targetUrl, hasExplicitRedirect, routeByAccount);
         return;
       }
 
-      const phoneFactor = result.supportedFirstFactors?.find(
-        (factor) => factor.strategy === "phone_code",
+      const factor = result.supportedFirstFactors?.find(
+        (item) => item.strategy === (method === "email" ? "email_code" : "phone_code"),
       );
 
-      if (phoneFactor?.strategy === "phone_code") {
-        await result.prepareFirstFactor({
-          phoneNumberId: phoneFactor.phoneNumberId,
-          strategy: "phone_code",
-        });
+      if (factor?.strategy === "email_code" || factor?.strategy === "phone_code") {
+        await result.prepareFirstFactor(factor.strategy === "email_code"
+          ? { emailAddressId: factor.emailAddressId, strategy: "email_code" }
+          : { phoneNumberId: factor.phoneNumberId, strategy: "phone_code" });
+        setSendCooldownUntil(Date.now() + codeSendCooldownMs);
         setFlow("sign-in");
         setStep("code");
         return;
       }
 
-      await signUp.create({
-        phoneNumber,
-      });
-      await signUp.prepareVerification({ strategy: "phone_code" });
-      setFlow("sign-up");
-      setStep("code");
+      setError(getUnsupportedPhoneFactorMessage(allowSignUpIfMissing));
     } catch (err) {
+      if (isIdentifierNotFoundError(err) && allowSignUpIfMissing && signUp) {
+        try {
+          await signUp.create(method === "email" ? { emailAddress: phoneNumber } : { phoneNumber });
+          await signUp.prepareVerification({ strategy: method === "email" ? "email_code" : "phone_code" });
+          setFlow("sign-up");
+          setSendCooldownUntil(Date.now() + codeSendCooldownMs);
+          setStep("code");
+        } catch (signUpError) {
+          setError(getClerkErrorMessage(signUpError));
+        }
+        return;
+      }
       if (isTooManyCodeRequestsError(err)) {
-        setStep("code");
-        setError(
-          "Clerk is pausing new code sends. If a code already arrived, enter the latest one here. Otherwise wait about 30 seconds, then try again.",
-        );
+        setSendCooldownUntil(Date.now() + codeSendCooldownMs);
+        setError("We could not send a new code yet. Wait 30 seconds and try again.");
         return;
       }
 
@@ -180,11 +203,11 @@ export function SignInClerkScreen({
       if (isSessionExistsError(err)) {
         setStep("phone");
         setError("");
-        await redirectAfterAuth(targetUrl, hasExplicitRedirect);
+        await redirectAfterAuth(targetUrl, hasExplicitRedirect, routeByAccount);
         return;
       }
 
-      setError(getClerkErrorMessage(err));
+      setError(getClerkStartErrorMessage(err, allowSignUpIfMissing));
     } finally {
       setSubmitting(false);
     }
@@ -193,7 +216,7 @@ export function SignInClerkScreen({
   async function verifyPhoneCode(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!ready || !signIn || !signUp) {
+    if (!ready || !signIn || (flow === "sign-up" && !signUp)) {
       return;
     }
 
@@ -204,31 +227,33 @@ export function SignInClerkScreen({
       return;
     }
 
+    setRequestStalled(false);
     setSubmitting(true);
     setError("");
 
     try {
       if (flow === "sign-up") {
+        if (!signUp || !setSignUpActive) return;
         const result = await signUp.attemptVerification({
           code: verificationCode,
-          strategy: "phone_code",
+          strategy: method === "email" ? "email_code" : "phone_code",
         });
 
         if (result.status === "complete" && result.createdSessionId) {
           await setSignUpActive({ session: result.createdSessionId });
-          await redirectAfterAuth(targetUrl, hasExplicitRedirect);
+          await redirectAfterAuth(targetUrl, hasExplicitRedirect, routeByAccount);
           return;
         }
       } else {
         try {
           const result = await signIn.attemptFirstFactor({
             code: verificationCode,
-            strategy: "phone_code",
+            strategy: method === "email" ? "email_code" : "phone_code",
           });
 
           if (result.status === "complete" && result.createdSessionId) {
             await setSignInActive({ session: result.createdSessionId });
-            await redirectAfterAuth(targetUrl, hasExplicitRedirect);
+            await redirectAfterAuth(targetUrl, hasExplicitRedirect, routeByAccount);
             return;
           }
         } catch (err) {
@@ -236,11 +261,15 @@ export function SignInClerkScreen({
             throw err;
           }
 
+          if (!allowSignUpIfMissing || !signUp) {
+            throw err;
+          }
+
           const result = await signUp.create({ transfer: true });
 
           if (result.status === "complete" && result.createdSessionId) {
             await setSignUpActive({ session: result.createdSessionId });
-            await redirectAfterAuth(targetUrl, hasExplicitRedirect);
+            await redirectAfterAuth(targetUrl, hasExplicitRedirect, routeByAccount);
             return;
           }
 
@@ -248,12 +277,34 @@ export function SignInClerkScreen({
         }
       }
 
-      setError("That code was not accepted. Try the newest code you received.");
+      setError("Verification needs an additional account step. Please contact Take a Seat so we can help you finish signing in.");
     } catch (err) {
       setError(getClerkVerificationErrorMessage(err));
     } finally {
       setSubmitting(false);
     }
+  }
+
+  async function resendCode() {
+    if (submitting || cooldownRemainingSeconds > 0) return;
+    setRequestStalled(false);
+    setSubmitting(true);
+    setError("");
+    try {
+      const strategy = method === "email" ? "email_code" : "phone_code";
+      if (flow === "sign-up") {
+        await signUp?.prepareVerification({ strategy });
+      } else {
+        const factor = signIn?.supportedFirstFactors?.find((item) => item.strategy === strategy);
+        if (factor?.strategy === "email_code") await signIn?.prepareFirstFactor({ strategy: "email_code", emailAddressId: factor.emailAddressId });
+        else if (factor?.strategy === "phone_code") await signIn?.prepareFirstFactor({ strategy: "phone_code", phoneNumberId: factor.phoneNumberId });
+        else throw new Error("Request a new code from the sign-in screen.");
+      }
+      setCode("");
+      setSendCooldownUntil(Date.now() + codeSendCooldownMs);
+    } catch {
+      setError("We could not resend your code. Wait a moment and try again.");
+    } finally { setSubmitting(false); }
   }
 
   function editPhone() {
@@ -265,13 +316,19 @@ export function SignInClerkScreen({
 
   return (
     <div className={className}>
-      {step === "code" ? (
+      <div id="clerk-captcha" />
+      {requestStalled && submitting ? <p className="phone-auth-error" role="alert">The verification service is taking too long. Complete any browser security check, or <a href={typeof window === "undefined" ? "/sign-in" : window.location.href}>reload and try again</a>.</p> : null}
+      {isSignedIn ? <div className="phone-auth-heading">
+        <p>You are already signed in. Continue to your profile, or use a different account.</p>
+        <a className="phone-auth-submit" href={targetUrl}>Continue to my profile</a>
+        <button className="phone-auth-text-button" type="button" onClick={() => signOut({ redirectUrl: window.location.href })}>Use a different account</button>
+      </div> : step === "code" ? (
         <form className="phone-auth-form" onSubmit={verifyPhoneCode}>
           <div className="phone-auth-heading">
             {eyebrow ? <span>{eyebrow}</span> : null}
             <h2>{codeHeading ?? "Enter your verification code."}</h2>
             <p>
-              {codeDescription ?? "Enter the code we just texted you."}
+              {codeDescription ?? (method === "email" ? "Enter the code we emailed you." : "Enter the code we texted you.")}
               {sentToPhone ? (
                 <>
                   {" "}
@@ -295,12 +352,15 @@ export function SignInClerkScreen({
               value={code}
             />
           </label>
-          {error ? <p className="phone-auth-error">{error}</p> : null}
+          {error ? <p className="phone-auth-error" role="alert">{error}</p> : null}
           <button className="phone-auth-submit" disabled={submitting} type="submit">
             {submitting ? "Checking code" : "Verify code"}
           </button>
-          <button className="phone-auth-text-button" onClick={editPhone} type="button">
-            Use a different phone number
+          <button className="phone-auth-text-button" disabled={submitting || cooldownRemainingSeconds > 0} onClick={resendCode} type="button">
+            {cooldownRemainingSeconds > 0 ? `Resend in ${cooldownRemainingSeconds}s` : "Resend code"}
+          </button>
+          <button className="phone-auth-text-button" disabled={submitting} onClick={editPhone} type="button">
+            Use a different email or phone number
           </button>
         </form>
       ) : (
@@ -313,20 +373,22 @@ export function SignInClerkScreen({
             </div>
           ) : null}
           <label>
-            <span>{phoneLabel}</span>
+            <span>{method === "email" ? "Email address" : phoneLabel}</span>
             <input
-              autoComplete="tel"
-              inputMode="tel"
-              name="phone"
-              onChange={(event) => setPhone(event.target.value)}
-              placeholder="+1 555 000 0000"
+              autoComplete={method === "email" ? "email" : "tel"}
+              inputMode={method === "email" ? "email" : "tel"}
+              name={method}
+              onChange={(event) => method === "email" ? setEmail(event.target.value) : setPhone(event.target.value)}
+              placeholder={method === "email" ? "you@example.com" : "+1 555 000 0000"}
               required
-              type="tel"
-              value={phone}
+              type={method === "email" ? "email" : "tel"}
+              value={method === "email" ? email : phone}
             />
           </label>
-          <div id="clerk-captcha" />
-          {error ? <p className="phone-auth-error">{error}</p> : null}
+          <button className="phone-auth-text-button" type="button" disabled={submitting} onClick={() => { setMethod(method === "email" ? "phone" : "email"); setError(""); }}>
+            {method === "email" ? "Use a phone number instead" : "Use an email address instead"}
+          </button>
+          {error ? <p className="phone-auth-error" role="alert">{error}</p> : null}
           <button
             className="phone-auth-submit"
             disabled={!ready || submitting || cooldownRemainingSeconds > 0}
@@ -344,10 +406,14 @@ export function SignInClerkScreen({
   );
 }
 
-async function redirectAfterAuth(fallbackUrl: string, hasExplicitRedirect: boolean) {
+async function redirectAfterAuth(
+  fallbackUrl: string,
+  hasExplicitRedirect: boolean,
+  routeByAccount: boolean,
+) {
   try {
     window.location.assign(
-      await getPostAuthRedirectUrl(fallbackUrl, hasExplicitRedirect),
+      await getPostAuthRedirectUrl(fallbackUrl, hasExplicitRedirect, routeByAccount),
     );
   } catch {
     window.location.assign(fallbackUrl);
@@ -357,8 +423,9 @@ async function redirectAfterAuth(fallbackUrl: string, hasExplicitRedirect: boole
 async function getPostAuthRedirectUrl(
   fallbackUrl: string,
   hasExplicitRedirect: boolean,
+  routeByAccount: boolean,
 ) {
-  if (hasExplicitRedirect) {
+  if (hasExplicitRedirect && !routeByAccount) {
     return fallbackUrl;
   }
 
@@ -442,7 +509,24 @@ function getClerkErrorMessage(error: unknown) {
     }
   }
 
-  return "We could not send a code for that phone number. Check it and try again.";
+  return "We could not send a verification code. Check your email address or phone number and try again.";
+}
+
+function getClerkStartErrorMessage(
+  error: unknown,
+  allowSignUpIfMissing: boolean,
+) {
+  if (!allowSignUpIfMissing && isIdentifierNotFoundError(error)) {
+    return "We could not find an invited creator account for that phone number.";
+  }
+
+  return getClerkErrorMessage(error);
+}
+
+function getUnsupportedPhoneFactorMessage(allowSignUpIfMissing: boolean) {
+  return allowSignUpIfMissing
+    ? "We could not start phone verification for that number. Confirm phone sign-in and sign-up are enabled in Clerk, then try again."
+    : "We could not find an invited creator account for that phone number.";
 }
 
 function getClerkVerificationErrorMessage(error: unknown) {
@@ -457,6 +541,31 @@ function getClerkVerificationErrorMessage(error: unknown) {
   }
 
   return clerkMessage;
+}
+
+function isIdentifierNotFoundError(error: unknown) {
+  if (
+    typeof error !== "object" ||
+    !error ||
+    !("errors" in error) ||
+    !Array.isArray(error.errors)
+  ) {
+    return false;
+  }
+
+  return error.errors.some((item) => {
+    const clerkError = item as { code?: unknown; message?: unknown };
+    const code = typeof clerkError.code === "string" ? clerkError.code : "";
+    const message =
+      typeof clerkError.message === "string" ? clerkError.message.toLowerCase() : "";
+
+    return (
+      code === "form_identifier_not_found" ||
+      code === "identifier_not_found" ||
+      message.includes("couldn't find your account") ||
+      message.includes("could not find your account")
+    );
+  });
 }
 
 function getCooldownRemainingSeconds(cooldownUntil: number, now: number) {
@@ -509,10 +618,7 @@ function isSignUpTransferError(error: unknown) {
   return error.errors.some((item) => {
     const clerkError = item as { code?: unknown; message?: unknown };
     const code = typeof clerkError.code === "string" ? clerkError.code : "";
-    const message =
-      typeof clerkError.message === "string" ? clerkError.message.toLowerCase() : "";
-
-    return code === "sign_up_if_missing_transfer" || message.includes("transfer");
+    return code === "sign_up_if_missing_transfer";
   });
 }
 

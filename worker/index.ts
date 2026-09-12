@@ -1,8 +1,11 @@
+import { withClerkSessionRefresh } from "../app/_lib/clerk-session-refresh";
 /** Cloudflare Worker entry point for the vinext-starter template. */
 import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } from "vinext/server/image-optimization";
 import handler from "vinext/server/app-router-entry";
 
 interface Env {
+  CLERK_SECRET_KEY?: string;
+  NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?: string;
   ASSETS: Fetcher;
   DB: D1Database;
   IMAGES: {
@@ -40,7 +43,9 @@ const worker = {
       }, allowedWidths);
     }
 
-    return handler.fetch(request, env, ctx);
+    return withClerkSessionRefresh(request, env, (authenticatedRequest) =>
+      handler.fetch(authenticatedRequest, env, ctx),
+    );
   },
 };
 

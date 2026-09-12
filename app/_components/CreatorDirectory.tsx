@@ -2,7 +2,7 @@
 
 /* eslint-disable @next/next/no-img-element */
 import { useMemo, useState } from "react";
-import { publicMarketplaceCreators } from "../_lib/creators";
+import { publicMarketplaceCreators, type Creator } from "../_lib/creators";
 
 const categories = [
   { label: "Top Experts", filter: "All", image: "/category-top-experts.png", position: "50% 34%" },
@@ -18,11 +18,13 @@ const categories = [
 ];
 
 type CreatorDirectoryProps = {
+  creators?: Creator[];
   initialQuery?: string;
   showInlineSearch?: boolean;
 };
 
 export function CreatorDirectory({
+  creators = publicMarketplaceCreators,
   initialQuery = "",
   showInlineSearch = true,
 }: CreatorDirectoryProps) {
@@ -32,7 +34,7 @@ export function CreatorDirectory({
   const visibleCreators = useMemo(() => {
     const cleanQuery = query.trim().toLowerCase();
 
-    return publicMarketplaceCreators.filter((creator) => {
+    return creators.filter((creator) => {
       const matchesCategory = category === "All" || creator.category === category;
 
       const searchable = [
@@ -51,7 +53,7 @@ export function CreatorDirectory({
 
       return matchesCategory && (!cleanQuery || searchable.includes(cleanQuery));
     });
-  }, [category, query]);
+  }, [category, query, creators]);
 
   return (
     <>

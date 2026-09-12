@@ -1,3 +1,4 @@
+import { env as workerEnv } from "cloudflare:workers";
 import { createClerkClient } from "@clerk/backend";
 
 export type TakeASeatClerkUser = {
@@ -52,11 +53,11 @@ export async function getSignedInClerkUserFromHeaders(
   }
 
   const user = await clerkClient.users.getUser(auth.userId);
-  const email = user.primaryEmailAddress?.emailAddress ?? null;
-  const phone =
-    user.primaryPhoneNumber?.phoneNumber ??
-    user.phoneNumbers.find((phoneNumber) => phoneNumber.phoneNumber)?.phoneNumber ??
-    null;
+  const email = user.primaryEmailAddress?.verification?.status === "verified"
+    ? user.primaryEmailAddress.emailAddress : null;
+  const phone = user.phoneNumbers.find((number) =>
+    number.verification?.status === "verified" && number.id === user.primaryPhoneNumberId
+  )?.phoneNumber ?? null;
 
   return {
     email: email?.toLowerCase() ?? null,
@@ -78,7 +79,8 @@ function getRuntimeEnv(name: string) {
       : undefined;
   const processValue =
     typeof process === "object" && process.env ? process.env[name] : undefined;
-  const value = typeof cloudflareValue === "string" ? cloudflareValue : processValue;
+  const workerValue = (workerEnv as Record<string, unknown>)[name];
+  const value = typeof cloudflareValue === "string" ? cloudflareValue : typeof workerValue === "string" ? workerValue : processValue;
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 

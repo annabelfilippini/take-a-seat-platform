@@ -1,0 +1,1 @@
+ALTER TABLE `creator_onboarding_profiles` ADD `profile_saved_at` text;

@@ -23,6 +23,8 @@ export default function CreatorOnboardingPage({
         initialStatuses={{
           availability: getStatus(searchParams?.availability),
           calendar: getStatus(searchParams?.calendar),
+          creatorEmail: getStatus(searchParams?.creatorEmail),
+          creatorEmailDetail: getStatus(searchParams?.creatorEmailDetail),
           profile: getStatus(searchParams?.profile),
           stripe: getStatus(searchParams?.stripe),
         }}

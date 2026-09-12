@@ -99,6 +99,13 @@
       "when": 1789224335957,
       "tag": "0014_great_omega_flight",
       "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "6",
+      "when": 1789252404453,
+      "tag": "0015_majestic_stryfe",
+      "breakpoints": true
     }
   ]
 }

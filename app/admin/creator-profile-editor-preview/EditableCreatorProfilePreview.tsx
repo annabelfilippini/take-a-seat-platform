@@ -604,7 +604,7 @@ export function EditableCreatorProfilePreview({
 
   return (
     <main className="platform-shell amber-profile-page editable-profile-page">
-      <div className="profile-announcement">Editable creator profile preview</div>
+      <div className="profile-announcement">Your creator profile. Save when you are ready for your card to appear on the website.</div>
       <header className="topbar profile-topbar">
         <a className="brand-mark" href="/" aria-label="Take a Seat home">
           Take a Seat

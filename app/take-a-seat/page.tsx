@@ -1,3 +1,4 @@
+import { listPublicMarketplaceCreators } from "../_lib/creator-onboarding";
 import type { Metadata } from "next";
 import { CreatorDirectory } from "../_components/CreatorDirectory";
 import { PageHeader } from "../_components/PageHeader";
@@ -12,7 +13,9 @@ type TakeASeatPageProps = {
   searchParams?: Record<string, string | string[] | undefined>;
 };
 
-export default function TakeASeatPage({ searchParams }: TakeASeatPageProps) {
+export const dynamic = "force-dynamic";
+
+export default async function TakeASeatPage({ searchParams }: TakeASeatPageProps) {
   const searchQuery = getSearchQuery(searchParams?.q);
 
   return (
@@ -23,7 +26,7 @@ export default function TakeASeatPage({ searchParams }: TakeASeatPageProps) {
         showCreatorSearch
       />
 
-      <CreatorDirectory initialQuery={searchQuery} showInlineSearch={false} />
+      <CreatorDirectory creators={await listPublicMarketplaceCreators()} initialQuery={searchQuery} showInlineSearch={false} />
     </main>
   );
 }

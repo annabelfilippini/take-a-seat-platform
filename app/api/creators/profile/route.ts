@@ -7,13 +7,16 @@ import {
 import { getRequestAdminEmail } from "../../../_lib/admin-auth";
 import { getSignedInClerkUser } from "../../../_lib/clerk-auth";
 import { CREATOR_PROFILE_EDITOR_URL } from "../../../_lib/creator-destination";
-import { sendCreatorApplicationEmail } from "../../../_lib/email";
+import {
+  sendCreatorApplicationEmail,
+  sendCreatorApplicationReceivedEmail,
+} from "../../../_lib/email";
 
 function profileStatusResponse(
   request: Request,
   status: string,
   detail?: string,
-  returnTo?: string,
+  returnTo?: string | null,
   extraParams: Record<string, string> = {},
 ) {
   if (wantsJson(request)) {
@@ -34,7 +37,7 @@ function redirectWithProfileStatus(
   request: Request,
   status: string,
   detail?: string,
-  returnTo?: string,
+  returnTo?: string | null,
   extraParams: Record<string, string> = {},
 ) {
   const target = new URL(getSafeReturnTo(returnTo, "/creators/onboard"), request.url);
@@ -58,7 +61,7 @@ function wantsJson(request: Request) {
   return request.headers.get("accept")?.includes("application/json") ?? false;
 }
 
-function getSafeReturnTo(value: string | null, fallback: string) {
+function getSafeReturnTo(value: string | null | undefined, fallback: string) {
   if (!value || !value.startsWith("/") || value.startsWith("//")) {
     return fallback;
   }
@@ -73,7 +76,7 @@ export async function POST(request: Request) {
   const input = await getCreatorProfileSettingsInput(formData);
   const returnTo = formData.get("returnTo");
 
-  if (!input) {
+  if (!input || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.email)) {
     return profileStatusResponse(
       request,
       "error",
@@ -122,14 +125,27 @@ export async function POST(request: Request) {
   }
 
   if (input.reviewSubmitted) {
-    const email = await sendCreatorApplicationEmail({
-      creatorId,
-      input,
-      request,
-    });
+    const [adminEmail, creatorEmail] = await Promise.all([
+      sendCreatorApplicationEmail({
+        creatorId,
+        input,
+        request,
+      }),
+      sendCreatorApplicationReceivedEmail({
+        creatorId,
+        input,
+      }),
+    ]);
 
     return profileStatusResponse(request, "saved", undefined, null, {
-      email: email.status,
+      creatorEmail: creatorEmail.status,
+      ...(creatorEmail.status === "skipped"
+        ? { creatorEmailDetail: creatorEmail.reason }
+        : {}),
+      email: adminEmail.status,
+      ...(adminEmail.status === "skipped"
+        ? { emailDetail: adminEmail.reason }
+        : {}),
     });
   }
 

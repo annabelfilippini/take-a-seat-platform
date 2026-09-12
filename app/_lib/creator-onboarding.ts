@@ -1,4 +1,4 @@
-import { and, desc, eq, or } from "drizzle-orm";
+import { and, desc, eq, isNotNull, or, sql } from "drizzle-orm";
 import {
   creatorAvailabilityRules,
   creatorAccounts,
@@ -12,6 +12,7 @@ import {
 } from "../../db/schema";
 import {
   creators,
+  publicMarketplaceCreators,
   getCreatorById,
   getCreatorBySlug,
   type Creator,
@@ -88,10 +89,15 @@ export type CreatorOnboardingProfile =
   typeof creatorOnboardingProfiles.$inferSelect;
 
 export class CreatorPublishError extends Error {
-  constructor(public readonly code: "public-id-invalid" | "public-id-taken") {
+  constructor(public readonly code: "public-id-invalid" | "public-id-taken" | "email-required") {
     super(code);
   }
 }
+
+const DEFAULT_CREATOR_APPLICATION_NAME = "New creator application";
+const DEFAULT_CREATOR_APPLICATION_PLATFORM = "Not provided";
+const DEFAULT_CREATOR_APPLICATION_DETAILS =
+  "Application submitted without profile details.";
 
 export type CreatorDashboardAccount =
   | {
@@ -125,24 +131,23 @@ export type CreatorInviteClaimResult =
     };
 
 export function getCreatorOnboardingInput(url: URL): CreatorOnboardingInput | null {
-  const name = cleanField(url.searchParams.get("name"));
+  const name =
+    cleanField(url.searchParams.get("name")) ??
+    DEFAULT_CREATOR_APPLICATION_NAME;
   const email = cleanEmail(url.searchParams.get("email"));
   const instagramHandle = cleanField(url.searchParams.get("instagramHandle")) ?? "";
   const phone = cleanPhone(url.searchParams.get("phone"));
   const tiktokHandle = cleanField(url.searchParams.get("tiktokHandle")) ?? "";
   const instagramPlatform =
     cleanField(url.searchParams.get("instagramPlatform")) ??
-    (instagramHandle || tiktokHandle);
+    (instagramHandle || tiktokHandle || DEFAULT_CREATOR_APPLICATION_PLATFORM);
   const profileDetails =
     cleanField(url.searchParams.get("profileDetails")) ??
-    cleanField(url.searchParams.get("about"));
+    cleanField(url.searchParams.get("about")) ??
+    DEFAULT_CREATOR_APPLICATION_DETAILS;
   const bio =
     cleanField(url.searchParams.get("bio")) ??
-    profileDetails?.slice(0, 240);
-
-  if (!name || !email || !phone || !profileDetails || !bio) {
-    return null;
-  }
+    profileDetails.slice(0, 240);
 
   return {
     bio,
@@ -161,29 +166,28 @@ export async function getCreatorProfileSettingsInput(
 ): Promise<CreatorProfileSettingsInput | null> {
   const name =
     cleanField(getString(formData, "name")) ??
-    getNameFromParts(formData);
+    getNameFromParts(formData) ??
+    DEFAULT_CREATOR_APPLICATION_NAME;
   const email = cleanEmail(getString(formData, "email"));
   const instagramHandle = cleanField(getString(formData, "instagramHandle")) ?? "";
   const phone = cleanPhone(getString(formData, "phone"));
   const tiktokHandle = cleanField(getString(formData, "tiktokHandle")) ?? "";
   const instagramPlatform =
     cleanField(getString(formData, "instagramPlatform")) ??
-    (instagramHandle || tiktokHandle);
+    (instagramHandle || tiktokHandle || DEFAULT_CREATOR_APPLICATION_PLATFORM);
   const profileDetails =
     cleanField(getString(formData, "profileDetails")) ??
-    cleanField(getString(formData, "about"));
+    cleanField(getString(formData, "about")) ??
+    DEFAULT_CREATOR_APPLICATION_DETAILS;
   const about = cleanField(getString(formData, "about")) ?? "";
   const profileIntro = cleanField(getString(formData, "profileIntro")) ?? "";
   const bio =
     cleanField(getString(formData, "bio")) ??
-    createCreatorCardSummary(profileIntro, about, profileDetails);
+    (createCreatorCardSummary(profileIntro, about, profileDetails) ||
+      DEFAULT_CREATOR_APPLICATION_DETAILS);
   const uploadedProfileImage = await cleanUploadedProfileImage(
     formData.get("profileImageFile"),
   );
-
-  if (!name || !email || !phone || !profileDetails || !bio) {
-    return null;
-  }
 
   return {
     about,
@@ -417,7 +421,9 @@ export async function saveCreatorProfileSettings(
         profileImageUrl: input.profileImageUrl,
         profileImageZoom: input.profileImageZoom,
         profileIntro: input.profileIntro,
-        ...(input.reviewSubmitted ? { applicationStatus } : {}),
+        applicationStatus: sql`case when ${creatorOnboardingProfiles.applicationStatus} = 'accepted' then 'accepted' else ${applicationStatus} end`,
+        profileSavedAt: sql`case when ${creatorOnboardingProfiles.applicationStatus} = 'accepted' then ${now} else ${creatorOnboardingProfiles.profileSavedAt} end`,
+        publishedAt: sql`case when ${creatorOnboardingProfiles.applicationStatus} = 'accepted' then coalesce(${creatorOnboardingProfiles.publishedAt}, ${now}) else ${creatorOnboardingProfiles.publishedAt} end`,
         reviewSubmittedAt,
         seat15Description: input.seat15Description,
         seat15DurationMinutes: input.seat15DurationMinutes,
@@ -554,6 +560,12 @@ export async function acceptCreatorApplication(
     return null;
   }
 
+  // Retrying acceptance must not rename or publish an existing creator.
+  if (profile.applicationStatus === "accepted") return profile;
+  if (!profile.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(profile.email)) {
+    throw new CreatorPublishError("email-required");
+  }
+
   const { getDb } = await import("../../db");
   const db = getDb();
   const now = new Date().toISOString();
@@ -583,19 +595,17 @@ export async function acceptCreatorApplication(
       throw new CreatorPublishError("public-id-taken");
     }
 
-    await db
-      .update(creatorOnboardingProfiles)
+    await db.batch([
+      db.update(creatorOnboardingProfiles)
       .set({
         applicationStatus: "accepted",
         id: publicId,
         originalApplicationId: profile.originalApplicationId ?? profile.id,
         publicSlug: publicId,
-        publishedAt: now,
+        publishedAt: null,
         updatedAt: now,
       })
-      .where(eq(creatorOnboardingProfiles.id, profile.id));
-
-    await Promise.all([
+      .where(eq(creatorOnboardingProfiles.id, profile.id)),
       db
         .update(creatorAvailabilityRules)
         .set({ creatorId: publicId, updatedAt: now })
@@ -636,7 +646,7 @@ export async function acceptCreatorApplication(
       id: publicId,
       originalApplicationId: profile.originalApplicationId ?? profile.id,
       publicSlug: publicId,
-      publishedAt: now,
+      publishedAt: null,
       updatedAt: now,
     };
   }
@@ -647,7 +657,7 @@ export async function acceptCreatorApplication(
       applicationStatus: "accepted",
       originalApplicationId: profile.originalApplicationId ?? profile.id,
       publicSlug: publicId,
-      publishedAt: now,
+      publishedAt: null,
       updatedAt: now,
     })
     .where(eq(creatorOnboardingProfiles.id, profile.id));
@@ -657,7 +667,7 @@ export async function acceptCreatorApplication(
     applicationStatus: "accepted",
     originalApplicationId: profile.originalApplicationId ?? profile.id,
     publicSlug: publicId,
-    publishedAt: now,
+    publishedAt: null,
     updatedAt: now,
   };
 }
@@ -748,6 +758,20 @@ export function normalizeCreatorPublicId(value: string | null | undefined) {
   return slug && isPublicCreatorId(slug) ? slug : null;
 }
 
+export async function listPublicMarketplaceCreators(): Promise<Creator[]> {
+  const { getDb, hasDatabaseBinding } = await import("../../db");
+  if (!hasDatabaseBinding()) return publicMarketplaceCreators;
+  const profiles = await getDb().select().from(creatorOnboardingProfiles).where(and(
+    eq(creatorOnboardingProfiles.applicationStatus, "accepted"),
+    isNotNull(creatorOnboardingProfiles.publishedAt),
+    isNotNull(creatorOnboardingProfiles.profileSavedAt),
+  ));
+  const published = profiles.map((profile) => createPublishedCreator(profile));
+  const bySlug = new Map(publicMarketplaceCreators.map((creator) => [creator.slug, creator]));
+  for (const creator of published) bySlug.set(creator.slug, creator);
+  return [...bySlug.values()];
+}
+
 export async function getPublishedCreatorBySlug(slug: string) {
   const publicSlug = normalizeCreatorPublicId(slug);
 
@@ -763,6 +787,8 @@ export async function getPublishedCreatorBySlug(slug: string) {
     .where(
       and(
         eq(creatorOnboardingProfiles.applicationStatus, "accepted"),
+        isNotNull(creatorOnboardingProfiles.publishedAt),
+        isNotNull(creatorOnboardingProfiles.profileSavedAt),
         or(
           eq(creatorOnboardingProfiles.publicSlug, publicSlug),
           eq(creatorOnboardingProfiles.id, publicSlug),

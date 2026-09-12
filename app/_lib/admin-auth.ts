@@ -1,3 +1,4 @@
+import { env as workerEnv } from "cloudflare:workers";
 import { headers } from "next/headers";
 import { getSignedInClerkUser, normalizePhoneIdentity } from "./clerk-auth";
 
@@ -5,7 +6,6 @@ export const DEFAULT_ADMIN_EMAIL = "annabelflip1@gmail.com";
 export const LOCAL_ADMIN_COOKIE = "tas_local_admin";
 
 const LOCAL_ADMIN_COOKIE_VALUE = "1";
-const USER_EMAIL_HEADER = "oai-authenticated-user-email";
 
 export function getAdminEmails() {
   const configured = getRuntimeEnv("TAKE_A_SEAT_ADMIN_EMAILS");
@@ -41,12 +41,7 @@ export function isLocalAdminDevEnabled() {
 
 export async function getSignedInAdminEmail() {
   const requestHeaders = await headers();
-  const headerEmail = requestHeaders.get(USER_EMAIL_HEADER);
   const mutableHeaders = new Headers(requestHeaders);
-
-  if (isTakeASeatAdminEmail(headerEmail)) {
-    return headerEmail;
-  }
 
   if (isLocalAdminRequest(mutableHeaders)) {
     return DEFAULT_ADMIN_EMAIL;
@@ -65,11 +60,6 @@ export async function getSignedInAdminEmail() {
 }
 
 export async function getRequestAdminEmail(request: Request) {
-  const headerEmail = request.headers.get(USER_EMAIL_HEADER);
-
-  if (isTakeASeatAdminEmail(headerEmail)) {
-    return headerEmail;
-  }
 
   if (isLocalAdminRequest(request.headers, request.url)) {
     return DEFAULT_ADMIN_EMAIL;
@@ -158,7 +148,8 @@ function getRuntimeEnv(name: string) {
       : undefined;
   const processValue =
     typeof process === "object" && process.env ? process.env[name] : undefined;
-  const value = typeof cloudflareValue === "string" ? cloudflareValue : processValue;
+  const workerValue = (workerEnv as Record<string, unknown>)[name];
+  const value = typeof cloudflareValue === "string" ? cloudflareValue : typeof workerValue === "string" ? workerValue : processValue;
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 

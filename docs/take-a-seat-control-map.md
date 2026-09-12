@@ -40,7 +40,7 @@ Admin:
 
 - Reviews creator applications.
 - Accepts creators and sends invite links.
-- Controls final public profile approval.
+- Accepts applications; creators publish their accepted profile by saving it.
 - Controls category placement, homepage featuring, refunds, exceptions, and
   launch readiness.
 - Should not be the permanent home for normal creator self-service.
@@ -91,8 +91,15 @@ Auth:
 
 - Clerk is the intended account system.
 - Shared sign-in route: `/sign-in`.
-- Sign-in method: phone code, with email support where Clerk/user records expose
-  email.
+- Sign-in defaults to an email verification code using the application email.
+  Phone-code sign-in remains available for existing phone accounts.
+- Clerk identities must have a verified primary email or phone before they can
+  claim an accepted D1 profile. Later sign-ins return to `/creators/dashboard`.
+- Clerk and admin configuration read Cloudflare Worker bindings directly.
+- The Worker forwards Clerk handshake redirects and refreshed cookies on auth
+  document requests; the first returned render receives the verified token.
+- Signed-in accounts without an accepted profile see an explanation and can
+  switch accounts. Code sending failures never fabricate a code-entry screen.
 - Admin access is allowlist-based through configured admin emails and optional
   admin phones.
 - Creator access is based on accepted creator profile identity and creator
@@ -103,6 +110,12 @@ Email:
 - Resend is used for transactional email.
 - Current branded sender: `Take a Seat <applications@takeaseatwith.com>`.
 - Application recipient/admin email is configured through runtime values.
+- Creator applications send Annabel the admin review email and send the
+  applicant a receipt email. A valid email is required to submit or accept.
+- Acceptance reserves a public slug and prepares a private starter profile, then
+  emails the applicant a setup link. `published_at` remains null until profile save.
+- Failed setup emails are visible to the admin and can be retried. An optional
+  inbox notification failure does not misreport the acceptance as failed.
 
 SMS:
 
@@ -219,7 +232,9 @@ The public creator model is split:
 - Some creators are checked-in seed/static records in `app/_lib/creators.ts`.
 - Public browsing uses an explicit allowlist of published static marketplace
   creators; concept and test profiles should stay off directory cards.
-- Published accepted creators can be loaded from D1.
+- The homepage and directory merge published D1 creators with seed creators.
+  Public routes and cards require accepted status plus publication and profile-save
+  timestamps; old auto-published applications remain private until saved.
 - This is acceptable for launch only if the distinction is documented as
   `seed creators` versus `published marketplace creators`.
 
@@ -341,3 +356,20 @@ have:
 - Stripe webhook handling tested with a full Checkout event.
 - Google Calendar OAuth and event creation tested.
 - One full test booking from public profile to paid checkout to calendar event.
+
+## Acceptance Repair Verification (2026-09-12)
+
+- `tests/creator-lifecycle.test.mjs` runs the real domain and routes against
+  isolated SQLite through the D1 statement interface. It verifies submission,
+  email recipient/link payloads, acceptance, private-before-save, invite identity,
+  ownership, publishing, repeat login, and email transport failure handling.
+- Legacy trusted identity headers no longer grant admin access. Production admin
+  access requires a verified Clerk identity on the allowlist.
+- Production inspection found `0014_great_omega_flight.sql` pending (three nullable
+  image-position columns). Apply it and `0015_majestic_stryfe.sql` (the profile-save
+  timestamp) before deploying this code.
+- Production currently uses Clerk development keys; no production instance is
+  configured in the linked Clerk project. Clerk CLI account OAuth needs renewal.
+- Automated browser attempts hit Clerk/Turnstile bot detection before OTP send.
+  Live email delivery and a complete real-user OTP/profile save rehearsal remain
+  required after approved production setup and deployment. Do not label them tested.

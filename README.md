@@ -59,7 +59,7 @@ stay in ignored local env files or Cloudflare Worker secrets.
 
 - App/runtime: vinext on Cloudflare Workers.
 - Database: Cloudflare D1 via Drizzle schema in `db/schema.ts`.
-- Auth: Clerk phone-code sign-in at `/sign-in`.
+- Auth: Clerk email-code sign-in (with phone-code fallback) at `/sign-in`.
 - Email: Resend transactional email.
 - Calendar: Google Calendar OAuth groundwork.
 - Payments: Stripe Connect and Stripe Checkout groundwork, with test-mode
@@ -86,7 +86,7 @@ Cloudflare production bindings are declared in `wrangler.deploy.jsonc`.
 - `/with/[slug]`: reusable public creator profile route.
 - `/with/ella`, `/with/annabel`: profile/test routes that still
   need consolidation into the reusable route over time.
-- `/sign-in`: shared Clerk phone sign-in.
+- `/sign-in`: shared Clerk verification-code sign-in.
 - `/creators/onboard`: creator application and setup entry.
 - `/creators/dashboard`: creator-owned profile, availability, payouts, and
   notifications dashboard for accepted creators.
