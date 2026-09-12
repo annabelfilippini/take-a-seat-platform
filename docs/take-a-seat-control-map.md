@@ -117,6 +117,8 @@ Email:
 - A successful send API response does not prove inbox delivery. Check Resend
   email events for delivered, bounced, or suppressed status. After repairing
   a bounce cause, clear the affected address's suppression before resending.
+- After the DNS repair and suppression cleanup, an admin setup-email resend
+  to the previously blocked test inbox was confirmed delivered in Resend.
 - Application recipient/admin email is configured through runtime values.
 - Creator applications send Annabel the admin review email and send the
   applicant a receipt email. A valid email is required to submit or accept.
