@@ -207,14 +207,10 @@ export function EditableCreatorProfilePreview({
     useState<EditableCreatorTab>("profile");
   const [draftMedia, setDraftMedia] = useState<{
     fileName: string;
-    kind: EditableGalleryItem["kind"];
-    source: string;
     title: string;
     uploadedSource: string;
   }>({
     fileName: "",
-    kind: "photo",
-    source: "",
     title: "",
     uploadedSource: "",
   });
@@ -325,40 +321,8 @@ export function EditableCreatorProfilePreview({
     }));
   }
 
-  function updateMediaItem(
-    id: string,
-    key: keyof Omit<EditableGalleryItem, "id">,
-    value: string,
-  ) {
-    setMediaSaveStatus("idle");
-    setProfile((current) => ({
-      ...current,
-      mediaItems: current.mediaItems.map((item) =>
-        item.id === id ? { ...item, [key]: value } : item,
-      ),
-    }));
-  }
-
-  function updateMediaItemSource(id: string, source: string) {
-    setMediaSaveStatus("idle");
-    setProfile((current) => ({
-      ...current,
-      mediaItems: current.mediaItems.map((item) =>
-        item.id === id
-          ? {
-              ...item,
-              fileName: undefined,
-              kind: isVideoSource(source) ? "video" : item.kind,
-              source,
-              sourceKind: "url",
-            }
-          : item,
-      ),
-    }));
-  }
-
   function chooseMediaItemFile(id: string, file: File | undefined) {
-    if (!file) {
+    if (!file || !file.type.startsWith("image/")) {
       return;
     }
 
@@ -371,7 +335,7 @@ export function EditableCreatorProfilePreview({
             ? {
                 ...item,
                 fileName: file.name,
-                kind: getMediaKindForFile(file),
+                kind: "photo",
                 source,
                 sourceKind: "upload",
                 title: item.title || getMediaTitleFromFileName(file.name),
@@ -391,7 +355,7 @@ export function EditableCreatorProfilePreview({
   }
 
   function addMediaItem() {
-    const source = draftMedia.uploadedSource || draftMedia.source.trim();
+    const source = draftMedia.uploadedSource;
 
     if (!source) {
       return;
@@ -404,14 +368,12 @@ export function EditableCreatorProfilePreview({
         {
           fileName: draftMedia.fileName || undefined,
           id: globalThis.crypto?.randomUUID?.() ?? `media-${Date.now()}`,
-          kind: draftMedia.kind,
+          kind: "photo",
           source,
-          sourceKind: draftMedia.uploadedSource ? "upload" : "url",
+          sourceKind: "upload",
           title:
             draftMedia.title.trim() ||
-            `${draftMedia.kind === "photo" ? "Photo" : "Video"} ${
-              current.mediaItems.length + 1
-            }`,
+            `Photo ${current.mediaItems.length + 1}`,
         },
       ],
     }));
@@ -419,7 +381,6 @@ export function EditableCreatorProfilePreview({
     setDraftMedia((current) => ({
       ...current,
       fileName: "",
-      source: "",
       title: "",
       uploadedSource: "",
     }));
@@ -586,7 +547,7 @@ export function EditableCreatorProfilePreview({
   }
 
   function chooseDraftMediaFile(file: File | undefined) {
-    if (!file) {
+    if (!file || !file.type.startsWith("image/")) {
       return;
     }
 
@@ -594,7 +555,6 @@ export function EditableCreatorProfilePreview({
       setDraftMedia((current) => ({
         ...current,
         fileName: file.name,
-        kind: getMediaKindForFile(file),
         title: current.title || getMediaTitleFromFileName(file.name),
         uploadedSource: source,
       }));
@@ -782,7 +742,7 @@ export function EditableCreatorProfilePreview({
           <div className="creator-form-header editable-media-header">
             <div className="editable-section-heading">
               <span>Images</span>
-              <h2>Photos and videos</h2>
+              <h2>Photos</h2>
             </div>
             <div className="editable-save-status-group">
               <span
@@ -831,39 +791,9 @@ export function EditableCreatorProfilePreview({
             {profile.mediaItems.map((item) => (
               <article className="editable-media-row" key={item.id}>
                 <MediaPreview item={item} />
-                <label>
-                  <span>Type</span>
-                  <select
-                    aria-label={`${item.title} media type`}
-                    className="editable-profile-field"
-                    value={item.kind}
-                    onChange={(event) =>
-                      updateMediaItem(
-                        item.id,
-                        "kind",
-                        event.target.value as EditableGalleryItem["kind"],
-                      )
-                    }
-                  >
-                    <option value="photo">Photo</option>
-                    <option value="video">Video</option>
-                  </select>
-                </label>
                 <div className="editable-media-source-control">
-                  <label>
-                    <span>URL</span>
-                    <input
-                      aria-label={`${item.title} media URL`}
-                      className="editable-profile-field"
-                      placeholder="Image URL, video URL, or TikTok video ID"
-                      value={item.sourceKind === "upload" ? "" : item.source}
-                      onChange={(event) =>
-                        updateMediaItemSource(item.id, event.target.value)
-                      }
-                    />
-                  </label>
                   <input
-                    accept="image/*,video/*"
+                    accept="image/*"
                     aria-label={`Upload replacement for ${item.title}`}
                     className="editable-profile-field editable-file-input"
                     type="file"
@@ -887,39 +817,10 @@ export function EditableCreatorProfilePreview({
           </div>
 
           <div className="editable-add-media">
-            <select
-              aria-label="New media type"
-              className="editable-profile-field"
-              value={draftMedia.kind}
-              onChange={(event) =>
-                setDraftMedia((current) => ({
-                  ...current,
-                  kind: event.target.value as EditableGalleryItem["kind"],
-                }))
-              }
-            >
-              <option value="photo">Photo</option>
-              <option value="video">Video</option>
-            </select>
             <div className="editable-add-source">
               <input
-                aria-label="New media URL"
-                className="editable-profile-field"
-                placeholder="/image.jpg, video URL, or TikTok video ID"
-                value={draftMedia.source}
-                onChange={(event) =>
-                  setDraftMedia((current) => ({
-                    ...current,
-                    source: event.target.value,
-                    uploadedSource: event.target.value.trim()
-                      ? ""
-                      : current.uploadedSource,
-                  }))
-                }
-              />
-              <input
-                accept="image/*,video/*"
-                aria-label="Upload new media file"
+                accept="image/*"
+                aria-label="Upload new photo"
                 className="editable-profile-field editable-file-input"
                 ref={draftMediaFileInputRef}
                 type="file"
@@ -931,11 +832,11 @@ export function EditableCreatorProfilePreview({
             </div>
             <button
               className="editable-primary-button"
-              disabled={!draftMedia.source.trim() && !draftMedia.uploadedSource}
+              disabled={!draftMedia.uploadedSource}
               onClick={addMediaItem}
               type="button"
             >
-              Add media
+              Add photo
             </button>
           </div>
         </div>
@@ -2409,10 +2310,6 @@ function readFileAsDataUrl(file: File, onLoad: (source: string) => void) {
   reader.readAsDataURL(file);
 }
 
-function getMediaKindForFile(file: File): EditableGalleryItem["kind"] {
-  return file.type.startsWith("video/") ? "video" : "photo";
-}
-
 function getMediaTitleFromFileName(fileName: string) {
   return fileName
     .replace(/\.[^.]+$/, "")
@@ -2423,7 +2320,9 @@ function getMediaTitleFromFileName(fileName: string) {
 function getProfileSettingsFormData(profile: EditableProfileState) {
   const formData = new FormData();
   const gallerySources = profile.mediaItems
+    .filter((item) => item.kind === "photo")
     .map((item) => item.source.trim())
+    .filter(isImageGallerySource)
     .filter(Boolean)
     .join("\n");
 
@@ -2468,9 +2367,11 @@ function getProfileSettingsFormData(profile: EditableProfileState) {
   return formData;
 }
 
-function isVideoSource(source: string) {
-  return /(?:tiktok\.com|youtube\.com|youtu\.be|vimeo\.com|\.mp4(?:\?|$)|^data:video\/)/i.test(
-    source,
+function isImageGallerySource(source: string) {
+  return (
+    /^data:image\//i.test(source) ||
+    /^\/[^?#]+\.(?:avif|gif|jpe?g|png|webp)(?:[?#].*)?$/i.test(source) ||
+    /^https?:\/\/[^?#]+\.(?:avif|gif|jpe?g|png|webp)(?:[?#].*)?$/i.test(source)
   );
 }
 

@@ -1549,7 +1549,7 @@ img {
   align-items: end;
   display: grid;
   gap: 14px;
-  grid-template-columns: 76px minmax(96px, 0.45fr) minmax(260px, 1fr) auto;
+  grid-template-columns: 76px minmax(260px, 1fr) auto;
 }
 
 .editable-media-thumb {
@@ -1653,7 +1653,7 @@ img {
   border-top: 1px solid rgba(222, 210, 191, 0.82);
   display: grid;
   gap: 12px;
-  grid-template-columns: minmax(96px, 0.4fr) minmax(260px, 1fr) auto;
+  grid-template-columns: minmax(260px, 1fr) auto;
   padding-top: 18px;
 }
 
