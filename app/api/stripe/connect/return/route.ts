@@ -2,6 +2,7 @@ import {
   getCreatorOnboardingProfileId,
   markStripeConnected,
 } from "../../../../_lib/creator-onboarding";
+import { getCreatorIntegrationAccess } from "../../../../_lib/creator-access";
 import {
   getConnectedAccountTransferStatus,
   getCreatorStripeConnection,
@@ -52,6 +53,13 @@ export async function GET(request: Request) {
 
   if (!secretKey) {
     return redirectWithStripeStatus(request, returnTo, "setup-needed", "stripe-secret");
+  }
+
+  const access = await getCreatorIntegrationAccess(request, creatorId);
+
+  if (access.status !== "allowed") {
+    const status = access.detail === "creator-auth" ? "setup-needed" : "error";
+    return redirectWithStripeStatus(request, returnTo, status, access.detail);
   }
 
   try {

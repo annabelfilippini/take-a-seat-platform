@@ -78,9 +78,18 @@ export default async function AdminApplicationPage({
     emailStatus,
     inviteEmailDetail,
     inviteEmailStatus,
+    recipientEmail: application.email,
     profileStatus,
     smsDetail,
     smsStatus,
+  });
+  const noticeTone = getNoticeTone({
+    acceptDetail,
+    acceptStatus,
+    emailDetail,
+    emailStatus,
+    inviteEmailDetail,
+    inviteEmailStatus,
   });
 
   return (
@@ -101,7 +110,11 @@ export default async function AdminApplicationPage({
         </Link>
 
         {noticeMessage ? (
-          <p className="admin-notice">
+          <p
+            aria-live="polite"
+            className={`admin-notice admin-notice-${noticeTone}`}
+            role="status"
+          >
             {noticeMessage}
           </p>
         ) : null}
@@ -157,6 +170,7 @@ export default async function AdminApplicationPage({
             <section className="admin-accept-panel" aria-label="Accept application">
               <span>Decision</span>
               <h2>Accept application</h2>
+              <p>Acceptance creates a private starter profile and emails the creator. Their card appears after they save their profile.</p>
               <form action="/api/creators/applications/accept" method="post">
                 <input name="creatorId" type="hidden" value={application.id} />
                 <label className="admin-public-id-field">
@@ -326,6 +340,7 @@ function formatDate(value: string) {
 }
 
 function getAcceptErrorMessage(detail: string | null) {
+  if (detail === "email-required") return "Add a valid application email before accepting this creator.";
   if (!detail) {
     return null;
   }
@@ -344,6 +359,7 @@ function getNoticeMessage({
   emailStatus,
   inviteEmailDetail,
   inviteEmailStatus,
+  recipientEmail,
   profileStatus,
   smsDetail,
   smsStatus,
@@ -354,6 +370,7 @@ function getNoticeMessage({
   emailStatus: string | null;
   inviteEmailDetail: string | null;
   inviteEmailStatus: string | null;
+  recipientEmail: string | null;
   profileStatus: string | null;
   smsDetail: string | null;
   smsStatus: string | null;
@@ -361,14 +378,14 @@ function getNoticeMessage({
   if (acceptStatus === "accepted") {
     return [
       "Accepted.",
-      getNotificationStatus("Email", emailStatus, emailDetail),
+      getNotificationStatus("Email", emailStatus, emailDetail, recipientEmail),
       getNotificationStatus("Text", smsStatus, smsDetail),
       `Profile ${profileStatus === "sent" ? "notified" : "not updated"}.`,
     ].join(" ");
   }
 
   if (inviteEmailStatus === "sent") {
-    return "Setup email sent with a fresh profile edit link.";
+    return `Setup email sent${recipientEmail ? ` to ${recipientEmail}` : ""} with a fresh profile edit link.`;
   }
 
   if (inviteEmailStatus === "skipped") {
@@ -383,13 +400,48 @@ function getNoticeMessage({
   return getAcceptErrorMessage(acceptDetail);
 }
 
+function getNoticeTone({
+  acceptDetail,
+  acceptStatus,
+  emailDetail,
+  emailStatus,
+  inviteEmailDetail,
+  inviteEmailStatus,
+}: {
+  acceptDetail: string | null;
+  acceptStatus: string | null;
+  emailDetail: string | null;
+  emailStatus: string | null;
+  inviteEmailDetail: string | null;
+  inviteEmailStatus: string | null;
+}) {
+  if (acceptStatus === "accepted") {
+    return emailStatus === "sent" ? "success" : "warning";
+  }
+
+  if (inviteEmailStatus === "sent") {
+    return "success";
+  }
+
+  if (inviteEmailStatus === "skipped") {
+    return inviteEmailDetail === "request-failed" ? "error" : "warning";
+  }
+
+  if (inviteEmailStatus === "error" || acceptDetail || emailDetail) {
+    return "error";
+  }
+
+  return "info";
+}
+
 function getNotificationStatus(
   label: "Email" | "Text",
   status: string | null,
   detail: string | null,
+  recipient?: string | null,
 ) {
   if (status === "sent") {
-    return `${label} sent.`;
+    return `${label} sent${recipient ? ` to ${recipient}` : ""}.`;
   }
 
   const reason = getNotificationSkipReason(detail);
@@ -408,6 +460,8 @@ function getNotificationSkipReason(detail: string | null) {
       return "creator email is not available";
     case "request-failed":
       return "provider request failed";
+    case "setup-link-failed":
+      return "setup link could not be created";
     default:
       return null;
   }

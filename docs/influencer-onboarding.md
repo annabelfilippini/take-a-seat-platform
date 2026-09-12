@@ -1,8 +1,8 @@
 # Influencer Onboarding
 
 Use Ella as the current launch profile. Each bookable creator needs profile
-copy, a Google Calendar connection, availability rules, and Stripe price IDs
-when paid checkout is enabled.
+copy, a Google Calendar connection, availability rules, and Stripe Connect when
+paid checkout is enabled.
 
 Annabel has an internal test profile at `/with/annabel`. Use it to prove the
 creator setup path before inviting an outside creator.
@@ -13,10 +13,8 @@ creator setup path before inviting an outside creator.
 2. Save profile, seat copy, pricing, and weekly availability from
    `/creators/onboard`.
 3. Connect the creator's Google Calendar from `/creators/onboard`.
-4. Create one Stripe Price for each paid seat length.
-5. Add Stripe Price IDs to Cloudflare when checkout is ready.
-6. Connect Stripe payouts through Stripe-hosted onboarding.
-7. Run a test booking before changing broader creator access to live.
+4. Connect Stripe payouts through Stripe-hosted onboarding.
+5. Run a test booking before changing broader creator access to live.
 
 ## Creator Dashboard Scope
 
@@ -106,10 +104,6 @@ npx wrangler secret put TWILIO_MESSAGING_SERVICE_SID --config wrangler.deploy.js
 npx wrangler secret put STRIPE_SECRET_KEY --config wrangler.deploy.jsonc
 npx wrangler secret put STRIPE_WEBHOOK_SECRET --config wrangler.deploy.jsonc
 npx wrangler secret put STRIPE_CONNECT_COUNTRY --config wrangler.deploy.jsonc
-npx wrangler secret put STRIPE_PRICE_ELLA_15 --config wrangler.deploy.jsonc
-npx wrangler secret put STRIPE_PRICE_ELLA_30 --config wrangler.deploy.jsonc
-npx wrangler secret put STRIPE_PRICE_ANNABEL_15 --config wrangler.deploy.jsonc
-npx wrangler secret put STRIPE_PRICE_ANNABEL_30 --config wrangler.deploy.jsonc
 ```
 
 Keep real secrets out of source and load them through Worker secrets. The
@@ -140,10 +134,9 @@ sends the creator to Stripe-hosted onboarding for payout details. The current
 starting model is marketplace-style recipient onboarding with Express Dashboard
 access.
 
-Paid bookings still sit after the Google Calendar scheduling layer. Create a
-Stripe Product for the creator's offer, then create a Price for each seat
-length. The app uses server-created Stripe Checkout Sessions so the secret key
-never reaches the browser.
+Paid bookings still sit after the Google Calendar scheduling layer. The app uses
+server-created Stripe Checkout Sessions with inline price data from the
+creator's saved seat prices, so the secret key never reaches the browser.
 
 Current app keys:
 
@@ -155,16 +148,14 @@ TAKE_A_SEAT_PLATFORM_FEE_BPS="1500"
 TWILIO_ACCOUNT_SID="AC_replace_me"
 TWILIO_AUTH_TOKEN="replace_me"
 TWILIO_MESSAGING_SERVICE_SID="MG_replace_me"
-STRIPE_PRICE_ELLA_15="price_replace_me"
-STRIPE_PRICE_ELLA_30="price_replace_me"
-STRIPE_PRICE_ANNABEL_15="price_replace_me"
-STRIPE_PRICE_ANNABEL_30="price_replace_me"
 ```
 
 Paid booking model:
 
 - Require the creator to finish Stripe Connect onboarding before their paid
   seats can be booked.
+- Use inline Checkout price data from the creator's approved D1 seat prices,
+  with optional Stripe Price IDs only for seed/demo profiles that need them.
 - Create Checkout Sessions as destination charges using the creator's connected
   Stripe account as `payment_intent_data[transfer_data][destination]`.
 - Collect Take a Seat's share through
@@ -183,7 +174,8 @@ unique values:
 - `slug`
 - `image`
 - `seats[].id`
-- `seats[].stripePriceEnv`
+- `seats[].stripePriceEnv`, only when the seed/demo profile should use a
+  prebuilt Stripe Price instead of inline Checkout price data
 
 Accepted marketplace creators should use the application and onboarding flow so
 their operational profile data lives in D1. Add a bespoke profile route under

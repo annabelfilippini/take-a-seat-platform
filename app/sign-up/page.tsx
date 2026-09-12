@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 export const metadata: Metadata = {
-  title: "Phone Number | Take a Seat",
-  description: "Phone number verification for Take a Seat.",
+  title: "Sign In | Take a Seat",
+  description: "Email verification for Take a Seat.",
 };
 
 type SignUpPageProps = {

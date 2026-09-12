@@ -4,6 +4,8 @@ NEXT_PUBLIC_SITE_URL="http://localhost:3000"
 # stay private and should be set as a Cloudflare secret in production.
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="pk_test_replace_me"
 CLERK_SECRET_KEY="sk_test_replace_me"
+# Enable only when phone-code sign-in is configured and supported by the Clerk plan.
+TAKE_A_SEAT_PHONE_SIGN_IN_ENABLED="false"
 
 # Google Calendar OAuth.
 GOOGLE_CLIENT_ID="replace_me.apps.googleusercontent.com"
@@ -38,7 +40,8 @@ TAKE_A_SEAT_ADMIN_PHONES="13035550000"
 # Optional local-only admin bypass for development. Keep false outside localhost.
 TAKE_A_SEAT_DEV_ADMIN_ENABLED="false"
 
-# Stripe Price IDs for Ella's bookable seats.
+# Optional Stripe Price IDs for seed/demo profiles. Accepted marketplace
+# creators can use inline Checkout price data from their saved seat prices.
 STRIPE_PRICE_ELLA_15="price_replace_me"
 STRIPE_PRICE_ELLA_30="price_replace_me"
 

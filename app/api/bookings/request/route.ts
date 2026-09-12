@@ -25,7 +25,7 @@ type StripeCheckoutReadiness =
       applicationFeeAmount: number;
       destinationAccountId: string;
       ok: true;
-      priceId: string;
+      priceId: string | null;
       secretKey: string;
     }
   | {
@@ -238,7 +238,7 @@ async function getStripeCheckoutReadiness({
     return { detail: "stripe-secret", ok: false };
   }
 
-  if (!priceId) {
+  if (!priceId && !canUseInlineStripePrice(seat)) {
     return { detail: "stripe-price", ok: false };
   }
 
@@ -303,7 +303,7 @@ async function createManualCaptureCheckoutSession({
   bookingInput: BookingRequestInput;
   creator: Creator;
   destinationAccountId: string;
-  priceId: string;
+  priceId: string | null;
   request: Request;
   returnTo: string;
   secretKey: string;
@@ -337,8 +337,7 @@ async function createManualCaptureCheckoutSession({
   });
 
   params.set("client_reference_id", bookingId);
-  params.set("line_items[0][price]", priceId);
-  params.set("line_items[0][quantity]", "1");
+  setStripeLineItemParams(params, creator, seat, priceId);
   params.set("metadata[appointment_start_at]", bookingInput.appointmentStartAt);
   params.set("metadata[booking_id]", bookingId);
   params.set("metadata[charge_pattern]", "manual_capture_destination_charge");
@@ -411,6 +410,38 @@ function buildStripeIntegrationIdentifier() {
   const suffix = Array.from(values, (value) => alphabet[value % alphabet.length]).join("");
 
   return `take_a_seat_hold_${suffix}`;
+}
+
+function setStripeLineItemParams(
+  params: URLSearchParams,
+  creator: Creator,
+  seat: Seat,
+  priceId: string | null,
+) {
+  if (priceId) {
+    params.set("line_items[0][price]", priceId);
+  } else {
+    params.set("line_items[0][price_data][currency]", getSeatCurrency(seat));
+    params.set(
+      "line_items[0][price_data][product_data][name]",
+      `${seat.name} with ${creator.name}`,
+    );
+    params.set("line_items[0][price_data][unit_amount]", String(seat.unitAmount));
+  }
+
+  params.set("line_items[0][quantity]", "1");
+}
+
+function canUseInlineStripePrice(seat: Seat) {
+  return (
+    Number.isSafeInteger(seat.unitAmount) &&
+    seat.unitAmount > 0 &&
+    /^[a-z]{3}$/u.test(getSeatCurrency(seat))
+  );
+}
+
+function getSeatCurrency(seat: Seat) {
+  return (seat.currency ?? "usd").trim().toLowerCase();
 }
 
 function getPlatformFeeBps() {

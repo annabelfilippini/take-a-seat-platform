@@ -19,7 +19,8 @@ export function ClerkAppProvider({
   return (
     <ClerkProvider
       afterSignOutUrl="/"
-      fallbackRedirectUrl="/take-a-seat"
+      signInFallbackRedirectUrl="/creators/dashboard"
+      signUpFallbackRedirectUrl="/creators/dashboard"
       publishableKey={publishableKey}
       signInUrl="/sign-in"
       signUpUrl="/sign-in"

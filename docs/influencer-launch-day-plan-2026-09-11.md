@@ -164,7 +164,8 @@ Before real paid bookings:
   account.
 - Rehearse Stripe Connect onboarding with the intended test or live account
   mode.
-- Create and store creator Stripe Price IDs for each seat length.
+- Confirm inline Checkout price data or optional seed/demo Stripe Price IDs for
+  each seat length.
 - Run one full booking from public profile to payment to creator notification to
   calendar event.
 

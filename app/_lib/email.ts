@@ -2,14 +2,22 @@ import type { CreatorProfileSettingsInput } from "./creator-onboarding";
 import { formatBookingDateTime, type CustomerBooking } from "./bookings";
 import { DEFAULT_ADMIN_EMAIL } from "./admin-auth";
 import { CREATOR_PROFILE_EDITOR_URL } from "./creator-destination";
-import { env } from "cloudflare:workers";
+import { env as workerEnv } from "cloudflare:workers";
 
 const RESEND_API_URL = "https://api.resend.com/emails";
 const TWILIO_API_BASE = "https://api.twilio.com/2010-04-01";
 
-type EmailResult =
+export type EmailResult =
   | { status: "sent" }
-  | { reason: "missing-key" | "missing-from" | "request-failed"; status: "skipped" };
+  | {
+      reason:
+        | "missing-from"
+        | "missing-key"
+        | "missing-recipient"
+        | "request-failed"
+        | "setup-link-failed";
+      status: "skipped";
+    };
 
 type SmsResult =
   | { status: "sent" }
@@ -36,6 +44,11 @@ type CreatorAcceptedEmail = {
   inviteToken: string;
   name: string;
   request: Request;
+};
+
+type CreatorApplicationReceivedEmail = {
+  creatorId: string;
+  input: CreatorProfileSettingsInput;
 };
 
 type CreatorAcceptedSms = {
@@ -106,6 +119,41 @@ export async function sendCreatorApplicationEmail({
   });
 }
 
+export async function sendCreatorApplicationReceivedEmail({
+  creatorId,
+  input,
+}: CreatorApplicationReceivedEmail): Promise<EmailResult> {
+  if (!input.email || !input.email.includes("@")) {
+    return { reason: "missing-recipient", status: "skipped" };
+  }
+
+  const firstName = input.name.trim().split(/\s+/u)[0] || "there";
+  const subject = "We received your Take a Seat application";
+  const text = [
+    `Hi ${firstName},`,
+    "",
+    "We received your Take a Seat creator application. Annabel will review it and follow up by email.",
+    "",
+    "If your application is accepted, you will receive a private setup link to sign in with an email verification code and edit your starter profile before anything goes live.",
+    "",
+    "Annabel",
+  ].join("\n");
+  const html = [
+    `<p>Hi ${escapeHtml(firstName)},</p>`,
+    "<p>We received your Take a Seat creator application. Annabel will review it and follow up by email.</p>",
+    "<p>If your application is accepted, you will receive a private setup link to sign in with an email verification code and edit your starter profile before anything goes live.</p>",
+    "<p>Annabel</p>",
+  ].join("");
+
+  return sendEmail({
+    idempotencyKey: `take-a-seat-application-received-${creatorId}`,
+    html,
+    subject,
+    text,
+    to: input.email,
+  });
+}
+
 export async function sendCreatorAcceptedEmail({
   creatorId,
   email,
@@ -119,22 +167,22 @@ export async function sendCreatorAcceptedEmail({
     `${CREATOR_PROFILE_EDITOR_URL}?invite=${encodeURIComponent(inviteToken)}`,
   );
   const firstName = name.trim().split(/\s+/u)[0] || "there";
-  const subject = "You've been accepted by Take a Seat";
+  const subject = "Congratulations! You've been accepted into Take a Seat";
   const text = [
     `Hi ${firstName},`,
     "",
-    "You've been accepted by Take a Seat. Click on this link to view and edit your profile.",
+    "Congratulations! You've been accepted into Take a Seat. Click this link to start working on your profile.",
     "",
-    `View and edit your profile: ${setupUrl}`,
-    "Sign in with the email or phone number from your accepted application.",
+    `Start working on your profile: ${setupUrl}`,
+    "Sign in with the email address from your accepted application. We will email you a verification code, then take you to your creator account. Save your profile when you are ready for your card to appear on the website.",
     "",
     "Annabel",
   ].join("\n");
   const html = [
     `<p>Hi ${escapeHtml(firstName)},</p>`,
-    "<p>You've been accepted by Take a Seat. Click on this link to view and edit your profile.</p>",
-    `<p><a href="${escapeHtml(setupUrl)}">View and edit your profile</a></p>`,
-    "<p>Sign in with the email or phone number from your accepted application.</p>",
+    "<p>Congratulations! You've been accepted into Take a Seat. Click this link to start working on your profile.</p>",
+    `<p><a href="${escapeHtml(setupUrl)}">Start working on your profile</a></p>`,
+    "<p>Sign in with the email address from your accepted application. We will email you a verification code, then take you to your creator account. Save your profile when you are ready for your card to appear on the website.</p>",
     "<p>Annabel</p>",
   ].join("");
 
@@ -336,9 +384,9 @@ async function sendSms({
       },
       method: "POST",
     },
-  );
+  ).catch(() => null);
 
-  if (!response.ok) {
+  if (!response?.ok) {
     return { reason: "request-failed", status: "skipped" };
   }
 
@@ -386,9 +434,9 @@ async function sendEmail({
       "Idempotency-Key": idempotencyKey,
     },
     method: "POST",
-  });
+  }).catch(() => null);
 
-  if (!response.ok) {
+  if (!response?.ok) {
     return { reason: "request-failed", status: "skipped" };
   }
 
@@ -408,10 +456,20 @@ function buildAbsoluteUrl(request: Request, path: string) {
 }
 
 function getRuntimeEnv(name: string) {
-  const cloudflareValue = (env as Record<string, unknown>)[name];
+  const globalEnv = (globalThis as Record<string, unknown>).env;
+  const globalValue =
+    globalEnv && typeof globalEnv === "object"
+      ? (globalEnv as Record<string, unknown>)[name]
+      : undefined;
+  const workerValue = (workerEnv as Record<string, unknown>)[name];
   const processValue =
     typeof process === "object" && process.env ? process.env[name] : undefined;
-  const value = typeof cloudflareValue === "string" ? cloudflareValue : processValue;
+  const value =
+    typeof globalValue === "string"
+      ? globalValue
+      : typeof workerValue === "string"
+        ? workerValue
+        : processValue;
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 

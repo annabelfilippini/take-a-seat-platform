@@ -15,24 +15,27 @@ export async function getSignedInCreatorEditorAccount(
 ) {
   const requestHeaders = await headers();
   const mutableHeaders = new Headers(requestHeaders);
-  const user = await getSignedInClerkUserFromHeaders(
-    mutableHeaders,
-    requestUrlFromHeaders(mutableHeaders, requestPath),
-  );
-
-  if (!user) {
-    return null;
-  }
-
   try {
+    const user = await getSignedInClerkUserFromHeaders(
+      mutableHeaders,
+      requestUrlFromHeaders(mutableHeaders, requestPath),
+    );
+
+    if (!user) {
+      return null;
+    }
+
     if (inviteToken) {
-      await claimCreatorInvite(inviteToken, user);
+      const claim = await claimCreatorInvite(inviteToken, user);
+      if (["identity-mismatch", "needs-identity", "account-mismatch"].includes(claim.status)) {
+        return { accessError: "This account does not match the accepted application. Sign out below and use the email address you applied with." };
+      }
     }
 
     const account = await getCreatorDashboardAccount(user);
 
     if (!("profile" in account)) {
-      return null;
+      return { accessError: "No accepted creator profile is linked to this account. Use the email address from your accepted application, or contact Take a Seat for help." };
     }
 
     const [notificationPreferences, notifications] = await Promise.all([
@@ -69,7 +72,7 @@ export async function getSignedInCreatorEditorAccount(
       profile: account.profile,
     };
   } catch {
-    return null;
+    return { accessError: "We could not load your profile right now. Please try again shortly. Your saved profile has not been changed." };
   }
 }
 

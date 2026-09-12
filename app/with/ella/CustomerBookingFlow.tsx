@@ -288,7 +288,7 @@ export function CustomerBookingFlow({
                       />
                     </label>
                     <label className="customer-booking-field-wide">
-                      <span>What do you want to talk about with Ella?</span>
+                      <span>What do you want to talk about with {creatorName}?</span>
                       <textarea
                         onChange={(event) => setTopic(event.target.value)}
                         required

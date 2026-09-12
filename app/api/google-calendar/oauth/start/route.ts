@@ -9,10 +9,9 @@ import {
   redirectWithCalendarStatus,
 } from "../shared";
 import {
-  createCreatorOnboardingProfile,
-  getCreatorOnboardingInput,
   getCreatorOnboardingProfileId,
 } from "../../../../_lib/creator-onboarding";
+import { getCreatorIntegrationAccess } from "../../../../_lib/creator-access";
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -32,19 +31,19 @@ export async function GET(request: Request) {
 
   if (!creatorId) {
     const onboardingProfileId = getCreatorOnboardingProfileId(url);
-    const input = getCreatorOnboardingInput(url);
 
-    if (input) {
-      try {
-        creatorId = await createCreatorOnboardingProfile(input, onboardingProfileId);
-      } catch {
-        return redirectWithCalendarStatus(request, returnTo, "setup-needed", "d1");
-      }
-    } else if (onboardingProfileId) {
+    if (onboardingProfileId) {
       creatorId = onboardingProfileId;
     } else {
       return redirectWithCalendarStatus(request, returnTo, "error", "profile-required");
     }
+  }
+
+  const access = await getCreatorIntegrationAccess(request, creatorId);
+
+  if (access.status !== "allowed") {
+    const status = access.detail === "creator-auth" ? "setup-needed" : "error";
+    return redirectWithCalendarStatus(request, returnTo, status, access.detail);
   }
 
   const nonce = createNonce();

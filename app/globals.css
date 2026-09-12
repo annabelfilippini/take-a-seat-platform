@@ -4880,6 +4880,24 @@ button.availability-date-field:focus-visible {
   padding: 16px 18px;
 }
 
+.admin-notice-success {
+  background: #f3faf1;
+  border-color: rgba(57, 124, 62, 0.35);
+  color: #244f29;
+}
+
+.admin-notice-warning {
+  background: #fff8ea;
+  border-color: rgba(162, 110, 32, 0.38);
+  color: #69461a;
+}
+
+.admin-notice-error {
+  background: #fff2ef;
+  border-color: rgba(184, 65, 45, 0.38);
+  color: #7d2f23;
+}
+
 .admin-queue {
   display: grid;
   gap: 10px;

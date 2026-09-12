@@ -2,9 +2,10 @@
 
 /* eslint-disable @next/next/no-img-element */
 import { useId, useState } from "react";
+import type { Creator } from "../_lib/creators";
 import { CreatorDirectory } from "./CreatorDirectory";
 
-export function BookingPlatform() {
+export function BookingPlatform({ creators }: { creators?: Creator[] }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const navId = useId();
 
@@ -79,7 +80,7 @@ export function BookingPlatform() {
         </form>
       </div>
 
-      <CreatorDirectory />
+      <CreatorDirectory creators={creators} />
 
       <section className="creator-invite" id="creators">
         <form action="/creators/onboard" className="nav-action-form" method="get">

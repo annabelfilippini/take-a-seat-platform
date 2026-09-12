@@ -27,7 +27,8 @@
     "enabled": true
   },
   "vars": {
-    "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_test_Z3VpZGVkLW5hcndoYWwtMTEzMy5jbGVyay5hY2NvdW50cy5kZXYk",
+    "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_live_Y2xlcmsudGFrZWFzZWF0d2l0aC5jb20k",
+    "TAKE_A_SEAT_PHONE_SIGN_IN_ENABLED": "false",
     "NEXT_PUBLIC_SITE_URL": "https://takeaseatwith.com",
     "TAKE_A_SEAT_ADMIN_EMAILS": "annabelflip1@gmail.com",
     "TAKE_A_SEAT_APPLICATION_RECIPIENT": "annabelflip1@gmail.com",
@@ -38,8 +39,6 @@
     "required": [
       "CLERK_SECRET_KEY",
       "RESEND_API_KEY",
-      "STRIPE_PRICE_ELLA_15",
-      "STRIPE_PRICE_ELLA_30",
       "STRIPE_SECRET_KEY",
       "STRIPE_WEBHOOK_SECRET"
     ]

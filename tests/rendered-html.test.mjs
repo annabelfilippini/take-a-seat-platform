@@ -1,3 +1,11 @@
+import { registerHooks } from "node:module";
+globalThis.__tasTestEnv = {};
+registerHooks({
+  resolve(specifier, context, nextResolve) {
+    if (specifier === "cloudflare:workers") return { url: "data:text/javascript,export const env = globalThis.__tasTestEnv", shortCircuit: true };
+    return nextResolve(specifier, context);
+  },
+});
 import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
 import { readFile } from "node:fs/promises";
@@ -192,11 +200,11 @@ test("server-renders the account sign-in entry", async () => {
 
   const html = await response.text();
   assert.match(html, /<title>Sign In \| Take a Seat<\/title>/i);
-  assert.match(html, /Sign in with your phone/);
+  assert.match(html, /Sign in with your application email/);
   assert.match(html, /account-auth-shell-minimal/);
   assert.doesNotMatch(html, /Enter your mobile number/);
-  assert.match(html, /Phone number/);
-  assert.match(html, /\+1 555 000 0000/);
+  assert.match(html, /Email address/);
+  assert.match(html, /you@example.com/);
   assert.match(html, /Next/);
   assert.doesNotMatch(html, /Your account starts here/);
   assert.doesNotMatch(html, /Creator dashboard/);
@@ -221,6 +229,32 @@ test("reads Clerk and admin auth settings from Cloudflare runtime env", async ()
   assert.match(clerkAuth, /getRuntimeEnv\("NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY"\)/);
 });
 
+test("phone sign-in sends codes before routing creators and customers by account", async () => {
+  const [creatorDashboardPage, creatorOnboarding, signInPage, signInScreen] = await Promise.all([
+    readFile(new URL("../app/creators/dashboard/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/_lib/creator-onboarding.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/sign-in/page.tsx", import.meta.url), "utf8"),
+    readFile(
+      new URL("../app/_components/SignInClerkScreen.tsx", import.meta.url),
+      "utf8",
+    ),
+  ]);
+
+  assert.match(creatorDashboardPage, /allowSignUpIfMissing/);
+  assert.match(creatorDashboardPage, /routeByAccount=\{!inviteToken\}/);
+  assert.match(signInPage, /const allowSignUpIfMissing = true/);
+  assert.match(signInPage, /isCreatorDashboardRedirect\(redirectUrl\)/);
+  assert.match(signInPage, /routeByAccount=\{routeByAccount\}/);
+  assert.match(signInScreen, /allowSignUpIfMissing = false/);
+  assert.match(signInScreen, /routeByAccount = false/);
+  assert.match(signInScreen, /isIdentifierNotFoundError\(err\) && allowSignUpIfMissing/);
+  assert.match(signInScreen, /prepareFirstFactor/);
+  assert.match(signInScreen, /hasExplicitRedirect && !routeByAccount/);
+  assert.match(creatorOnboarding, /getAcceptedCreatorProfileForUser\(user\)/);
+  assert.match(creatorOnboarding, /normalizePhoneIdentity\(profile\.phone\) === user\.phone/);
+  assert.match(creatorOnboarding, /creatorAccounts/);
+});
+
 test("legacy creator auth paths redirect into current auth and creator dashboard routes", async () => {
   const signInResponse = await render("/creators/sign-in");
   assert.equal(signInResponse.status, 307);
@@ -239,8 +273,11 @@ test("legacy creator auth paths redirect into current auth and creator dashboard
   const dashboardHtml = await dashboardResponse.text();
   assert.match(dashboardHtml, /<title>Creator Dashboard \| Take a Seat<\/title>/i);
   assert.match(dashboardHtml, /Creator dashboard/);
-  assert.match(dashboardHtml, /Sign in with your creator phone/);
-  assert.match(dashboardHtml, /redirect_url=%2Fcreators%2Fdashboard/);
+  assert.match(dashboardHtml, /Sign in to build your profile/);
+  assert.match(dashboardHtml, /Email address/);
+  assert.match(dashboardHtml, /Send verification code/);
+  assert.doesNotMatch(dashboardHtml, /Sign in with phone/);
+  assert.doesNotMatch(dashboardHtml, /redirect_url=%2Fcreators%2Fdashboard/);
   assert.doesNotMatch(dashboardHtml, /Creator Profile Editor Preview/);
 
   const stripeReturnDashboardResponse = await render(
@@ -254,7 +291,7 @@ test("legacy creator auth paths redirect into current auth and creator dashboard
   );
   assert.match(
     stripeReturnDashboardHtml,
-    /we will text you a verification code/,
+    /we will email you a verification code/,
   );
 
   const invitedDashboardResponse = await render(
@@ -262,10 +299,8 @@ test("legacy creator auth paths redirect into current auth and creator dashboard
   );
   assert.equal(invitedDashboardResponse.status, 200);
   const invitedDashboardHtml = await invitedDashboardResponse.text();
-  assert.match(
-    invitedDashboardHtml,
-    /redirect_url=%2Fcreators%2Fdashboard%3Finvite%3Dtest_invite_token/,
-  );
+  assert.match(invitedDashboardHtml, /Send verification code/);
+  assert.doesNotMatch(invitedDashboardHtml, /Sign in with phone/);
 
   const retiredSetupResponse = await render(
     "/creators/onboard/accepted?creatorId=onboard_test",
@@ -278,19 +313,16 @@ test("legacy creator auth paths redirect into current auth and creator dashboard
 });
 
 test("server-renders the admin creator profile editor preview", async () => {
-  const response = await dispatch("/admin/creator-profile-editor-preview", {
-    headers: {
-      accept: "text/html",
-      "oai-authenticated-user-email": "annabelflip1@gmail.com",
-    },
-  });
+  const response = await withEnv({ TAKE_A_SEAT_DEV_ADMIN_ENABLED: "true" }, () => dispatch("/admin/creator-profile-editor-preview", {
+    headers: { accept: "text/html", host: "localhost", cookie: "tas_local_admin=1" },
+  }));
 
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
 
   const html = await response.text();
   assert.match(html, /Creator Profile Editor Preview \| Take a Seat/);
-  assert.match(html, /Editable creator profile preview/);
+  assert.match(html, /Your creator profile/);
   assert.match(html, /editable-profile-photo-frame/);
   assert.match(html, /aria-label="Drag profile picture to reposition it"/);
   assert.match(html, /aria-label="Profile picture zoom controls"/);
@@ -560,9 +592,10 @@ test("wires accepted creators to public profile publishing", async () => {
   assert.match(adminApplicationPage, /getAvailableCreatorPublicIdSuggestion/);
   assert.match(adminApplicationPage, /that public creator ID is already taken/);
   assert.match(acceptRoute, /acceptCreatorApplication\(\s*creatorId,\s*normalizedPublicCreatorId/s);
+  assert.match(acceptRoute, /sendCreatorAcceptedInviteEmail/);
   assert.match(acceptRoute, /sendCreatorAcceptedSms/);
   assert.match(acceptRoute, /createCreatorAcceptedNotification/);
-  assert.match(acceptRoute, /inviteToken:\s*invite\?\.token/);
+  assert.match(acceptRoute, /inviteToken:\s*email\.inviteToken/);
   assert.match(adminApplicationPage, /Accept and send setup email/);
   assert.match(adminApplicationPage, /Send setup email again/);
   assert.match(adminApplicationPage, /\/api\/creators\/applications\/invite/);
@@ -591,6 +624,7 @@ test("wires accepted creators to public profile publishing", async () => {
   assert.match(customerBookingFlow, /action="\/api\/bookings\/request"/);
   assert.match(customerBookingFlow, /selectedSlot\?\.sourceAppointmentStartAt/);
   assert.match(customerBookingFlow, /selectedSlot\?\.sourceTimezone/);
+  assert.match(customerBookingFlow, /What do you want to talk about with \{creatorName\}\?/);
   assert.match(customerBookingFlow, /You won't be charged unless \$\{creatorName\} accepts/);
   assert.match(customerBookingFlow, /Go to payment next/);
   assert.match(bookingsLib, /accepted: "accepted"/);
@@ -741,9 +775,22 @@ test("returns a specific Stripe setup blocker before request checkout", async ()
 });
 
 test("notifies accepted creators in email, text, and profile", async () => {
-  const [acceptRoute, dashboard, inviteRoute, email, notifications, editor] = await Promise.all([
+  const [
+    acceptRoute,
+    acceptedInvite,
+    dashboard,
+    inviteRoute,
+    email,
+    notifications,
+    adminApplicationPage,
+    editor,
+  ] = await Promise.all([
     readFile(
       new URL("../app/api/creators/applications/accept/route.ts", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../app/_lib/creator-accepted-invite.ts", import.meta.url),
       "utf8",
     ),
     readFile(new URL("../app/_lib/creator-dashboard.ts", import.meta.url), "utf8"),
@@ -754,6 +801,10 @@ test("notifies accepted creators in email, text, and profile", async () => {
     readFile(new URL("../app/_lib/email.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/_lib/notifications.ts", import.meta.url), "utf8"),
     readFile(
+      new URL("../app/admin/applications/[creatorId]/page.tsx", import.meta.url),
+      "utf8",
+    ),
+    readFile(
       new URL(
         "../app/admin/creator-profile-editor-preview/EditableCreatorProfilePreview.tsx",
         import.meta.url,
@@ -762,25 +813,55 @@ test("notifies accepted creators in email, text, and profile", async () => {
     ),
   ]);
 
-  assert.match(acceptRoute, /sendCreatorAcceptedEmail/);
+  assert.match(acceptRoute, /sendCreatorAcceptedInviteEmail/);
   assert.match(acceptRoute, /sendCreatorAcceptedSms/);
   assert.match(acceptRoute, /createCreatorAcceptedNotification/);
+  assert.match(acceptRoute, /inviteToken:\s*email\.inviteToken/);
+  assert.match(acceptedInvite, /createCreatorInvite/);
+  assert.match(acceptedInvite, /sendCreatorAcceptedEmail/);
+  assert.match(acceptedInvite, /missing-recipient/);
+  assert.match(acceptedInvite, /setup-link-failed/);
   assert.match(dashboard, /claimCreatorInvite/);
   assert.match(dashboard, /inviteToken/);
-  assert.match(inviteRoute, /sendCreatorAcceptedEmail/);
-  assert.match(inviteRoute, /createCreatorInvite/);
+  assert.match(inviteRoute, /sendCreatorAcceptedInviteEmail/);
   assert.match(inviteRoute, /applicationStatus !== "accepted"/);
   assert.match(inviteRoute, /inviteEmail: email\.status/);
-  assert.match(email, /You've been accepted by Take a Seat/);
-  assert.match(email, /Click on this link to view and edit your profile/);
-  assert.match(email, /View and edit your profile/);
+  assert.match(email, /Congratulations! You've been accepted into Take a Seat/);
+  assert.match(email, /Click this link to start working on your profile/);
+  assert.match(email, /Start working on your profile/);
+  assert.match(email, /email address from your accepted application/);
+  assert.match(email, /take you to your creator account/);
+  assert.match(email, /globalThis/);
+  assert.match(email, /workerEnv/);
   assert.match(email, /CREATOR_PROFILE_EDITOR_URL\}\?invite=/);
   assert.match(email, /inviteToken\?: string/);
   assert.match(notifications, /application_accepted/);
   assert.match(notifications, /title: "Application accepted"/);
+  assert.match(adminApplicationPage, /setup link could not be created/);
   assert.match(editor, /getNotificationHref/);
   assert.match(editor, /notification\.type === "application_accepted"/);
   assert.match(editor, /CREATOR_PROFILE_EDITOR_URL/);
+});
+
+test("sends creator-facing application receipt emails", async () => {
+  const [profileRoute, email, onboardingPage, onboardingForm] = await Promise.all([
+    readFile(new URL("../app/api/creators/profile/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/_lib/email.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/creators/onboard/page.tsx", import.meta.url), "utf8"),
+    readFile(
+      new URL("../app/creators/onboard/CreatorOnboardingForm.tsx", import.meta.url),
+      "utf8",
+    ),
+  ]);
+
+  assert.match(profileRoute, /sendCreatorApplicationReceivedEmail/);
+  assert.match(profileRoute, /Promise\.all/);
+  assert.match(profileRoute, /creatorEmail: creatorEmail\.status/);
+  assert.match(email, /We received your Take a Seat creator application/);
+  assert.match(email, /edit your starter profile/);
+  assert.match(email, /missing-recipient/);
+  assert.match(onboardingPage, /creatorEmail: getStatus\(searchParams\?\.creatorEmail\)/);
+  assert.match(onboardingForm, /confirmation email/i);
 });
 
 test("notifies creators when customers authorize a requested seat", async () => {
@@ -839,7 +920,7 @@ test("does not render the generic 404 for an emailed application link", async ()
     {
       headers: {
         accept: "text/html",
-        "oai-authenticated-user-email": "annabelflip1@gmail.com",
+        cookie: "tas_local_admin=1",
       },
     },
   );
@@ -876,7 +957,7 @@ test("removes starter metadata and preview dependencies", async () => {
   ]);
 
   assert.match(page, /export const metadata:\s*Metadata/);
-  assert.match(page, /<BookingPlatform \/>/);
+  assert.match(page, /<BookingPlatform creators=/);
   assert.doesNotMatch(page, /PublicCreatorProfile/);
   assert.match(layout, /title:\s*"Take a Seat"/);
   assert.match(packageJson, /"name": "take-a-seat-platform"/);
@@ -1024,6 +1105,22 @@ test("server-renders creator onboarding form", async () => {
   assert.doesNotMatch(html, /Style advice through private Take a Seat calls/);
 });
 
+test("creator applications require contact fields and keep sparse profile defaults", async () => {
+  const [creatorOnboardingForm, creatorOnboardingLib] = await Promise.all([
+    readFile(new URL("../app/creators/onboard/CreatorOnboardingForm.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/_lib/creator-onboarding.ts", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(creatorOnboardingForm, /name="email"[\s\S]*?required/);
+  assert.match(creatorOnboardingForm, /name="phone"[\s\S]*?required/);
+  assert.match(creatorOnboardingLib, /DEFAULT_CREATOR_APPLICATION_NAME/);
+  assert.match(creatorOnboardingLib, /DEFAULT_CREATOR_APPLICATION_DETAILS/);
+  assert.doesNotMatch(
+    creatorOnboardingLib,
+    /if \(!name \|\| !email \|\| !phone \|\| !profileDetails \|\| !bio\)/,
+  );
+});
+
 test("server-renders Annabel's test profile page", async () => {
   const response = await render("/with/annabel");
   assert.equal(response.status, 200);
@@ -1045,14 +1142,21 @@ test("server-renders Annabel's test profile page", async () => {
 test("starts Google Calendar OAuth for a creator", async () => {
   await withEnv(
     {
+      TAKE_A_SEAT_DEV_ADMIN_ENABLED: "true",
       GOOGLE_CLIENT_ID: "test-client.apps.googleusercontent.com",
       GOOGLE_CLIENT_SECRET: "test-client-secret",
       GOOGLE_OAUTH_REDIRECT_URI:
         "http://localhost:3000/api/google-calendar/oauth/callback",
     },
     async () => {
-      const response = await render(
+      const response = await dispatch(
         "/api/google-calendar/oauth/start?creatorId=ella&returnTo=/creators/onboard",
+        {
+          headers: {
+            accept: "text/html",
+            cookie: "tas_local_admin=1",
+          },
+        },
       );
       assert.equal(response.status, 303);
 
@@ -1081,6 +1185,30 @@ test("starts Google Calendar OAuth for a creator", async () => {
         /https:\/\/www\.googleapis\.com\/auth\/calendar\.events\.owned/,
       );
       assert.match(response.headers.get("set-cookie") ?? "", /HttpOnly/);
+    },
+  );
+});
+
+test("requires creator access before starting Google Calendar OAuth", async () => {
+  await withEnv(
+    {
+      GOOGLE_CLIENT_ID: "test-client.apps.googleusercontent.com",
+      GOOGLE_CLIENT_SECRET: "test-client-secret",
+      GOOGLE_OAUTH_REDIRECT_URI:
+        "http://localhost:3000/api/google-calendar/oauth/callback",
+    },
+    async () => {
+      const response = await dispatch(
+        "/api/google-calendar/oauth/start?creatorId=ella&returnTo=/creators/dashboard",
+        {
+          headers: { accept: "text/html" },
+        },
+      );
+      assert.equal(response.status, 303);
+      assert.match(
+        response.headers.get("location") ?? "",
+        /\/creators\/dashboard\?calendar=setup-needed&detail=creator-auth/,
+      );
     },
   );
 });
@@ -1115,15 +1243,40 @@ test("asks for Stripe setup before starting Connect onboarding", async () => {
     /\/creators\/onboard\?stripe=setup-needed&detail=stripe-secret/,
   );
 
-  const [startRoute, stripeConnect] = await Promise.all([
+  const [startRoute, returnRoute, stripeConnect] = await Promise.all([
     readFile(new URL("../app/api/stripe/connect/start/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/stripe/connect/return/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/_lib/stripe-connect.ts", import.meta.url), "utf8"),
   ]);
 
   assert.match(startRoute, /getCreatorApplication\(creatorId\)/);
+  assert.match(startRoute, /getCreatorIntegrationAccess\(request, creatorId\)/);
+  assert.doesNotMatch(startRoute, /createCreatorOnboardingProfile/);
+  assert.match(returnRoute, /getCreatorIntegrationAccess\(request, creatorId\)/);
   assert.match(startRoute, /"creator-email-required"/);
   assert.match(startRoute, /contactEmail,/);
   assert.match(stripeConnect, /contact_email:\s*contactEmail/);
+});
+
+test("requires creator access before starting Stripe Connect onboarding", async () => {
+  await withEnv(
+    {
+      STRIPE_SECRET_KEY: "sk_test_take_a_seat",
+    },
+    async () => {
+      const response = await dispatch(
+        "/api/stripe/connect/start?creatorId=ella&returnTo=/creators/dashboard",
+        {
+          headers: { accept: "text/html" },
+        },
+      );
+      assert.equal(response.status, 303);
+      assert.match(
+        response.headers.get("location") ?? "",
+        /\/creators\/dashboard\?stripe=setup-needed&detail=creator-auth/,
+      );
+    },
+  );
 });
 
 test("checks Stripe transfer readiness before marking Connect returned accounts connected", async () => {
@@ -1199,7 +1352,6 @@ test("creates Stripe Checkout destination charges with a platform fee", async ()
   try {
     await withEnv(
       {
-        STRIPE_PRICE_ELLA_15: "price_test_ella_15",
         STRIPE_SECRET_KEY: "sk_test_take_a_seat",
         TAKE_A_SEAT_TEST_BOOKINGS: "true",
         TAKE_A_SEAT_TEST_STRIPE_CONNECTIONS: JSON.stringify([
@@ -1254,7 +1406,13 @@ test("creates Stripe Checkout destination charges with a platform fee", async ()
   const body = stripeRequest.init.body;
   assert.equal(body.get("mode"), "payment");
   assert.equal(body.get("customer_email"), "customer@example.com");
-  assert.equal(body.get("line_items[0][price]"), "price_test_ella_15");
+  assert.equal(body.get("line_items[0][price]"), null);
+  assert.equal(body.get("line_items[0][price_data][currency]"), "usd");
+  assert.equal(
+    body.get("line_items[0][price_data][product_data][name]"),
+    "15 minutes with Ella McLane",
+  );
+  assert.equal(body.get("line_items[0][price_data][unit_amount]"), "5000");
   assert.match(body.get("client_reference_id") ?? "", /^booking_/);
   assert.match(body.get("metadata[booking_id]") ?? "", /^booking_/);
   assert.equal(body.get("metadata[appointment_start_at]"), "2026-09-17T09:30:00");

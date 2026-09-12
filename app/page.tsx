@@ -1,3 +1,4 @@
+import { listPublicMarketplaceCreators } from "./_lib/creator-onboarding";
 import type { Metadata } from "next";
 import { BookingPlatform } from "./_components/BookingPlatform";
 
@@ -7,6 +8,8 @@ export const metadata: Metadata = {
     "Choose a private seat with rising creators, tastemakers, and experts.",
 };
 
-export default function Home() {
-  return <BookingPlatform />;
+export const dynamic = "force-dynamic";
+
+export default async function Home() {
+  return <BookingPlatform creators={await listPublicMarketplaceCreators()} />;
 }

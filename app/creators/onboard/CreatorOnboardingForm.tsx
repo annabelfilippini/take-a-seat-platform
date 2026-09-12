@@ -5,6 +5,8 @@ import { useMemo, useState } from "react";
 type InitialStatuses = {
   availability: string | null;
   calendar: string | null;
+  creatorEmail: string | null;
+  creatorEmailDetail: string | null;
   profile: string | null;
   stripe: string | null;
 };
@@ -17,6 +19,8 @@ export function CreatorOnboardingForm({
   const statuses = initialStatuses ?? {
     availability: null,
     calendar: null,
+    creatorEmail: null,
+    creatorEmailDetail: null,
     profile: null,
     stripe: null,
   };
@@ -43,13 +47,16 @@ export function CreatorOnboardingForm({
     <section className="creator-apply-stage">
       {profileStatus === "error" || profileStatus === "setup-needed" ? (
         <p className="booking-notice">
-          Application save needs attention. Check the required fields and D1
-          setup.
+          Application save needs attention. Please try again, or check the local
+          D1 setup.
         </p>
       ) : null}
 
       {profileStatus === "saved" ? (
-        <ReviewState />
+        <ReviewState
+          creatorEmailDetail={statuses.creatorEmailDetail}
+          creatorEmailStatus={statuses.creatorEmail}
+        />
       ) : (
         <div className="creator-application-layout">
           <h1>Apply to Inspire</h1>
@@ -149,7 +156,6 @@ function ApplicationForm({
             name="firstName"
             onChange={(event) => setFirstName(event.target.value)}
             placeholder="First name"
-            required
             value={firstName}
           />
         </label>
@@ -160,7 +166,6 @@ function ApplicationForm({
             name="lastName"
             onChange={(event) => setLastName(event.target.value)}
             placeholder="Last name"
-            required
             value={lastName}
           />
         </label>
@@ -223,7 +228,6 @@ function ApplicationForm({
           name="profileDetails"
           onChange={(event) => setExpertise(event.target.value)}
           placeholder="Tell us what people already come to you for, what kind of advice you give, and what a useful 1:1 call with you would help them decide."
-          required
           rows={6}
           value={expertise}
         />
@@ -236,13 +240,51 @@ function ApplicationForm({
   );
 }
 
-function ReviewState() {
+function ReviewState({
+  creatorEmailDetail,
+  creatorEmailStatus,
+}: {
+  creatorEmailDetail: string | null;
+  creatorEmailStatus: string | null;
+}) {
   return (
     <section className="creator-review-state" aria-labelledby="review-heading">
       <h1 id="review-heading">Application in review.</h1>
       <p>We will review your application and follow up soon.</p>
+      <p>{getCreatorEmailStatusMessage(creatorEmailStatus, creatorEmailDetail)}</p>
     </section>
   );
+}
+
+function getCreatorEmailStatusMessage(
+  status: string | null,
+  detail: string | null,
+) {
+  if (status === "sent") {
+    return "We sent a confirmation email to the address you provided.";
+  }
+
+  if (status === "skipped") {
+    const reason = getCreatorEmailSkipReason(detail);
+    return `Confirmation email not sent${reason ? `: ${reason}` : ""}.`;
+  }
+
+  return "If you included an email address, you will receive a confirmation email.";
+}
+
+function getCreatorEmailSkipReason(detail: string | null) {
+  switch (detail) {
+    case "missing-from":
+      return "sender is not configured";
+    case "missing-key":
+      return "email provider is not configured";
+    case "missing-recipient":
+      return "email address is missing";
+    case "request-failed":
+      return "email provider request failed";
+    default:
+      return null;
+  }
 }
 
 function generateProfileSections({

@@ -1,9 +1,6 @@
 import { getRequestAdminEmail } from "../../../../_lib/admin-auth";
-import {
-  createCreatorInvite,
-  getCreatorApplication,
-} from "../../../../_lib/creator-onboarding";
-import { sendCreatorAcceptedEmail } from "../../../../_lib/email";
+import { sendCreatorAcceptedInviteEmail } from "../../../../_lib/creator-accepted-invite";
+import { getCreatorApplication } from "../../../../_lib/creator-onboarding";
 
 function redirectTo(request: Request, path: string, params: Record<string, string>) {
   const target = new URL(path, request.url);
@@ -54,23 +51,7 @@ export async function POST(request: Request) {
       });
     }
 
-    if (!profile.email || !profile.email.includes("@")) {
-      return redirectTo(request, returnPath, {
-        inviteEmail: "skipped",
-        inviteEmailDetail: "missing-recipient",
-      });
-    }
-
-    const invite = await createCreatorInvite(profile);
-    const email = await sendCreatorAcceptedEmail({
-      creatorId: profile.id,
-      email: profile.email,
-      emailNonce: invite.emailNonce,
-      expiresAt: invite.expiresAt,
-      inviteToken: invite.token,
-      name: profile.name,
-      request,
-    });
+    const email = await sendCreatorAcceptedInviteEmail({ profile, request });
 
     return redirectTo(request, returnPath, {
       inviteEmail: email.status,

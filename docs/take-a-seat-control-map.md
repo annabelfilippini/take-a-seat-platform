@@ -40,7 +40,7 @@ Admin:
 
 - Reviews creator applications.
 - Accepts creators and sends invite links.
-- Controls final public profile approval.
+- Accepts applications; creators publish their accepted profile by saving it.
 - Controls category placement, homepage featuring, refunds, exceptions, and
   launch readiness.
 - Should not be the permanent home for normal creator self-service.
@@ -89,10 +89,19 @@ Database:
 
 Auth:
 
-- Clerk is the intended account system.
+- Clerk production instance: `ins_3JFOtf1Vw17O6o6hLdO7c5SwEAz`.
+- Frontend API: `clerk.takeaseatwith.com`; account portal: `accounts.takeaseatwith.com`.
 - Shared sign-in route: `/sign-in`.
-- Sign-in method: phone code, with email support where Clerk/user records expose
-  email.
+- Sign-in defaults to an email verification code using the application email.
+  Production uses email codes only. Phone-code requires a paid Clerk feature and
+  is hidden unless `TAKE_A_SEAT_PHONE_SIGN_IN_ENABLED=true` and Clerk supports it.
+- Clerk identities must have a verified primary email or phone before they can
+  claim an accepted D1 profile. Later sign-ins return to `/creators/dashboard`.
+- Clerk and admin configuration read Cloudflare Worker bindings directly.
+- The Worker forwards Clerk handshake redirects and refreshed cookies on auth
+  document requests; the first returned render receives the verified token.
+- Signed-in accounts without an accepted profile see an explanation and can
+  switch accounts. Code sending failures never fabricate a code-entry screen.
 - Admin access is allowlist-based through configured admin emails and optional
   admin phones.
 - Creator access is based on accepted creator profile identity and creator
@@ -103,6 +112,12 @@ Email:
 - Resend is used for transactional email.
 - Current branded sender: `Take a Seat <applications@takeaseatwith.com>`.
 - Application recipient/admin email is configured through runtime values.
+- Creator applications send Annabel the admin review email and send the
+  applicant a receipt email. A valid email is required to submit or accept.
+- Acceptance reserves a public slug and prepares a private starter profile, then
+  emails the applicant a setup link. `published_at` remains null until profile save.
+- Failed setup emails are visible to the admin and can be retried. An optional
+  inbox notification failure does not misreport the acceptance as failed.
 
 SMS:
 
@@ -139,8 +154,9 @@ Payments:
   `payment_authorized` -> creator acceptance/capture -> `paid` -> calendar
   confirmation. The creator request inbox should show actionable requests after
   payment authorization.
-- Stripe test mode is configured with Ella 15 and 30 minute Price IDs and a
-  signed webhook endpoint at `/api/stripe/webhook` for successful Checkout
+- Stripe Checkout can use existing seed/demo Price IDs when configured, or
+  inline Checkout price data from accepted creators' saved seat prices. A signed
+  webhook endpoint lives at `/api/stripe/webhook` for successful Checkout
   payment events.
 - Connect onboarding requires a creator contact email, and returned accounts
   are only marked connected after Stripe reports transfer readiness as active.
@@ -218,7 +234,9 @@ The public creator model is split:
 - Some creators are checked-in seed/static records in `app/_lib/creators.ts`.
 - Public browsing uses an explicit allowlist of published static marketplace
   creators; concept and test profiles should stay off directory cards.
-- Published accepted creators can be loaded from D1.
+- The homepage and directory merge published D1 creators with seed creators.
+  Public routes and cards require accepted status plus publication and profile-save
+  timestamps; old auto-published applications remain private until saved.
 - This is acceptable for launch only if the distinction is documented as
   `seed creators` versus `published marketplace creators`.
 
@@ -280,8 +298,8 @@ Required or expected production secrets:
 - `STRIPE_SECRET_KEY`
 - `STRIPE_WEBHOOK_SECRET`
 - `STRIPE_CONNECT_COUNTRY`
-- Creator Stripe Price IDs such as `STRIPE_PRICE_ELLA_15` and
-  `STRIPE_PRICE_ELLA_30`
+- Optional seed/demo creator Stripe Price IDs such as `STRIPE_PRICE_ELLA_15`
+  and `STRIPE_PRICE_ELLA_30`
 
 ## Recommended Cleanup Sequence
 
@@ -340,3 +358,20 @@ have:
 - Stripe webhook handling tested with a full Checkout event.
 - Google Calendar OAuth and event creation tested.
 - One full test booking from public profile to paid checkout to calendar event.
+
+## Acceptance Repair Verification (2026-09-12)
+
+- `tests/creator-lifecycle.test.mjs` runs the real domain and routes against
+  isolated SQLite through the D1 statement interface. It verifies submission,
+  email recipient/link payloads, acceptance, private-before-save, invite identity,
+  ownership, publishing, repeat login, and email transport failure handling.
+- Legacy trusted identity headers no longer grant admin access. Production admin
+  access requires a verified Clerk identity on the allowlist.
+- Production D1 now includes `0014_great_omega_flight.sql` (image positioning)
+  and `0015_majestic_stryfe.sql` (the profile-save timestamp), applied on 2026-09-12.
+- Production Clerk was created with email verification; account OAuth is restored.
+  All five CNAME records resolve and Clerk email DNS is verified. A real email
+  arrived in the existing creator's application inbox and its code completed
+  production sign-up. The verified identity is prepared for the existing D1 link.
+- A complete application/acceptance/profile-save rehearsal through the deployed
+  custom UI remains required. Portal verification alone does not prove that flow.

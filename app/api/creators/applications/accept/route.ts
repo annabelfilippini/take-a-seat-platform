@@ -1,14 +1,11 @@
 import { getRequestAdminEmail } from "../../../../_lib/admin-auth";
+import { sendCreatorAcceptedInviteEmail } from "../../../../_lib/creator-accepted-invite";
 import {
   acceptCreatorApplication,
-  createCreatorInvite,
   CreatorPublishError,
   normalizeCreatorPublicId,
 } from "../../../../_lib/creator-onboarding";
-import {
-  sendCreatorAcceptedEmail,
-  sendCreatorAcceptedSms,
-} from "../../../../_lib/email";
+import { sendCreatorAcceptedSms } from "../../../../_lib/email";
 import { createCreatorAcceptedNotification } from "../../../../_lib/notifications";
 
 function redirectTo(request: Request, path: string, params: Record<string, string>) {
@@ -72,28 +69,13 @@ export async function POST(request: Request) {
     let smsStatus: "sent" | "skipped" = "skipped";
     let smsDetail: string | null = null;
     let profileNotificationStatus: "sent" | "skipped" = "skipped";
-    let invite:
-      | Awaited<ReturnType<typeof createCreatorInvite>>
-      | null = null;
-
-    if (profile.email && profile.email.includes("@")) {
-      invite = await createCreatorInvite(profile);
-      const email = await sendCreatorAcceptedEmail({
-        creatorId: profile.id,
-        email: profile.email,
-        emailNonce: invite.emailNonce,
-        expiresAt: invite.expiresAt,
-        inviteToken: invite.token,
-        name: profile.name,
-        request,
-      });
-      emailStatus = email.status;
-      emailDetail = email.status === "skipped" ? email.reason : null;
-    }
+    const email = await sendCreatorAcceptedInviteEmail({ profile, request });
+    emailStatus = email.status;
+    emailDetail = email.status === "skipped" ? email.reason : null;
 
     if (profile.phone) {
       const sms = await sendCreatorAcceptedSms({
-        inviteToken: invite?.token,
+        inviteToken: email.inviteToken,
         name: profile.name,
         request,
         to: profile.phone,
@@ -102,11 +84,16 @@ export async function POST(request: Request) {
       smsDetail = sms.status === "skipped" ? sms.reason : null;
     }
 
-    await createCreatorAcceptedNotification({
-      creatorId: profile.id,
-      creatorName: profile.name,
-    });
-    profileNotificationStatus = "sent";
+    try {
+      await createCreatorAcceptedNotification({
+        creatorId: profile.id,
+        creatorName: profile.name,
+      });
+      profileNotificationStatus = "sent";
+    } catch {
+      // Acceptance and email delivery remain successful if the optional inbox fails.
+      profileNotificationStatus = "skipped";
+    }
 
     return redirectTo(request, `/admin/applications/${profile.id}`, {
       accept: "accepted",
