@@ -111,6 +111,12 @@ Email:
 
 - Resend is used for transactional email.
 - Current branded sender: `Take a Seat <applications@takeaseatwith.com>`.
+- Resend requires DNS-only CNAME records in Cloudflare: `rsend` points to
+  `rsend.forge.rmta.net`, and `send` points to `send.forge.rmta.net`.
+  Both were restored on 2026-09-12; Resend reports the domain verified.
+- A successful send API response does not prove inbox delivery. Check Resend
+  email events for delivered, bounced, or suppressed status. After repairing
+  a bounce cause, clear the affected address's suppression before resending.
 - Application recipient/admin email is configured through runtime values.
 - Creator applications send Annabel the admin review email and send the
   applicant a receipt email. A valid email is required to submit or accept.
