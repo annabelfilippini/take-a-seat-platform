@@ -248,10 +248,12 @@ export async function markBookingPaymentAuthorized({
   if (
     !existingBooking ||
     existingBooking.stripeCheckoutSessionId !== stripeCheckoutSessionId ||
-    existingBooking.status !== BOOKING_STATUS.requested
+    ![BOOKING_STATUS.requested, BOOKING_STATUS.paymentAuthorized, BOOKING_STATUS.paid, BOOKING_STATUS.approved].some((status) => status === existingBooking.status)
   ) {
     return null;
   }
+
+  if (existingBooking.status !== BOOKING_STATUS.requested) return existingBooking;
 
   const { getDb } = await import("../../db");
   const db = getDb();
@@ -289,10 +291,12 @@ export async function markBookingPaid({
   if (
     !existingBooking ||
     existingBooking.stripeCheckoutSessionId !== stripeCheckoutSessionId ||
-    !canMarkBookingPaid(existingBooking.status)
+    !(canMarkBookingPaid(existingBooking.status) || existingBooking.status === BOOKING_STATUS.paid || existingBooking.status === BOOKING_STATUS.approved)
   ) {
     return null;
   }
+
+  if (existingBooking.status === BOOKING_STATUS.paid || existingBooking.status === BOOKING_STATUS.approved) return existingBooking;
 
   const { getDb } = await import("../../db");
   const db = getDb();
@@ -309,10 +313,26 @@ export async function markBookingPaid({
       and(
         eq(customerBookings.id, bookingId),
         eq(customerBookings.stripeCheckoutSessionId, stripeCheckoutSessionId),
+        eq(customerBookings.status, existingBooking.status),
       ),
     );
 
   return getCustomerBooking(bookingId);
+}
+
+export async function markBookingPaymentEnded({ bookingId, sessionId, status }: {
+  bookingId: string;
+  sessionId: string;
+  status: "payment_canceled" | "checkout_expired";
+}) {
+  const booking = await getCustomerBooking(bookingId);
+  if (!booking || booking.stripeCheckoutSessionId !== sessionId ||
+    !["requested", "checkout_started", "payment_authorized"].includes(booking.status)) return;
+  // Session expiry must never revoke an authorization or a captured payment.
+  if (status === "checkout_expired" && booking.status === "payment_authorized") return;
+  const { getDb } = await import("../../db");
+  await getDb().update(customerBookings).set({ status, updatedAt: new Date().toISOString() })
+    .where(and(eq(customerBookings.id, bookingId), eq(customerBookings.stripeCheckoutSessionId, sessionId), eq(customerBookings.status, booking.status)));
 }
 
 export async function markBookingAccepted(bookingId: string) {
@@ -535,6 +555,7 @@ function isBlockingBooking(booking: CustomerBooking) {
 
 function canMarkBookingPaid(status: string) {
   return (
+    status === BOOKING_STATUS.requested ||
     status === BOOKING_STATUS.accepted ||
     status === BOOKING_STATUS.checkoutStarted ||
     status === BOOKING_STATUS.paymentAuthorized

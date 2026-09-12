@@ -1,28 +1,23 @@
-import { markBookingPaid, markBookingPaymentAuthorized } from "../../../_lib/bookings";
+import { getCustomerBooking, markBookingPaid, markBookingPaymentAuthorized, markBookingPaymentEnded } from "../../../_lib/bookings";
 import {
   notifyCreatorBookingPaid,
   notifyCreatorBookingRequested,
 } from "../../../_lib/notifications";
 import { getStripeWebhookSecret } from "../../../_lib/stripe-connect";
 
+import {
+  getVerifiedCheckoutPayment,
+  retrieveStripeCheckoutSession,
+  retrieveStripePaymentIntent,
+  type StripeCheckoutSession,
+} from "../../../_lib/stripe-payments";
+
 const STRIPE_SIGNATURE_TOLERANCE_SECONDS = 300;
 
 type StripeWebhookEvent = {
-  data?: {
-    object?: StripeCheckoutSessionDetails;
-  };
+  data?: { object?: { id: string; metadata?: { booking_id?: string } | null; client_reference_id?: string | null } };
   id?: string;
   type?: string;
-};
-
-type StripeCheckoutSessionDetails = {
-  client_reference_id?: string | null;
-  id: string;
-  metadata?: {
-    booking_id?: string;
-  } | null;
-  payment_intent?: string | { id?: string } | null;
-  payment_status?: string;
 };
 
 export async function POST(request: Request) {
@@ -60,41 +55,45 @@ export async function POST(request: Request) {
     return Response.json({ detail: "json", status: "invalid" }, { status: 400 });
   }
 
-  if (
-    event.type === "checkout.session.completed" ||
-    event.type === "checkout.session.async_payment_succeeded"
-  ) {
-    const session = event.data?.object;
-    const bookingId = getBookingId(session);
-
-    if (!session?.id || !bookingId) {
-      return Response.json(
-        { detail: "booking", status: "invalid" },
-        { status: 400 },
-      );
+  const object = event.data?.object;
+  const checkoutEvents = ["checkout.session.completed", "checkout.session.async_payment_succeeded", "checkout.session.expired"];
+  const intentEvents = ["payment_intent.amount_capturable_updated", "payment_intent.succeeded", "payment_intent.canceled"];
+  try {
+    if (checkoutEvents.includes(event.type ?? "")) {
+      const bookingId = object?.metadata?.booking_id ?? object?.client_reference_id;
+      if (!object?.id || !bookingId) return Response.json({ received: true });
+      const session = await retrieveStripeCheckoutSession(object.id);
+      if (session.status === "expired") {
+        await markBookingPaymentEnded({ bookingId, sessionId: session.id, status: "checkout_expired" });
+      } else {
+        await reconcileSession(session, bookingId, request);
+      }
+    } else if (intentEvents.includes(event.type ?? "")) {
+      const bookingId = object?.metadata?.booking_id;
+      if (!object?.id || !bookingId) return Response.json({ received: true });
+      const booking = await getCustomerBooking(bookingId);
+      if (!booking) return Response.json({ received: true });
+      if (!booking.stripeCheckoutSessionId) throw new Error("Checkout association is not saved yet");
+      const session = await retrieveStripeCheckoutSession(booking.stripeCheckoutSessionId);
+      const sessionIntentId = typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id;
+      if (sessionIntentId !== object.id) return Response.json({ received: true });
+      // Read current state so delayed events cannot overwrite a newer payment outcome.
+      const intent = await retrieveStripePaymentIntent(object.id);
+      if (intent.status === "canceled") {
+        await markBookingPaymentEnded({ bookingId, sessionId: session.id, status: "payment_canceled" });
+      } else if (intent.status === "succeeded") {
+        // The PaymentIntent is authoritative even if Checkout's snapshot lags.
+        const paid = await markBookingPaid({ bookingId, stripeCheckoutSessionId: session.id, stripePaymentIntentId: intent.id });
+        if (paid?.status === "paid" && booking.status !== "paid") {
+          await notifyCreatorBookingPaid({ booking: paid, request }).catch(() => undefined);
+        }
+      } else {
+        await reconcileSession({ ...session, payment_intent: intent }, bookingId, request);
+      }
     }
-
-    const paymentIntentId = getPaymentIntentId(session);
-    const booking =
-      session.payment_status === "paid"
-        ? await markBookingPaid({
-            bookingId,
-            stripeCheckoutSessionId: session.id,
-            stripePaymentIntentId: paymentIntentId,
-          })
-        : await markBookingPaymentAuthorized({
-            bookingId,
-            stripeCheckoutSessionId: session.id,
-            stripePaymentIntentId: paymentIntentId,
-          });
-
-    if (booking?.status === "paid") {
-      await notifyCreatorBookingPaid({ booking, request }).catch(() => undefined);
-    }
-
-    if (booking?.status === "payment_authorized") {
-      await notifyCreatorBookingRequested({ booking, request }).catch(() => undefined);
-    }
+  } catch {
+    // Stripe must retry a failed database/API operation rather than lose the event.
+    return Response.json({ detail: "payment-reconciliation", status: "retry" }, { status: 500 });
   }
 
   return Response.json({ received: true });
@@ -197,14 +196,19 @@ function hexToBytes(value: string) {
   return bytes;
 }
 
-function getBookingId(session: StripeCheckoutSessionDetails | undefined) {
-  return session?.metadata?.booking_id ?? session?.client_reference_id ?? null;
-}
-
-function getPaymentIntentId(session: StripeCheckoutSessionDetails) {
-  if (typeof session.payment_intent === "string") {
-    return session.payment_intent;
+async function reconcileSession(session: StripeCheckoutSession, bookingId: string, request: Request) {
+  const existing = await getCustomerBooking(bookingId);
+  if (!existing) return;
+  if (!existing.stripeCheckoutSessionId) throw new Error("Checkout association is not saved yet");
+  if (existing.stripeCheckoutSessionId !== session.id) return;
+  const payment = await getVerifiedCheckoutPayment(session);
+  if (!payment) return;
+  const input = { bookingId, stripeCheckoutSessionId: session.id, stripePaymentIntentId: payment.paymentIntentId };
+  const booking = payment.status === "paid" ? await markBookingPaid(input) : await markBookingPaymentAuthorized(input);
+  if (booking?.status === "paid" && existing.status !== "paid") {
+    await notifyCreatorBookingPaid({ booking, request }).catch(() => undefined);
   }
-
-  return session.payment_intent?.id ?? null;
+  if (booking?.status === "payment_authorized" && existing.status !== "payment_authorized") {
+    await notifyCreatorBookingRequested({ booking, request }).catch(() => undefined);
+  }
 }

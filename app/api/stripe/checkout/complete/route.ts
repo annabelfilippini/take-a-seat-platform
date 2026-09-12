@@ -1,4 +1,5 @@
 import {
+  getCustomerBooking,
   markBookingPaid,
   markBookingPaymentAuthorized,
 } from "../../../../_lib/bookings";
@@ -6,16 +7,11 @@ import {
   notifyCreatorBookingPaid,
   notifyCreatorBookingRequested,
 } from "../../../../_lib/notifications";
+import { getStripeSecretKey } from "../../../../_lib/stripe-connect";
 import {
-  getStripeSecretKey,
-  STRIPE_API_VERSION,
-} from "../../../../_lib/stripe-connect";
-
-type StripeCheckoutSessionDetails = {
-  id: string;
-  payment_intent?: string | { id?: string } | null;
-  payment_status?: string;
-};
+  getVerifiedCheckoutPayment,
+  retrieveStripeCheckoutSession,
+} from "../../../../_lib/stripe-payments";
 
 function redirectTo(request: Request, path: string, status: string, detail?: string) {
   const target = new URL(path, request.url);
@@ -52,11 +48,16 @@ export async function GET(request: Request) {
   }
 
   try {
-    const session = await retrieveCheckoutSession(sessionId, secretKey);
+    const session = await retrieveStripeCheckoutSession(sessionId);
 
-    const paymentIntentId = getPaymentIntentId(session);
+    const payment = await getVerifiedCheckoutPayment(session);
+    if (!payment) {
+      return redirectTo(request, `/bookings/${encodeURIComponent(bookingId)}`, "error", "payment-required");
+    }
+    const existing = await getCustomerBooking(bookingId);
+    const paymentIntentId = payment.paymentIntentId;
     const booking =
-      session.payment_status === "paid"
+      payment.status === "paid"
         ? await markBookingPaid({
             bookingId,
             stripeCheckoutSessionId: session.id,
@@ -68,18 +69,21 @@ export async function GET(request: Request) {
             stripePaymentIntentId: paymentIntentId,
           });
 
-    if (booking && booking.status === "paid") {
+    if (booking && booking.status === "paid" && existing?.status !== "paid") {
       await notifyCreatorBookingPaid({ booking, request }).catch(() => undefined);
     }
 
-    if (booking && booking.status === "payment_authorized") {
+    if (booking && booking.status === "payment_authorized" && existing?.status !== "payment_authorized") {
       await notifyCreatorBookingRequested({ booking, request }).catch(() => undefined);
     }
 
+    if (!booking) {
+      return redirectTo(request, `/bookings/${encodeURIComponent(bookingId)}`, "error", "checkout-confirmation");
+    }
     return redirectTo(
       request,
       `/bookings/${encodeURIComponent(bookingId)}`,
-      booking?.status === "paid" ? "success" : "authorized",
+      ["paid", "approved"].includes(booking.status) ? "success" : "authorized",
     );
   } catch {
     return redirectTo(
@@ -89,30 +93,4 @@ export async function GET(request: Request) {
       "checkout-confirmation",
     );
   }
-}
-
-async function retrieveCheckoutSession(sessionId: string, secretKey: string) {
-  const response = await fetch(
-    `https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(sessionId)}`,
-    {
-      headers: {
-        authorization: `Bearer ${secretKey}`,
-        "stripe-version": STRIPE_API_VERSION,
-      },
-    },
-  );
-
-  if (!response.ok) {
-    throw new Error(`Stripe session retrieve failed with ${response.status}`);
-  }
-
-  return (await response.json()) as StripeCheckoutSessionDetails;
-}
-
-function getPaymentIntentId(session: StripeCheckoutSessionDetails) {
-  if (typeof session.payment_intent === "string") {
-    return session.payment_intent;
-  }
-
-  return session.payment_intent?.id ?? null;
 }
