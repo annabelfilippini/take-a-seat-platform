@@ -85,7 +85,7 @@ test("server-renders the public booking homepage", async () => {
   assert.match(html, /home-vanity-hero\.png/);
   assert.match(html, /<button class="hero-cta" type="submit">Take a Seat<\/button>/);
   assert.match(html, /Apply to Inspire/);
-  assert.doesNotMatch(html, /Our Mission/);
+  assert.match(html, /Our Mission/);
   assert.match(html, /Search creators/);
   assert.match(html, /Sign In/);
   assert.match(html, /directory-results/);
@@ -883,22 +883,22 @@ test("removes starter metadata and preview dependencies", async () => {
   assert.doesNotMatch(css, /#020617|codex-preview|SkeletonPreview/i);
 });
 
-test("server-renders the about page", async () => {
+test("server-renders the mission page", async () => {
   const response = await render("/about");
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
 
   const html = await response.text();
-  assert.match(html, /<title>About \| Take a Seat<\/title>/i);
-  assert.doesNotMatch(html, /Our Mission/i);
+  assert.match(html, /<title>Our Mission \| Take a Seat<\/title>/i);
+  assert.match(html, /big older sister for getting dressed/);
+  assert.match(html, /last-minute &quot;is this cute\?&quot; moments/);
+  assert.doesNotMatch(html, /<span>Our mission<\/span>/i);
   assert.doesNotMatch(html, /First seats/i);
   assert.doesNotMatch(html, /Ella McLane/);
-  assert.match(html, /cute, confident, and inspired/);
-  assert.match(html, /Come take a seat with us/);
-  assert.match(html, /The idea/);
-  assert.match(html, /Influencers know the good stuff/);
-  assert.match(html, /Your question deserves context/);
-  assert.match(html, /Cute is the mission/);
+  assert.match(html, /Why we exist/);
+  assert.match(html, /The question was already there/);
+  assert.match(html, /A comment thread cannot see the outfit/);
+  assert.match(html, /Confidence is the whole point/);
   assert.match(html, /Apply to Inspire/);
   assert.match(html, /Find a Seat/);
 });
