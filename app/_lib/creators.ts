@@ -23,6 +23,15 @@ export type CreatorAvailabilityRule = {
   timezone: string;
 };
 
+export type CreatorMediaItem = {
+  alt?: string;
+  href?: string;
+  id: string;
+  kind: "photo" | "video";
+  source: string;
+  title: string;
+};
+
 export type Creator = {
   id: string;
   slug: string;
@@ -39,6 +48,7 @@ export type Creator = {
   image: string | null;
   objectPosition: string;
   accent: string;
+  mediaItems?: CreatorMediaItem[];
   instagramUrl?: string;
   tiktokUrl?: string;
   location?: string;
@@ -75,6 +85,32 @@ export const creators: Creator[] = [
     accent: "style",
     instagramUrl: "https://www.instagram.com/ellamclane2/",
     tiktokUrl: "https://www.tiktok.com/@ellamclane",
+    mediaItems: [
+      {
+        alt: "Ella McLane in a sundress near the coast",
+        href: "https://www.tiktok.com/@ellamclane/video/7665329691254951198",
+        id: "ella-reference-sundress",
+        kind: "photo",
+        source: "/ella-reference-sundress.jpg",
+        title: "Sundress styling",
+      },
+      {
+        alt: "Ella McLane street style outfit reference",
+        href: "https://www.tiktok.com/@ellamclane/video/7661987130444418334",
+        id: "ella-reference-street-style",
+        kind: "photo",
+        source: "/ella-reference-street-style.jpg",
+        title: "Everyday outfit polish",
+      },
+      {
+        alt: "Ella McLane coastal outfit inspiration",
+        href: "https://www.tiktok.com/@ellamclane/video/7657164268663557407",
+        id: "ella-reference-coast",
+        kind: "photo",
+        source: "/ella-reference-coast.jpg",
+        title: "Coastal classics",
+      },
+    ],
     seats: [
       {
         id: "ella-15",

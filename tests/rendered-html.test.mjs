@@ -399,6 +399,46 @@ test("server-renders candidate creator concept profiles", async () => {
   }
 });
 
+test("preserves creator uploaded media for dashboard and public profiles", async () => {
+  const [
+    creatorOnboarding,
+    editor,
+    dynamicProfilePage,
+    ellaPage,
+    ellaGallery,
+    creatorGallery,
+    creatorsLib,
+  ] = await Promise.all([
+    readFile(new URL("../app/_lib/creator-onboarding.ts", import.meta.url), "utf8"),
+    readFile(
+      new URL(
+        "../app/admin/creator-profile-editor-preview/EditableCreatorProfilePreview.tsx",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    readFile(new URL("../app/with/[slug]/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/with/ella/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/with/ella/EllaGallery.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/_components/CreatorMediaGallery.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/_lib/creators.ts", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(creatorOnboarding, /cleanProfileImageUrl\(getString\(formData, "profileImageUrl"\)\)/);
+  assert.match(creatorOnboarding, /\/\^data:image\\\/\/i\.test\(trimmed\)/);
+  assert.match(creatorOnboarding, /return trimmed;/);
+  assert.match(creatorOnboarding, /mediaItems: getPublishedCreatorMediaItems\(profile\)/);
+  assert.match(creatorOnboarding, /function getPublishedCreatorMediaItems/);
+  assert.match(editor, /setMediaSaveStatus\("idle"\);\s+setProfileImageFileName/s);
+  assert.match(dynamicProfilePage, /<CreatorMediaGallery items=\{creator\.mediaItems\} name=\{creator\.name\} \/>/);
+  assert.match(ellaPage, /src=\{creator\.image \?\? "\/ella-profile\.jpg"\}/);
+  assert.match(ellaPage, /items=\{creator\.mediaItems\?\.length \? creator\.mediaItems : undefined\}/);
+  assert.match(ellaGallery, /CreatorMediaGallery/);
+  assert.match(creatorGallery, /className="amber-hero-gallery"/);
+  assert.match(creatorsLib, /mediaItems: \[/);
+  assert.match(creatorsLib, /source: "\/ella-reference-sundress\.jpg"/);
+});
+
 test("wires accepted creators to public profile publishing", async () => {
   const [
     availabilityLib,
@@ -797,15 +837,15 @@ test("server-renders the mission page", async () => {
 
   const html = await response.text();
   assert.match(html, /<title>Our Mission \| Take a Seat<\/title>/i);
-  assert.match(html, /To give everyone private access/);
-  assert.match(html, /a few minutes of context/);
+  assert.match(html, /big older sister for getting dressed/);
+  assert.match(html, /last-minute &quot;is this cute\?&quot; moments/);
   assert.match(html, /First seats/);
   assert.match(html, /Ella McLane/);
-  assert.match(html, /Our story/);
-  assert.match(html, /The advice was happening/);
-  assert.match(html, /A private seat makes it real/);
-  assert.match(html, /The point is useful access/);
-  assert.match(html, /Become an Inspiration/);
+  assert.match(html, /Why we exist/);
+  assert.match(html, /The question was already there/);
+  assert.match(html, /A comment thread cannot see the outfit/);
+  assert.match(html, /Confidence is the whole point/);
+  assert.match(html, /Apply to Inspire/);
   assert.match(html, /Find a Seat/);
 });
 

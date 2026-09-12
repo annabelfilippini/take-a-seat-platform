@@ -2628,6 +2628,7 @@ img {
   color: var(--cream);
   display: grid;
   gap: 22px;
+  justify-items: center;
   margin: 0 auto;
   min-height: 100svh;
   max-width: none;
@@ -2686,18 +2687,18 @@ img {
   font-weight: 300;
   line-height: 1.1;
   margin: 0 auto;
-  max-width: min(1080px, calc(100vw - 384px));
+  max-width: min(880px, calc(100vw - 56px));
   text-shadow: 0 16px 44px rgba(31, 29, 26, 0.64);
-  white-space: nowrap;
 }
 
 .about-mission p {
-  color: #4f4840;
-  font-size: 16px;
+  color: rgba(255, 250, 242, 0.9);
+  font-size: clamp(16px, 1.5vw, 20px);
   font-weight: 400;
-  line-height: 1.45;
+  line-height: 1.42;
   margin: 0 auto;
   max-width: 680px;
+  text-shadow: 0 10px 34px rgba(31, 29, 26, 0.66);
 }
 
 .about-believers {
@@ -5482,6 +5483,10 @@ button.availability-date-field:focus-visible {
     grid-template-columns: 1fr;
   }
 
+  .creator-application-layout > h1 {
+    transform: none;
+  }
+
   .about-topbar {
     align-items: stretch;
     display: grid;
@@ -5721,6 +5726,15 @@ button.availability-date-field:focus-visible {
 
   .about-nav {
     grid-template-columns: 1fr;
+  }
+
+  .creator-onboard-page .about-nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .creator-onboard-page .creator-apply-stage {
+    align-items: start;
+    padding-top: 176px;
   }
 
   .creator-dashboard-card-grid {

@@ -10,7 +10,14 @@ import {
   creatorStripeConnections,
   customerBookings,
 } from "../../db/schema";
-import { creators, getCreatorById, getCreatorBySlug, type Creator, type Seat } from "./creators";
+import {
+  creators,
+  getCreatorById,
+  getCreatorBySlug,
+  type Creator,
+  type CreatorMediaItem,
+  type Seat,
+} from "./creators";
 import {
   normalizePhoneIdentity,
   type TakeASeatClerkUser,
@@ -187,7 +194,7 @@ export async function getCreatorProfileSettingsInput(
     profileGallery: cleanProfileGallery(getString(formData, "profileGallery")),
     profileDetails,
     profileImageUrl:
-      uploadedProfileImage ?? cleanField(getString(formData, "profileImageUrl")) ?? "",
+      uploadedProfileImage ?? cleanProfileImageUrl(getString(formData, "profileImageUrl")) ?? "",
     profileIntro,
     reviewSubmitted: formData.get("reviewSubmittedAt") === "true",
     seat15Description:
@@ -1046,6 +1053,7 @@ export function createPublishedCreator(
     instagramUrl: getSocialUrl("instagram", profile.instagramHandle),
     length: firstSeat?.name ?? "Opening soon",
     location: profile.location || undefined,
+    mediaItems: getPublishedCreatorMediaItems(profile),
     name: profile.name,
     note: firstSeat?.description ?? profile.bio,
     objectPosition: "50% 50%",
@@ -1148,6 +1156,24 @@ function splitProfileLines(value: string | null) {
     .split(/\n+/u)
     .map((item) => item.trim())
     .filter(Boolean);
+}
+
+function getPublishedCreatorMediaItems(
+  profile: CreatorOnboardingProfile,
+): CreatorMediaItem[] {
+  return splitProfileLines(profile.profileGallery).map((source, index) => ({
+    id: `${profile.id}-media-${index + 1}`,
+    kind: isVideoMediaSource(source) ? "video" : "photo",
+    source,
+    title: `${profile.name} media ${index + 1}`,
+  }));
+}
+
+function isVideoMediaSource(source: string) {
+  return (
+    /^data:video\//i.test(source) ||
+    /(?:\.m4v|\.mov|\.mp4|\.webm)(?:[?#].*)?$/i.test(source)
+  );
 }
 
 function getCreatorAccent(category: string | null) {
@@ -1352,6 +1378,20 @@ function cleanProfileGallery(value: string | null) {
     .filter(Boolean)
     .slice(0, 12)
     .join("\n");
+}
+
+function cleanProfileImageUrl(value: string | null) {
+  const trimmed = value?.trim() ?? "";
+
+  if (!trimmed) {
+    return null;
+  }
+
+  if (/^data:image\//i.test(trimmed)) {
+    return trimmed;
+  }
+
+  return cleanField(trimmed);
 }
 
 async function cleanUploadedProfileImage(value: FormDataEntryValue | null) {

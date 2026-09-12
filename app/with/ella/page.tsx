@@ -97,9 +97,10 @@ export default async function EllaProfile({ searchParams }: EllaProfileProps) {
       <section className="amber-profile-hero">
         <div className="amber-hero-copy">
           <img
-            alt="Ella McLane"
+            alt={creator.name}
             className="amber-headshot"
-            src="/ella-profile.jpg"
+            src={creator.image ?? "/ella-profile.jpg"}
+            style={{ objectPosition: creator.objectPosition }}
           />
           <h1>{creator.name}</h1>
           <p className="amber-meta">
@@ -125,7 +126,7 @@ export default async function EllaProfile({ searchParams }: EllaProfileProps) {
           <p>{intro}</p>
         </div>
 
-        <EllaGallery />
+        <EllaGallery items={creator.mediaItems?.length ? creator.mediaItems : undefined} />
       </section>
 
       <section className="amber-about-section" id="about">

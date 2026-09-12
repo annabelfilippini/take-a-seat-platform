@@ -406,6 +406,7 @@ export function EditableCreatorProfilePreview({
         profileImagePositionY: 50,
         profileImageZoom: 135,
       }));
+      setMediaSaveStatus("idle");
       setProfileImageFileName(file.name);
     });
   }
