@@ -4,15 +4,31 @@
   "main": "dist/server/index.js",
   "compatibility_date": "2026-08-29",
   "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "preview_urls": true,
   "assets": {
     "directory": "dist/client"
   },
+  "routes": [
+    {
+      "pattern": "takeaseatwith.com",
+      "custom_domain": true,
+      "enabled": true,
+      "previews_enabled": false
+    },
+    {
+      "pattern": "www.takeaseatwith.com",
+      "custom_domain": true,
+      "enabled": true,
+      "previews_enabled": false
+    }
+  ],
   "observability": {
     "enabled": true
   },
   "vars": {
     "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_test_Z3VpZGVkLW5hcndoYWwtMTEzMy5jbGVyay5hY2NvdW50cy5kZXYk",
-    "NEXT_PUBLIC_SITE_URL": "https://take-a-seat-platform.annabelflip1.workers.dev",
+    "NEXT_PUBLIC_SITE_URL": "https://takeaseatwith.com",
     "TAKE_A_SEAT_ADMIN_EMAILS": "annabelflip1@gmail.com",
     "TAKE_A_SEAT_APPLICATION_RECIPIENT": "annabelflip1@gmail.com",
     "TAKE_A_SEAT_EMAIL_FROM": "Take a Seat <applications@takeaseatwith.com>",

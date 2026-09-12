@@ -1,6 +1,6 @@
 # Take a Seat Control Map
 
-Last updated: 2026-09-11
+Last updated: 2026-09-12
 
 This is the working source of truth for Take a Seat while the product is being
 organized. It should stay short, current, and operational.
@@ -56,6 +56,7 @@ Customer account area:
 App/runtime:
 
 - Framework: vinext.
+- Production URL: `https://takeaseatwith.com/`.
 - Production target: Cloudflare Workers.
 - Production config: `wrangler.deploy.jsonc`.
 - Local Vite config: `vite.config.ts`.
@@ -149,6 +150,7 @@ Payments:
 D1 should own operational marketplace state:
 
 - Creator applications and published profile fields.
+- Creator profile image crop position and zoom.
 - Creator account links to Clerk users.
 - Creator invite tokens.
 - Creator Google Calendar connections.
@@ -257,6 +259,8 @@ Production:
   required secrets.
 - Non-secret public/config values can live in Wrangler vars.
 - Secret values should be set as Cloudflare Worker secrets.
+- Custom domain routes in `wrangler.deploy.jsonc` keep
+  `takeaseatwith.com` and `www.takeaseatwith.com` attached to the Worker.
 - Before deploying, confirm D1 migrations have been applied to
   `take-a-seat-platform-db` with `wrangler.deploy.jsonc`.
 - Before inviting creators or testing live booking paths, confirm required

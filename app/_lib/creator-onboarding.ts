@@ -10,11 +10,23 @@ import {
   creatorStripeConnections,
   customerBookings,
 } from "../../db/schema";
-import { creators, getCreatorById, getCreatorBySlug, type Creator, type Seat } from "./creators";
+import {
+  creators,
+  getCreatorById,
+  getCreatorBySlug,
+  type Creator,
+  type CreatorMediaItem,
+  type Seat,
+} from "./creators";
 import {
   normalizePhoneIdentity,
   type TakeASeatClerkUser,
 } from "./clerk-auth";
+import {
+  getProfileImageObjectPosition,
+  getProfileImagePercentValue,
+  getProfileImageZoomValue,
+} from "./profile-image";
 
 export type CreatorOnboardingInput = {
   bio: string;
@@ -36,7 +48,10 @@ export type CreatorProfileSettingsInput = CreatorOnboardingInput & {
   oneToOneReason: string;
   offer: string;
   profileGallery: string;
+  profileImagePositionX: number | null;
+  profileImagePositionY: number | null;
   profileImageUrl: string;
+  profileImageZoom: number | null;
   profileIntro: string;
   reviewSubmitted: boolean;
   seat15DurationMinutes: number;
@@ -186,8 +201,23 @@ export async function getCreatorProfileSettingsInput(
     phone,
     profileGallery: cleanProfileGallery(getString(formData, "profileGallery")),
     profileDetails,
+    profileImagePositionX: cleanOptionalInteger(
+      getString(formData, "profileImagePositionX"),
+      0,
+      100,
+    ),
+    profileImagePositionY: cleanOptionalInteger(
+      getString(formData, "profileImagePositionY"),
+      0,
+      100,
+    ),
     profileImageUrl:
-      uploadedProfileImage ?? cleanField(getString(formData, "profileImageUrl")) ?? "",
+      uploadedProfileImage ?? cleanProfileImageUrl(getString(formData, "profileImageUrl")) ?? "",
+    profileImageZoom: cleanOptionalInteger(
+      getString(formData, "profileImageZoom"),
+      100,
+      220,
+    ),
     profileIntro,
     reviewSubmitted: formData.get("reviewSubmittedAt") === "true",
     seat15Description:
@@ -226,7 +256,7 @@ export function getCreatorAvailabilityInput(
   const timezone = cleanTimezone(getString(formData, "timezone"));
   const rules = getAvailabilityRules(getString(formData, "availabilitySlots"));
 
-  if (!creatorId || rules.length === 0) {
+  if (!creatorId) {
     return null;
   }
 
@@ -345,7 +375,10 @@ export async function saveCreatorProfileSettings(
       phone: input.phone,
       profileGallery: input.profileGallery,
       profileDetails: input.profileDetails,
+      profileImagePositionX: input.profileImagePositionX,
+      profileImagePositionY: input.profileImagePositionY,
       profileImageUrl: input.profileImageUrl,
+      profileImageZoom: input.profileImageZoom,
       profileIntro: input.profileIntro,
       applicationStatus,
       reviewSubmittedAt,
@@ -379,7 +412,10 @@ export async function saveCreatorProfileSettings(
         profileGallery: input.profileGallery,
         phone: input.phone,
         profileDetails: input.profileDetails,
+        profileImagePositionX: input.profileImagePositionX,
+        profileImagePositionY: input.profileImagePositionY,
         profileImageUrl: input.profileImageUrl,
+        profileImageZoom: input.profileImageZoom,
         profileIntro: input.profileIntro,
         ...(input.reviewSubmitted ? { applicationStatus } : {}),
         reviewSubmittedAt,
@@ -1046,11 +1082,24 @@ export function createPublishedCreator(
     instagramUrl: getSocialUrl("instagram", profile.instagramHandle),
     length: firstSeat?.name ?? "Opening soon",
     location: profile.location || undefined,
+    mediaItems: getPublishedCreatorMediaItems(profile),
     name: profile.name,
     note: firstSeat?.description ?? profile.bio,
-    objectPosition: "50% 50%",
+    objectPosition: getProfileImageObjectPosition({
+      profileImagePositionX: profile.profileImagePositionX,
+      profileImagePositionY: profile.profileImagePositionY,
+    }),
     offer: profile.offer || firstSeat?.name || "Private advice seat",
     price: firstSeat?.price ?? "Soon",
+    profileImagePositionX: getProfileImagePercentValue(
+      profile.profileImagePositionX,
+      50,
+    ),
+    profileImagePositionY: getProfileImagePercentValue(
+      profile.profileImagePositionY,
+      50,
+    ),
+    profileImageZoom: getProfileImageZoomValue(profile.profileImageZoom, 100),
     profile: {
       about,
       announcement: "Now booking on Take a Seat",
@@ -1150,6 +1199,24 @@ function splitProfileLines(value: string | null) {
     .filter(Boolean);
 }
 
+function getPublishedCreatorMediaItems(
+  profile: CreatorOnboardingProfile,
+): CreatorMediaItem[] {
+  return splitProfileLines(profile.profileGallery).map((source, index) => ({
+    id: `${profile.id}-media-${index + 1}`,
+    kind: isVideoMediaSource(source) ? "video" : "photo",
+    source,
+    title: `${profile.name} media ${index + 1}`,
+  }));
+}
+
+function isVideoMediaSource(source: string) {
+  return (
+    /^data:video\//i.test(source) ||
+    /(?:\.m4v|\.mov|\.mp4|\.webm)(?:[?#].*)?$/i.test(source)
+  );
+}
+
 function getCreatorAccent(category: string | null) {
   const normalized = (category ?? "").toLowerCase();
 
@@ -1193,22 +1260,24 @@ export async function saveCreatorAvailability(input: CreatorAvailabilityInput) {
     .delete(creatorAvailabilityRules)
     .where(eq(creatorAvailabilityRules.creatorId, input.creatorId));
 
-  await db.insert(creatorAvailabilityRules).values(
-    input.rules.map((rule) => ({
-      bufferMinutes: input.bufferMinutes,
-      createdAt: now,
-      creatorId: input.creatorId,
-      dayOfWeek: rule.dayOfWeek,
-      enabled: true,
-      endTime: rule.endTime,
-      maxBookingsPerDay: input.maxBookingsPerDay,
-      maxBookingsPerWeek: input.maxBookingsPerWeek,
-      minNoticeMinutes: input.minNoticeMinutes,
-      startTime: rule.startTime,
-      timezone: input.timezone,
-      updatedAt: now,
-    })),
-  );
+  if (input.rules.length > 0) {
+    await db.insert(creatorAvailabilityRules).values(
+      input.rules.map((rule) => ({
+        bufferMinutes: input.bufferMinutes,
+        createdAt: now,
+        creatorId: input.creatorId,
+        dayOfWeek: rule.dayOfWeek,
+        enabled: true,
+        endTime: rule.endTime,
+        maxBookingsPerDay: input.maxBookingsPerDay,
+        maxBookingsPerWeek: input.maxBookingsPerWeek,
+        minNoticeMinutes: input.minNoticeMinutes,
+        startTime: rule.startTime,
+        timezone: input.timezone,
+        updatedAt: now,
+      })),
+    );
+  }
 }
 
 export async function listCreatorAvailabilityRules(creatorId: string) {
@@ -1354,6 +1423,20 @@ function cleanProfileGallery(value: string | null) {
     .join("\n");
 }
 
+function cleanProfileImageUrl(value: string | null) {
+  const trimmed = value?.trim() ?? "";
+
+  if (!trimmed) {
+    return null;
+  }
+
+  if (/^data:image\//i.test(trimmed)) {
+    return trimmed;
+  }
+
+  return cleanField(trimmed);
+}
+
 async function cleanUploadedProfileImage(value: FormDataEntryValue | null) {
   if (!value || typeof value === "string" || !isFileLike(value)) {
     return null;
@@ -1474,10 +1557,10 @@ function getAvailabilityRules(value: string | null): CreatorAvailabilityRuleInpu
     let previousSlot = sortedSlots[0];
 
     for (const slot of sortedSlots.slice(1)) {
-      if (slot !== addMinutes(previousSlot, 30)) {
+      if (slot !== addMinutes(previousSlot, 15)) {
         rules.push({
           dayOfWeek,
-          endTime: addMinutes(previousSlot, 30),
+          endTime: addMinutes(previousSlot, 15),
           startTime: rangeStart,
         });
         rangeStart = slot;
@@ -1489,7 +1572,7 @@ function getAvailabilityRules(value: string | null): CreatorAvailabilityRuleInpu
     if (rangeStart && previousSlot) {
       rules.push({
         dayOfWeek,
-        endTime: addMinutes(previousSlot, 30),
+        endTime: addMinutes(previousSlot, 15),
         startTime: rangeStart,
       });
     }

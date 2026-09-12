@@ -250,6 +250,15 @@ export function EditableCreatorProfilePreview({
   const [mediaSaveStatus, setMediaSaveStatus] = useState<
     "error" | "idle" | "saved" | "saving"
   >("saved");
+  const profileSaveLabel =
+    mediaSaveStatus === "saving"
+      ? "Saving"
+      : mediaSaveStatus === "saved"
+        ? "Saved"
+        : mediaSaveStatus === "error"
+          ? "Save failed"
+          : "Unsaved";
+  const profileSaving = mediaSaveStatus === "saving";
 
   useEffect(() => {
     const frame = profileImageFrameRef.current;
@@ -307,6 +316,7 @@ export function EditableCreatorProfilePreview({
     key: K,
     value: EditableProfileState[K],
   ) {
+    setMediaSaveStatus("idle");
     setProfile((current) => ({ ...current, [key]: value }));
   }
 
@@ -314,6 +324,7 @@ export function EditableCreatorProfilePreview({
     key: "instagramUrl" | "tiktokUrl",
     value: string,
   ) {
+    setMediaSaveStatus("idle");
     setProfile((current) => ({
       ...current,
       [key]: value,
@@ -406,6 +417,7 @@ export function EditableCreatorProfilePreview({
         profileImagePositionY: 50,
         profileImageZoom: 135,
       }));
+      setMediaSaveStatus("idle");
       setProfileImageFileName(file.name);
     });
   }
@@ -414,6 +426,7 @@ export function EditableCreatorProfilePreview({
     x?: number | string;
     y?: number | string;
   }) {
+    setMediaSaveStatus("idle");
     setProfile((current) => ({
       ...current,
       profileImagePositionX: getPercentValue(
@@ -426,6 +439,7 @@ export function EditableCreatorProfilePreview({
   }
 
   function updateProfileImageZoom(value: number) {
+    setMediaSaveStatus("idle");
     setProfile((current) => ({
       ...current,
       profileImageZoom: getZoomValue(value),
@@ -433,6 +447,7 @@ export function EditableCreatorProfilePreview({
   }
 
   function adjustProfileImageZoom(delta: number) {
+    setMediaSaveStatus("idle");
     setProfile((current) => ({
       ...current,
       profileImageZoom: getZoomValue(getZoomValue(current.profileImageZoom) + delta),
@@ -440,6 +455,7 @@ export function EditableCreatorProfilePreview({
   }
 
   function panProfileImage(deltaX: number, deltaY: number) {
+    setMediaSaveStatus("idle");
     setProfile((current) => ({
       ...current,
       profileImagePositionX: getPercentValue(
@@ -566,7 +582,7 @@ export function EditableCreatorProfilePreview({
     });
   }
 
-  async function saveMediaItems() {
+  async function saveProfileChanges() {
     setMediaSaveStatus("saving");
 
     try {
@@ -577,7 +593,7 @@ export function EditableCreatorProfilePreview({
       });
 
       if (!response.ok) {
-        throw new Error("Profile media save failed.");
+        throw new Error("Profile save failed.");
       }
 
       setMediaSaveStatus("saved");
@@ -757,21 +773,15 @@ export function EditableCreatorProfilePreview({
                     : "dashboard-status"
                 }
               >
-                {mediaSaveStatus === "saving"
-                  ? "Saving"
-                  : mediaSaveStatus === "saved"
-                    ? "Saved"
-                    : mediaSaveStatus === "error"
-                      ? "Save failed"
-                      : "Unsaved"}
+                {profileSaveLabel}
               </span>
               <button
                 className="editable-primary-button editable-save-button"
-                disabled={mediaSaveStatus === "saving"}
-                onClick={saveMediaItems}
+                disabled={profileSaving}
+                onClick={saveProfileChanges}
                 type="button"
               >
-                {mediaSaveStatus === "saving" ? "Saving media" : "Save media"}
+                {profileSaving ? "Saving profile" : "Save profile"}
               </button>
             </div>
           </div>
@@ -913,6 +923,27 @@ export function EditableCreatorProfilePreview({
           </div>
         </aside>
       </section>
+      <section className="editable-profile-save-footer" aria-label="Save profile changes">
+        <div className="editable-save-status-group">
+          <span
+            className={
+              mediaSaveStatus === "saved"
+                ? "dashboard-status-complete"
+                : "dashboard-status"
+            }
+          >
+            {profileSaveLabel}
+          </span>
+          <button
+            className="editable-primary-button editable-save-button"
+            disabled={profileSaving}
+            onClick={saveProfileChanges}
+            type="button"
+          >
+            {profileSaving ? "Saving profile" : "Save profile"}
+          </button>
+        </div>
+      </section>
       </div>
 
       <section
@@ -1040,6 +1071,7 @@ function EditableAvailabilityPanel({
     () => getAvailabilitySlotKeysFromRules(initialRules),
     [initialRules],
   );
+  const [savedSlotKeys, setSavedSlotKeys] = useState(() => initialSlotKeys);
   const [availabilityByWeek, setAvailabilityByWeek] = useState<Record<string, string[]>>(
     () => ({
       [firstWeek?.value ?? ""]:
@@ -1069,10 +1101,9 @@ function EditableAvailabilityPanel({
   const selectedSlots = useMemo(
     () =>
       new Set(
-        availabilityByWeek[selectedWeek?.value ?? ""] ??
-          (initialSlotKeys.length > 0 ? initialSlotKeys : []),
+        availabilityByWeek[selectedWeek?.value ?? ""] ?? savedSlotKeys,
       ),
-    [availabilityByWeek, initialSlotKeys, selectedWeek],
+    [availabilityByWeek, savedSlotKeys, selectedWeek],
   );
   const selectedWeekDays = selectedWeek?.days ?? availabilityDays.map((day) => ({
     ...day,
@@ -1100,7 +1131,7 @@ function EditableAvailabilityPanel({
         ? current
         : {
             ...current,
-            [weekValue]: initialSlotKeys.length > 0 ? initialSlotKeys : [],
+            [weekValue]: savedSlotKeys,
           },
     );
     setSelectedWeekValue(weekValue);
@@ -1253,6 +1284,18 @@ function EditableAvailabilityPanel({
         throw new Error("Availability save failed.");
       }
 
+      const nextSavedSlotKeys = sortAvailabilitySlotKeys(Array.from(selectedSlots));
+      setSavedSlotKeys(nextSavedSlotKeys);
+      setAvailabilityByWeek((current) => {
+        const weekValue = selectedWeek?.value ?? "";
+        const nextAvailability = Object.fromEntries(
+          Object.keys(current).map((key) => [key, nextSavedSlotKeys]),
+        );
+
+        return weekValue
+          ? { ...nextAvailability, [weekValue]: nextSavedSlotKeys }
+          : nextAvailability;
+      });
       setSaveStatus("saved");
     } catch {
       setSaveStatus("error");
@@ -1349,7 +1392,10 @@ function EditableAvailabilityPanel({
             list="creator-timezone-options"
             placeholder="Search timezone"
             value={timezone}
-            onChange={(event) => setTimezone(event.target.value)}
+            onChange={(event) => {
+              setTimezone(event.target.value);
+              setSaveStatus("idle");
+            }}
           />
           <datalist id="creator-timezone-options">
             {timezoneOptions.map((option) => (
@@ -1392,7 +1438,7 @@ function EditableAvailabilityPanel({
 
       <button
         className="editable-primary-button editable-save-button"
-        disabled={saveStatus === "saving" || selectedSlots.size === 0}
+        disabled={saveStatus === "saving"}
         onClick={saveAvailability}
         type="button"
       >
@@ -2357,7 +2403,16 @@ function getProfileSettingsFormData(profile: EditableProfileState) {
   formData.set("phone", profile.phone);
   formData.set("profileDetails", profile.profileDetails || profile.about);
   formData.set("profileGallery", gallerySources);
+  formData.set(
+    "profileImagePositionX",
+    String(getPercentValue(profile.profileImagePositionX)),
+  );
+  formData.set(
+    "profileImagePositionY",
+    String(getPercentValue(profile.profileImagePositionY)),
+  );
   formData.set("profileImageUrl", profile.image);
+  formData.set("profileImageZoom", String(getZoomValue(profile.profileImageZoom)));
   formData.set("profileIntro", profile.profileIntro);
   formData.set("seat15Description", profile.seat15Description);
   formData.set("seat15DurationMinutes", String(profile.seat15DurationMinutes));

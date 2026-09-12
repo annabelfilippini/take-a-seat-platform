@@ -1,9 +1,13 @@
 /* eslint-disable @next/next/no-html-link-for-pages, @next/next/no-img-element */
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
+import { CreatorMediaGallery } from "../../_components/CreatorMediaGallery";
 import { creators } from "../../_lib/creators";
 import { getPublicCreatorBySlug } from "../../_lib/creator-onboarding";
+import {
+  getProfileImageObjectPosition,
+  getProfileImageTransform,
+} from "../../_lib/profile-image";
 import { CustomerBookingFlow } from "../ella/CustomerBookingFlow";
 
 type CreatorProfilePageProps = {
@@ -12,6 +16,8 @@ type CreatorProfilePageProps = {
   };
   searchParams?: Record<string, string | string[] | undefined>;
 };
+
+export const dynamic = "force-dynamic";
 
 function InstagramIcon() {
   return (
@@ -82,9 +88,11 @@ export default async function CreatorProfilePage({
         </a>
         <nav className="profile-nav" aria-label={`${creator.name} profile navigation`}>
           {creator.tiktokUrl ? <a href={creator.tiktokUrl}>{creator.tiktokHandle}</a> : null}
-          <Link className="profile-sign-in-link" href="/sign-in">
-            Sign In
-          </Link>
+          <form action="/sign-in" className="nav-action-form" method="get">
+            <button className="profile-sign-in-link" type="submit">
+              Sign In
+            </button>
+          </form>
         </nav>
       </header>
 
@@ -119,23 +127,30 @@ export default async function CreatorProfilePage({
           <p>{profile.intro}</p>
         </div>
 
-        <div
-          className={`test-profile-preview profile-concept-preview profile-${creator.accent}${
-            creator.image ? " profile-concept-preview-image" : ""
-          }`}
-          aria-label={`${creator.name} profile preview`}
-        >
-          {creator.image ? (
-            <img
-              alt={`${creator.name} profile`}
-              src={creator.image}
-              style={{ objectPosition: creator.objectPosition }}
-            />
-          ) : null}
-          <span>{creator.category}</span>
-          <strong>{creator.offer}</strong>
-          <p>{creator.title}</p>
-        </div>
+        {creator.mediaItems?.length ? (
+          <CreatorMediaGallery items={creator.mediaItems} name={creator.name} />
+        ) : (
+          <div
+            className={`test-profile-preview profile-concept-preview profile-${creator.accent}${
+              creator.image ? " profile-concept-preview-image" : ""
+            }`}
+            aria-label={`${creator.name} profile preview`}
+          >
+            {creator.image ? (
+              <img
+                alt={`${creator.name} profile`}
+                src={creator.image}
+                style={{
+                  objectPosition: getProfileImageObjectPosition(creator),
+                  transform: getProfileImageTransform(creator),
+                }}
+              />
+            ) : null}
+            <span>{creator.category}</span>
+            <strong>{creator.offer}</strong>
+            <p>{creator.title}</p>
+          </div>
+        )}
       </section>
 
       <section className="amber-about-section" id="about">

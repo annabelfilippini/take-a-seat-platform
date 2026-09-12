@@ -50,6 +50,9 @@ small.
 ## Production Deploy Target
 
 Push production updates to the Cloudflare Workers site:
+`https://takeaseatwith.com/`.
+
+The underlying Worker endpoint remains
 `https://take-a-seat-platform.annabelflip1.workers.dev/`.
 
 ## Google Calendar Setup

@@ -2,22 +2,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { PageHeader } from "../_components/PageHeader";
 
-/* eslint-disable @next/next/no-img-element */
-
 export const metadata: Metadata = {
   title: "Our Mission | Take a Seat",
   description:
-    "Take a Seat gives followers private Office Hours with creators whose taste and judgment they trust.",
+    "Take a Seat is a platform built to make you feel cute, confident, and inspired through private advice from creators you already trust.",
 };
-
-const missionBelievers = [
-  {
-    image: "/ella-profile.jpg",
-    name: "Ella McLane",
-    role: "College style and shopping advice",
-    position: "50% 50%",
-  },
-];
 
 export default function AboutPage() {
   return (
@@ -25,74 +14,58 @@ export default function AboutPage() {
       <PageHeader ctaLabel="Find a Seat" navLabel="Mission page navigation" />
 
       <section className="about-mission" aria-labelledby="mission-heading">
-        <span>Our mission</span>
         <h1 id="mission-heading">
-          To give everyone private access to the people whose
-          <br />
-          taste, ideas, and judgment they trust.
+          A platform built to make you feel cute, confident, and inspired.
         </h1>
-      </section>
-
-      <section className="about-believers" aria-labelledby="believers-heading">
-        <div className="about-section-heading">
-          <h2 id="believers-heading">First seats</h2>
-          <p>The first person opening a private seat.</p>
-        </div>
-        <div className="about-believer-grid">
-          {missionBelievers.map((item) => (
-            <article className="about-believer-card" key={item.name}>
-              <img
-                alt=""
-                src={item.image}
-                style={{ objectPosition: item.position }}
-              />
-              <strong>{item.name}</strong>
-              <span>{item.role}</span>
-            </article>
-          ))}
-        </div>
+        <p>Come take a seat with us.</p>
       </section>
 
       <section className="about-story" aria-labelledby="story-heading">
         <div className="about-story-heading">
-          <h2 id="story-heading">Our story</h2>
+          <h2 id="story-heading">Why we exist</h2>
         </div>
         <div className="about-story-copy">
           <article>
-            <h3>The advice was happening.</h3>
+            <h3>Influencers know the good stuff.</h3>
             <p>
-              People ask creators what to wear, what to buy, how to make
-              a room feel better, where to start, and whether something is worth it.
-              The most useful answer usually needs a few minutes of context, not
-              another comment thread.
+              Influencers are at the forefront when it comes to new brands,
+              trends, different skincare products, outfits, and all the little
+              things worth trying. Their knowledge lives in their heads, and
+              while a lot of it is shared with fans, it is not always catered
+              to an individual.
             </p>
           </article>
           <article>
-            <h3>A private seat makes it real.</h3>
+            <h3>Your question deserves context.</h3>
             <p>
-              Take a Seat turns that trust into a short, personal video call.
-              The follower brings the question. The creator brings the eye they
-              are known for. The booking, calendar, payment, and approval path
-              stay out of the way.
+              Take a Seat is an opportunity to engage with influencers, pick
+              their brain about what you are interested in, or ask for advice
+              on whatever it may be. Tell them where you are going and what you
+              are doing, and they can help you feel comfortable and look cute.
+              They can help you pair clothes you never knew went together and
+              make new outfits from pieces you had but never executed properly.
             </p>
           </article>
           <article>
-            <h3>The point is useful access.</h3>
+            <h3>Cute is the mission.</h3>
             <p>
-              A great creator can help someone choose the dress, fix the corner
-              of the room, pack for the trip, or make one decision with more
-              confidence. One good seat should feel personal, specific, and
-              immediately useful.
+              Isn&apos;t the goal in life to look cute so you feel confident
+              and more yourself? That&apos;s what we thought too :). Take a Seat
+              lets you have a moment with the people you already trust the
+              most. Meet 1:1 with the people whose knowledge you already look
+              up to, lean on them to be your fashion committee, makeup
+              committee, or whatever committee you need, and leave feeling cute
+              and confident.
             </p>
           </article>
         </div>
       </section>
 
       <section className="about-final-cta" aria-label="Start with Take a Seat">
-        <h2>Book the creator whose advice you keep saving.</h2>
+        <h2>Meet your committee.</h2>
         <div className="about-cta-actions">
           <Link href="/#browse">Find a Seat</Link>
-          <Link href="/creators/onboard">Become an Inspiration</Link>
+          <Link href="/creators/onboard">Apply to Inspire</Link>
         </div>
       </section>
     </main>

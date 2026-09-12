@@ -19,14 +19,11 @@ export default function SignInPage({ searchParams }: SignInPageProps) {
   return (
     <main className="account-auth-page">
       <PageHeader ctaLabel="Find a Seat" navLabel="Sign in navigation" />
-      <section className="account-auth-shell" aria-label="Phone number sign-in">
-        <h1>Sign in with your phone.</h1>
+      <section className="account-auth-shell account-auth-shell-minimal" aria-label="Phone number sign-in">
+        <h1 className="visually-hidden">Sign in with your phone.</h1>
         {clerkPublishableKey ? (
           <SignInClerkScreen
             codeHeading="Enter your verification code."
-            description="Sign in by mobile phone and we will text you a verification code."
-            eyebrow="Take a Seat"
-            heading="Enter your mobile number."
             redirectUrl={redirectUrl}
             submitLabel="Next"
           />
@@ -54,15 +51,8 @@ function StaticPhoneNumberForm() {
   return (
     <div className="account-auth-widget">
       <form className="phone-auth-form">
-        <div className="phone-auth-heading">
-          <span>Take a Seat</span>
-          <h2>Enter your mobile number.</h2>
-          <p>
-            Sign in by mobile phone and we will text you a verification code.
-          </p>
-        </div>
         <label>
-          <span>Mobile phone</span>
+          <span>Phone number</span>
           <input
             autoComplete="tel"
             disabled

@@ -102,6 +102,16 @@ img {
   text-align: inherit;
 }
 
+.visually-hidden {
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  height: 1px;
+  overflow: hidden;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
+}
+
 .brand-mark {
   color: var(--cream);
   font-family: var(--serif);
@@ -125,6 +135,44 @@ img {
   align-items: center;
   display: flex;
   gap: 24px;
+}
+
+.home-mobile-actions,
+.page-header-mobile-actions {
+  display: none;
+}
+
+.mobile-nav-toggle {
+  align-items: center;
+  appearance: none;
+  background: rgba(255, 250, 242, 0.18);
+  border: 1px solid rgba(255, 250, 242, 0.38);
+  border-radius: 999px;
+  color: var(--cream);
+  cursor: pointer;
+  display: none;
+  height: 40px;
+  justify-content: center;
+  padding: 0;
+  position: relative;
+  width: 40px;
+}
+
+.mobile-nav-toggle span {
+  background: currentColor;
+  border-radius: 999px;
+  display: block;
+  height: 2px;
+  position: absolute;
+  width: 17px;
+}
+
+.mobile-nav-toggle span:first-child {
+  transform: translateY(-5px);
+}
+
+.mobile-nav-toggle span:last-child {
+  transform: translateY(5px);
 }
 
 .topnav a,
@@ -853,6 +901,7 @@ img {
   position: sticky;
   top: 0;
   transform: none;
+  z-index: 6;
 }
 
 .profile-topbar .brand-mark {
@@ -1028,6 +1077,25 @@ img {
   margin-bottom: 32px;
   object-fit: cover;
   width: 120px;
+}
+
+.creator-headshot-frame {
+  aspect-ratio: 1;
+  background: #ede4d6;
+  border-radius: 50%;
+  box-shadow: 0 18px 32px rgba(31, 29, 26, 0.1);
+  display: block;
+  margin-bottom: 32px;
+  overflow: hidden;
+  width: 120px;
+}
+
+.creator-headshot-frame img {
+  display: block;
+  height: 100%;
+  object-fit: cover;
+  transform-origin: center center;
+  width: 100%;
 }
 
 .amber-hero-copy h1,
@@ -1683,6 +1751,16 @@ img {
 
 .editable-save-button {
   justify-self: start;
+}
+
+.editable-profile-save-footer {
+  align-items: center;
+  border-top: 1px solid rgba(124, 63, 53, 0.16);
+  display: flex;
+  justify-content: flex-end;
+  margin: 0 auto;
+  max-width: min(1120px, calc(100vw - 48px));
+  padding: 22px 0 56px;
 }
 
 .editable-secondary-button {
@@ -2628,6 +2706,7 @@ img {
   color: var(--cream);
   display: grid;
   gap: 22px;
+  justify-items: center;
   margin: 0 auto;
   min-height: 100svh;
   max-width: none;
@@ -2686,34 +2765,20 @@ img {
   font-weight: 300;
   line-height: 1.1;
   margin: 0 auto;
-  max-width: min(1080px, calc(100vw - 384px));
+  max-width: min(880px, calc(100vw - 56px));
   text-shadow: 0 16px 44px rgba(31, 29, 26, 0.64);
-  white-space: nowrap;
 }
 
 .about-mission p {
-  color: #4f4840;
-  font-size: 16px;
+  color: rgba(255, 250, 242, 0.9);
+  font-size: clamp(16px, 1.5vw, 20px);
   font-weight: 400;
-  line-height: 1.45;
+  line-height: 1.42;
   margin: 0 auto;
   max-width: 680px;
+  text-shadow: 0 10px 34px rgba(31, 29, 26, 0.66);
 }
 
-.about-believers {
-  background: var(--cream);
-  border-block: 1px solid var(--line);
-  padding: 64px max(28px, calc((100vw - 1220px) / 2)) 76px;
-}
-
-.about-section-heading {
-  display: grid;
-  gap: 8px;
-  margin-bottom: 30px;
-  text-align: left;
-}
-
-.about-section-heading h2,
 .about-story-heading h2,
 .about-final-cta h2 {
   font-family: var(--serif);
@@ -2721,55 +2786,6 @@ img {
   letter-spacing: 0;
   line-height: 1;
   margin: 0;
-}
-
-.about-section-heading h2 {
-  font-size: clamp(38px, 4vw, 64px);
-  line-height: 1.08;
-}
-
-.about-section-heading p {
-  color: var(--muted);
-  font-size: 14px;
-  font-weight: 400;
-  line-height: 1.5;
-  margin: 0;
-}
-
-.about-believer-grid {
-  display: grid;
-  gap: 20px;
-  grid-template-columns: minmax(0, 220px);
-  justify-content: start;
-}
-
-.about-believer-card {
-  display: grid;
-  gap: 10px;
-  min-width: 0;
-  text-align: center;
-}
-
-.about-believer-card img {
-  aspect-ratio: 1 / 1;
-  border-radius: 999px;
-  box-shadow: 0 14px 28px rgba(31, 29, 26, 0.1);
-  height: auto;
-  object-fit: cover;
-  width: 100%;
-}
-
-.about-believer-card strong {
-  font-size: 15px;
-  font-weight: 900;
-  line-height: 1.16;
-}
-
-.about-believer-card span {
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 1.3;
 }
 
 .about-story {
@@ -3090,6 +3106,11 @@ img {
   width: 100%;
 }
 
+.account-auth-shell-minimal {
+  grid-template-columns: minmax(320px, 460px);
+  justify-content: end;
+}
+
 .account-auth-shell::before,
 .account-auth-shell::after {
   content: "";
@@ -3242,6 +3263,10 @@ img {
   min-height: auto;
   padding: clamp(24px, 4vw, 38px);
   transform: translateY(1.15in);
+}
+
+.account-auth-shell-minimal .account-auth-widget {
+  grid-column: 1;
 }
 
 .phone-auth-form {
@@ -4280,6 +4305,7 @@ button.availability-date-field:focus-visible {
   inset: 0;
   object-fit: cover;
   position: absolute;
+  transform-origin: center center;
   width: 100%;
 }
 
@@ -5289,10 +5315,6 @@ button.availability-date-field:focus-visible {
     width: min(100%, 180px);
   }
 
-  .about-believer-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
   .booking-card {
     max-width: none;
   }
@@ -5447,6 +5469,67 @@ button.availability-date-field:focus-visible {
     padding: 10px 14px;
   }
 
+  .home-topbar {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .home-mobile-actions {
+    align-items: center;
+    display: flex;
+    gap: 10px;
+    grid-column: 2;
+    justify-self: end;
+  }
+
+  .home-mobile-actions .hero-search-control {
+    color: var(--cream);
+    width: 40px;
+  }
+
+  .home-topbar .mobile-nav-toggle {
+    display: inline-flex;
+  }
+
+  .home-topbar .topnav {
+    background: rgba(31, 29, 26, 0.38);
+    border: 1px solid rgba(255, 250, 242, 0.22);
+    border-radius: 8px;
+    display: none;
+    gap: 4px;
+    grid-column: 1 / -1;
+    grid-template-columns: 1fr;
+    justify-self: end;
+    margin-top: 10px;
+    padding: 6px;
+    width: min(100%, 230px);
+  }
+
+  .home-topbar.mobile-nav-open .topnav {
+    display: grid;
+  }
+
+  .home-topbar .home-desktop-search-action {
+    display: none;
+  }
+
+  .home-topbar.mobile-nav-open .topnav .nav-action-form {
+    align-items: stretch;
+    display: flex;
+    grid-column: auto;
+    grid-row: auto;
+    justify-self: stretch;
+  }
+
+  .home-topbar.mobile-nav-open .topnav .home-desktop-search-action {
+    display: none;
+  }
+
+  .home-topbar .topnav button {
+    border-radius: 4px;
+    padding: 0 12px;
+    width: 100%;
+  }
+
   .hero {
     min-height: 100svh;
   }
@@ -5482,6 +5565,10 @@ button.availability-date-field:focus-visible {
     grid-template-columns: 1fr;
   }
 
+  .creator-application-layout > h1 {
+    transform: none;
+  }
+
   .about-topbar {
     align-items: stretch;
     display: grid;
@@ -5510,6 +5597,71 @@ button.availability-date-field:focus-visible {
     padding: 10px 12px;
   }
 
+  .about-topbar {
+    align-items: center;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .page-header-mobile-actions {
+    align-items: center;
+    display: flex;
+    gap: 10px;
+    justify-self: end;
+  }
+
+  .page-header-mobile-actions .header-search-control {
+    width: 40px;
+  }
+
+  .about-topbar .mobile-nav-toggle {
+    color: var(--ink);
+    display: inline-flex;
+  }
+
+  .about-page .about-topbar .mobile-nav-toggle,
+  .account-auth-page .about-topbar .mobile-nav-toggle,
+  .creator-onboard-page .about-topbar .mobile-nav-toggle {
+    color: var(--cream);
+  }
+
+  .about-nav {
+    display: none;
+    gap: 8px;
+    grid-column: 1 / -1;
+    grid-template-columns: 1fr;
+    justify-self: end;
+    width: min(100%, 230px);
+  }
+
+  .about-topbar.mobile-nav-open .about-nav {
+    display: grid;
+  }
+
+  .about-nav .header-search-control {
+    display: none;
+  }
+
+  .about-nav .nav-action-form {
+    display: flex;
+    width: 100%;
+  }
+
+  .about-nav button {
+    background: rgba(255, 250, 242, 0.12);
+    border-radius: 4px;
+    padding-inline: 12px;
+    width: 100%;
+  }
+
+  .seat-directory-page .about-topbar .mobile-nav-toggle,
+  .creator-setup-page .about-topbar .mobile-nav-toggle {
+    color: var(--ink);
+  }
+
+  .account-auth-shell-minimal {
+    justify-content: stretch;
+  }
+
   .about-mission {
     background:
       linear-gradient(90deg, rgba(31, 29, 26, 0.34), rgba(31, 29, 26, 0.58)),
@@ -5520,10 +5672,6 @@ button.availability-date-field:focus-visible {
 
   .about-mission h1 {
     max-width: 680px;
-  }
-
-  .about-believers {
-    padding-inline: 18px;
   }
 
   .about-story {
@@ -5706,7 +5854,46 @@ button.availability-date-field:focus-visible {
   }
 
   .expert-grid {
-    grid-template-columns: 1fr;
+    gap: 14px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .expert-copy {
+    padding: 13px 11px 15px;
+  }
+
+  .expert-image-frame img,
+  .profile-placeholder {
+    aspect-ratio: 1 / 1.02;
+  }
+
+  .profile-placeholder {
+    min-height: 0;
+  }
+
+  .expert-topline {
+    align-items: start;
+    display: grid;
+    gap: 4px;
+  }
+
+  .expert-topline strong {
+    font-size: 17px;
+  }
+
+  .rating,
+  .expert-rate,
+  .expert-category,
+  .expert-note {
+    font-size: 12px;
+  }
+
+  .rating span {
+    font-size: 14px;
+  }
+
+  .expert-note {
+    display: none;
   }
 
   .hero-copy h1 {
@@ -5723,6 +5910,15 @@ button.availability-date-field:focus-visible {
     grid-template-columns: 1fr;
   }
 
+  .creator-onboard-page .about-nav {
+    grid-template-columns: 1fr;
+  }
+
+  .creator-onboard-page .creator-apply-stage {
+    align-items: start;
+    padding-top: 176px;
+  }
+
   .creator-dashboard-card-grid {
     grid-template-columns: 1fr;
   }
@@ -5735,10 +5931,6 @@ button.availability-date-field:focus-visible {
   .creator-studio-tabs button {
     min-width: 0;
     padding-inline: 10px;
-  }
-
-  .about-believer-grid {
-    grid-template-columns: minmax(0, 220px);
   }
 
   .about-mission h1 {
@@ -5791,7 +5983,8 @@ button.availability-date-field:focus-visible {
     width: auto;
   }
 
-  .amber-headshot {
+  .amber-headshot,
+  .creator-headshot-frame {
     width: 112px;
   }
 

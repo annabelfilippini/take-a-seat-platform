@@ -1,8 +1,11 @@
 /* eslint-disable @next/next/no-html-link-for-pages, @next/next/no-img-element */
 import type { Metadata } from "next";
-import Link from "next/link";
 import { getCreatorById } from "../../_lib/creators";
 import { getPublishedCreatorBySlug } from "../../_lib/creator-onboarding";
+import {
+  getProfileImageObjectPosition,
+  getProfileImageTransform,
+} from "../../_lib/profile-image";
 import { CustomerBookingFlow } from "./CustomerBookingFlow";
 import { EllaGallery } from "./EllaGallery";
 
@@ -11,6 +14,8 @@ export const metadata: Metadata = {
   description:
     "Book Ella McLane for a private college lifestyle, outfit, and shopping advice seat.",
 };
+
+export const dynamic = "force-dynamic";
 
 const helpItems = [
   "Choose what to wear for a night out, trip, class, or event.",
@@ -88,19 +93,26 @@ export default async function EllaProfile({ searchParams }: EllaProfileProps) {
               {creator.instagramHandle ?? creator.name}
             </a>
           ) : null}
-          <Link className="profile-sign-in-link" href="/sign-in">
-            Sign In
-          </Link>
+          <form action="/sign-in" className="nav-action-form" method="get">
+            <button className="profile-sign-in-link" type="submit">
+              Sign In
+            </button>
+          </form>
         </nav>
       </header>
 
       <section className="amber-profile-hero">
         <div className="amber-hero-copy">
-          <img
-            alt="Ella McLane"
-            className="amber-headshot"
-            src="/ella-profile.jpg"
-          />
+          <span className="creator-headshot-frame">
+            <img
+              alt={creator.name}
+              src={creator.image ?? "/ella-profile.jpg"}
+              style={{
+                objectPosition: getProfileImageObjectPosition(creator),
+                transform: getProfileImageTransform(creator),
+              }}
+            />
+          </span>
           <h1>{creator.name}</h1>
           <p className="amber-meta">
             {creator.instagramUrl ? (
@@ -125,7 +137,7 @@ export default async function EllaProfile({ searchParams }: EllaProfileProps) {
           <p>{intro}</p>
         </div>
 
-        <EllaGallery />
+        <EllaGallery items={creator.mediaItems?.length ? creator.mediaItems : undefined} />
       </section>
 
       <section className="amber-about-section" id="about">
