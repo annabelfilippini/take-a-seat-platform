@@ -4,9 +4,25 @@
   "main": "dist/server/index.js",
   "compatibility_date": "2026-08-29",
   "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "preview_urls": true,
   "assets": {
     "directory": "dist/client"
   },
+  "routes": [
+    {
+      "pattern": "takeaseatwith.com",
+      "custom_domain": true,
+      "enabled": true,
+      "previews_enabled": false
+    },
+    {
+      "pattern": "www.takeaseatwith.com",
+      "custom_domain": true,
+      "enabled": true,
+      "previews_enabled": false
+    }
+  ],
   "observability": {
     "enabled": true
   },

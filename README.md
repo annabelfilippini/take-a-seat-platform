@@ -24,8 +24,11 @@ npm run deploy
 The canonical production URL is:
 
 ```text
-https://take-a-seat-platform.annabelflip1.workers.dev/
+https://takeaseatwith.com/
 ```
+
+The underlying Cloudflare Workers endpoint remains available at
+`https://take-a-seat-platform.annabelflip1.workers.dev/`.
 
 ## Local Development
 

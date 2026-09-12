@@ -117,7 +117,7 @@ completed first in the intended mode.
 ### 4. Outreach Packet
 
 - Prepare one application link:
-  `https://take-a-seat-platform.annabelflip1.workers.dev/creators/onboard`
+  `https://takeaseatwith.com/creators/onboard`
 - Prepare one short creator promise:
   "Apply, build your private-call profile, and we will personally review it
   before your page goes live."
