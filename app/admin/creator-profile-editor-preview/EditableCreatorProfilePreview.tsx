@@ -207,10 +207,12 @@ export function EditableCreatorProfilePreview({
     useState<EditableCreatorTab>("profile");
   const [draftMedia, setDraftMedia] = useState<{
     fileName: string;
+    kind: EditableGalleryItem["kind"];
     title: string;
     uploadedSource: string;
   }>({
     fileName: "",
+    kind: "photo",
     title: "",
     uploadedSource: "",
   });
@@ -322,7 +324,7 @@ export function EditableCreatorProfilePreview({
   }
 
   function chooseMediaItemFile(id: string, file: File | undefined) {
-    if (!file || !file.type.startsWith("image/")) {
+    if (!file || !isSupportedMediaFile(file)) {
       return;
     }
 
@@ -335,7 +337,7 @@ export function EditableCreatorProfilePreview({
             ? {
                 ...item,
                 fileName: file.name,
-                kind: "photo",
+                kind: getMediaKindForFile(file),
                 source,
                 sourceKind: "upload",
                 title: item.title || getMediaTitleFromFileName(file.name),
@@ -368,12 +370,14 @@ export function EditableCreatorProfilePreview({
         {
           fileName: draftMedia.fileName || undefined,
           id: globalThis.crypto?.randomUUID?.() ?? `media-${Date.now()}`,
-          kind: "photo",
+          kind: draftMedia.kind,
           source,
           sourceKind: "upload",
           title:
             draftMedia.title.trim() ||
-            `Photo ${current.mediaItems.length + 1}`,
+            `${draftMedia.kind === "photo" ? "Photo" : "Video"} ${
+              current.mediaItems.length + 1
+            }`,
         },
       ],
     }));
@@ -547,7 +551,7 @@ export function EditableCreatorProfilePreview({
   }
 
   function chooseDraftMediaFile(file: File | undefined) {
-    if (!file || !file.type.startsWith("image/")) {
+    if (!file || !isSupportedMediaFile(file)) {
       return;
     }
 
@@ -555,6 +559,7 @@ export function EditableCreatorProfilePreview({
       setDraftMedia((current) => ({
         ...current,
         fileName: file.name,
+        kind: getMediaKindForFile(file),
         title: current.title || getMediaTitleFromFileName(file.name),
         uploadedSource: source,
       }));
@@ -742,7 +747,7 @@ export function EditableCreatorProfilePreview({
           <div className="creator-form-header editable-media-header">
             <div className="editable-section-heading">
               <span>Images</span>
-              <h2>Photos</h2>
+              <h2>Photos and videos</h2>
             </div>
             <div className="editable-save-status-group">
               <span
@@ -793,7 +798,7 @@ export function EditableCreatorProfilePreview({
                 <MediaPreview item={item} />
                 <div className="editable-media-source-control">
                   <input
-                    accept="image/*"
+                    accept="image/*,video/*"
                     aria-label={`Upload replacement for ${item.title}`}
                     className="editable-profile-field editable-file-input"
                     type="file"
@@ -819,8 +824,8 @@ export function EditableCreatorProfilePreview({
           <div className="editable-add-media">
             <div className="editable-add-source">
               <input
-                accept="image/*"
-                aria-label="Upload new photo"
+                accept="image/*,video/*"
+                aria-label="Upload new media file"
                 className="editable-profile-field editable-file-input"
                 ref={draftMediaFileInputRef}
                 type="file"
@@ -836,7 +841,7 @@ export function EditableCreatorProfilePreview({
               onClick={addMediaItem}
               type="button"
             >
-              Add photo
+              Add media
             </button>
           </div>
         </div>
@@ -2310,6 +2315,14 @@ function readFileAsDataUrl(file: File, onLoad: (source: string) => void) {
   reader.readAsDataURL(file);
 }
 
+function isSupportedMediaFile(file: File) {
+  return file.type.startsWith("image/") || file.type.startsWith("video/");
+}
+
+function getMediaKindForFile(file: File): EditableGalleryItem["kind"] {
+  return file.type.startsWith("video/") ? "video" : "photo";
+}
+
 function getMediaTitleFromFileName(fileName: string) {
   return fileName
     .replace(/\.[^.]+$/, "")
@@ -2320,9 +2333,8 @@ function getMediaTitleFromFileName(fileName: string) {
 function getProfileSettingsFormData(profile: EditableProfileState) {
   const formData = new FormData();
   const gallerySources = profile.mediaItems
-    .filter((item) => item.kind === "photo")
     .map((item) => item.source.trim())
-    .filter(isImageGallerySource)
+    .filter(isUploadedGallerySource)
     .filter(Boolean)
     .join("\n");
 
@@ -2367,11 +2379,14 @@ function getProfileSettingsFormData(profile: EditableProfileState) {
   return formData;
 }
 
-function isImageGallerySource(source: string) {
+function isUploadedGallerySource(source: string) {
   return (
     /^data:image\//i.test(source) ||
+    /^data:video\//i.test(source) ||
     /^\/[^?#]+\.(?:avif|gif|jpe?g|png|webp)(?:[?#].*)?$/i.test(source) ||
-    /^https?:\/\/[^?#]+\.(?:avif|gif|jpe?g|png|webp)(?:[?#].*)?$/i.test(source)
+    /^\/[^?#]+\.(?:m4v|mov|mp4|webm)(?:[?#].*)?$/i.test(source) ||
+    /^https?:\/\/[^?#]+\.(?:avif|gif|jpe?g|png|webp)(?:[?#].*)?$/i.test(source) ||
+    /^https?:\/\/[^?#]+\.(?:m4v|mov|mp4|webm)(?:[?#].*)?$/i.test(source)
   );
 }
 

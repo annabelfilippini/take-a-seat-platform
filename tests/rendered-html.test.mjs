@@ -310,7 +310,7 @@ test("server-renders the admin creator profile editor preview", async () => {
   assert.doesNotMatch(html, /editable-creator-tabs-shell/);
   assert.match(html, /src="\/amber-headshot\.jpg"/);
   assert.match(html, /Upload profile picture/);
-  assert.match(html, />Photos<\/h2>/);
+  assert.match(html, /Photos and videos/);
   assert.match(html, />Save media<\/button>/);
   assert.match(html, />Availability<\/h2>/);
   assert.match(html, />Save availability<\/button>/);
@@ -329,9 +329,11 @@ test("server-renders the admin creator profile editor preview", async () => {
   assert.match(html, /aria-label="Upload profile picture"/);
   assert.match(html, /aria-label="Instagram URL"/);
   assert.match(html, /aria-label="TikTok URL"/);
-  assert.match(html, /aria-label="Upload new photo"/);
-  assert.match(html, />Add photo<\/button>/);
+  assert.match(html, /aria-label="Upload new media file"/);
+  assert.match(html, />Add media<\/button>/);
+  assert.match(html, /accept="image\/\*,video\/\*"/);
   assert.doesNotMatch(html, /aria-label="New media URL"/);
+  assert.doesNotMatch(html, /aria-label="TikTok video URL"/);
   assert.doesNotMatch(html, /TikTok video ID/);
   assert.doesNotMatch(html, /aria-label="New media label"/);
   assert.match(html, /aria-label="Creator hero name"/);
