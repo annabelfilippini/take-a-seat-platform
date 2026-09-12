@@ -837,14 +837,14 @@ test("server-renders the mission page", async () => {
 
   const html = await response.text();
   assert.match(html, /<title>Our Mission \| Take a Seat<\/title>/i);
-  assert.match(html, /big older sister for getting dressed/);
-  assert.match(html, /last-minute &quot;is this cute\?&quot; moments/);
+  assert.match(html, /cute, confident, and inspired/);
+  assert.match(html, /Come take a seat with us/);
   assert.match(html, /First seats/);
   assert.match(html, /Ella McLane/);
-  assert.match(html, /Why we exist/);
-  assert.match(html, /The question was already there/);
-  assert.match(html, /A comment thread cannot see the outfit/);
-  assert.match(html, /Confidence is the whole point/);
+  assert.match(html, /The idea/);
+  assert.match(html, /Influencers know the good stuff/);
+  assert.match(html, /Your question deserves context/);
+  assert.match(html, /Cute is the mission/);
   assert.match(html, /Apply to Inspire/);
   assert.match(html, /Find a Seat/);
 });
