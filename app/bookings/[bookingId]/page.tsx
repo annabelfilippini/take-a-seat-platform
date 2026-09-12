@@ -54,9 +54,11 @@ export default async function BookingPage({
         </a>
         <nav className="profile-nav" aria-label="Booking navigation">
           <Link href={`/with/${booking.creatorId}`}>Creator</Link>
-          <Link className="profile-sign-in-link" href="/sign-in">
-            Sign In
-          </Link>
+          <form action="/sign-in" className="nav-action-form" method="get">
+            <button className="profile-sign-in-link" type="submit">
+              Sign In
+            </button>
+          </form>
         </nav>
       </header>
 

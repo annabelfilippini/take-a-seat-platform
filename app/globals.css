@@ -853,6 +853,7 @@ img {
   position: sticky;
   top: 0;
   transform: none;
+  z-index: 6;
 }
 
 .profile-topbar .brand-mark {
@@ -1028,6 +1029,25 @@ img {
   margin-bottom: 32px;
   object-fit: cover;
   width: 120px;
+}
+
+.creator-headshot-frame {
+  aspect-ratio: 1;
+  background: #ede4d6;
+  border-radius: 50%;
+  box-shadow: 0 18px 32px rgba(31, 29, 26, 0.1);
+  display: block;
+  margin-bottom: 32px;
+  overflow: hidden;
+  width: 120px;
+}
+
+.creator-headshot-frame img {
+  display: block;
+  height: 100%;
+  object-fit: cover;
+  transform-origin: center center;
+  width: 100%;
 }
 
 .amber-hero-copy h1,
@@ -1683,6 +1703,16 @@ img {
 
 .editable-save-button {
   justify-self: start;
+}
+
+.editable-profile-save-footer {
+  align-items: center;
+  border-top: 1px solid rgba(124, 63, 53, 0.16);
+  display: flex;
+  justify-content: flex-end;
+  margin: 0 auto;
+  max-width: min(1120px, calc(100vw - 48px));
+  padding: 22px 0 56px;
 }
 
 .editable-secondary-button {
@@ -2701,20 +2731,6 @@ img {
   text-shadow: 0 10px 34px rgba(31, 29, 26, 0.66);
 }
 
-.about-believers {
-  background: var(--cream);
-  border-block: 1px solid var(--line);
-  padding: 64px max(28px, calc((100vw - 1220px) / 2)) 76px;
-}
-
-.about-section-heading {
-  display: grid;
-  gap: 8px;
-  margin-bottom: 30px;
-  text-align: left;
-}
-
-.about-section-heading h2,
 .about-story-heading h2,
 .about-final-cta h2 {
   font-family: var(--serif);
@@ -2722,55 +2738,6 @@ img {
   letter-spacing: 0;
   line-height: 1;
   margin: 0;
-}
-
-.about-section-heading h2 {
-  font-size: clamp(38px, 4vw, 64px);
-  line-height: 1.08;
-}
-
-.about-section-heading p {
-  color: var(--muted);
-  font-size: 14px;
-  font-weight: 400;
-  line-height: 1.5;
-  margin: 0;
-}
-
-.about-believer-grid {
-  display: grid;
-  gap: 20px;
-  grid-template-columns: minmax(0, 220px);
-  justify-content: start;
-}
-
-.about-believer-card {
-  display: grid;
-  gap: 10px;
-  min-width: 0;
-  text-align: center;
-}
-
-.about-believer-card img {
-  aspect-ratio: 1 / 1;
-  border-radius: 999px;
-  box-shadow: 0 14px 28px rgba(31, 29, 26, 0.1);
-  height: auto;
-  object-fit: cover;
-  width: 100%;
-}
-
-.about-believer-card strong {
-  font-size: 15px;
-  font-weight: 900;
-  line-height: 1.16;
-}
-
-.about-believer-card span {
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 1.3;
 }
 
 .about-story {
@@ -4281,6 +4248,7 @@ button.availability-date-field:focus-visible {
   inset: 0;
   object-fit: cover;
   position: absolute;
+  transform-origin: center center;
   width: 100%;
 }
 
@@ -5290,10 +5258,6 @@ button.availability-date-field:focus-visible {
     width: min(100%, 180px);
   }
 
-  .about-believer-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
   .booking-card {
     max-width: none;
   }
@@ -5404,21 +5368,16 @@ button.availability-date-field:focus-visible {
 
   .home-topbar .topnav .nav-action-form:first-of-type {
     grid-column: 1;
-    grid-row: 1;
+    grid-row: 1 / span 2;
   }
 
   .home-topbar .topnav .nav-action-form:nth-of-type(2) {
-    grid-column: 1;
-    grid-row: 2;
-  }
-
-  .home-topbar .topnav .nav-action-form:nth-of-type(3) {
     grid-column: 2;
     grid-row: 1 / span 2;
     justify-self: end;
   }
 
-  .home-topbar .topnav .nav-action-form:nth-of-type(4) {
+  .home-topbar .topnav .nav-action-form:nth-of-type(3) {
     grid-column: 3;
     grid-row: 1 / span 2;
     justify-self: end;
@@ -5525,10 +5484,6 @@ button.availability-date-field:focus-visible {
 
   .about-mission h1 {
     max-width: 680px;
-  }
-
-  .about-believers {
-    padding-inline: 18px;
   }
 
   .about-story {
@@ -5751,10 +5706,6 @@ button.availability-date-field:focus-visible {
     padding-inline: 10px;
   }
 
-  .about-believer-grid {
-    grid-template-columns: minmax(0, 220px);
-  }
-
   .about-mission h1 {
     font-size: clamp(24px, calc(10vw - 10px), 34px);
     white-space: normal;
@@ -5805,7 +5756,8 @@ button.availability-date-field:focus-visible {
     width: auto;
   }
 
-  .amber-headshot {
+  .amber-headshot,
+  .creator-headshot-frame {
     width: 112px;
   }
 

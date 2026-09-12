@@ -24,9 +24,6 @@ export function PageHeader({
         <form action="/creators/onboard" className="nav-action-form" method="get">
           <button type="submit">Apply to Inspire</button>
         </form>
-        <form action="/about" className="nav-action-form" method="get">
-          <button type="submit">Our Mission</button>
-        </form>
         {showCreatorSearch ? (
           <form
             action="/take-a-seat"

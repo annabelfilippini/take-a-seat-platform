@@ -47,6 +47,9 @@ export type Creator = {
   note: string;
   image: string | null;
   objectPosition: string;
+  profileImagePositionX?: number | null;
+  profileImagePositionY?: number | null;
+  profileImageZoom?: number | null;
   accent: string;
   mediaItems?: CreatorMediaItem[];
   instagramUrl?: string;

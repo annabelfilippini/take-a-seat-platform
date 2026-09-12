@@ -14,9 +14,6 @@ export function BookingPlatform() {
           <form action="/creators/onboard" className="nav-action-form" method="get">
             <button type="submit">Apply to Inspire</button>
           </form>
-          <form action="/about" className="nav-action-form" method="get">
-            <button type="submit">Our Mission</button>
-          </form>
           <form action="/take-a-seat" className="nav-action-form" method="get">
             <button className="hero-search-control hero-search-link" type="submit" aria-label="Search creators">
               <span>Search creators</span>

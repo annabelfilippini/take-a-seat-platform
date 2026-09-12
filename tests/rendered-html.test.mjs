@@ -85,7 +85,7 @@ test("server-renders the public booking homepage", async () => {
   assert.match(html, /home-vanity-hero\.png/);
   assert.match(html, /<button class="hero-cta" type="submit">Take a Seat<\/button>/);
   assert.match(html, /Apply to Inspire/);
-  assert.match(html, /Our Mission/);
+  assert.doesNotMatch(html, /Our Mission/);
   assert.match(html, /Search creators/);
   assert.match(html, /Sign In/);
   assert.match(html, /directory-results/);
@@ -311,7 +311,8 @@ test("server-renders the admin creator profile editor preview", async () => {
   assert.match(html, /src="\/amber-headshot\.jpg"/);
   assert.match(html, /Upload profile picture/);
   assert.match(html, /Photos and videos/);
-  assert.match(html, />Save media<\/button>/);
+  assert.match(html, />Save profile<\/button>/);
+  assert.match(html, /aria-label="Save profile changes"/);
   assert.match(html, />Availability<\/h2>/);
   assert.match(html, />Save availability<\/button>/);
   assert.match(html, /Stripe payouts/);
@@ -403,11 +404,15 @@ test("preserves creator uploaded media for dashboard and public profiles", async
   const [
     creatorOnboarding,
     editor,
+    editorData,
+    schema,
+    cropMigration,
     dynamicProfilePage,
     ellaPage,
     ellaGallery,
     creatorGallery,
     creatorsLib,
+    profileImageHelper,
   ] = await Promise.all([
     readFile(new URL("../app/_lib/creator-onboarding.ts", import.meta.url), "utf8"),
     readFile(
@@ -417,21 +422,66 @@ test("preserves creator uploaded media for dashboard and public profiles", async
       ),
       "utf8",
     ),
+    readFile(
+      new URL(
+        "../app/admin/creator-profile-editor-preview/creator-profile-editor-data.ts",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),
+    readFile(
+      new URL("../drizzle/0014_great_omega_flight.sql", import.meta.url),
+      "utf8",
+    ),
     readFile(new URL("../app/with/[slug]/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/with/ella/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/with/ella/EllaGallery.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/_components/CreatorMediaGallery.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/_lib/creators.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/_lib/profile-image.ts", import.meta.url), "utf8"),
   ]);
 
   assert.match(creatorOnboarding, /cleanProfileImageUrl\(getString\(formData, "profileImageUrl"\)\)/);
   assert.match(creatorOnboarding, /\/\^data:image\\\/\/i\.test\(trimmed\)/);
   assert.match(creatorOnboarding, /return trimmed;/);
+  assert.match(schema, /profileImagePositionX:\s*integer\("profile_image_position_x"\)/);
+  assert.match(schema, /profileImagePositionY:\s*integer\("profile_image_position_y"\)/);
+  assert.match(schema, /profileImageZoom:\s*integer\("profile_image_zoom"\)/);
+  assert.match(cropMigration, /ADD `profile_image_position_x` integer/);
+  assert.match(cropMigration, /ADD `profile_image_position_y` integer/);
+  assert.match(cropMigration, /ADD `profile_image_zoom` integer/);
+  assert.match(creatorOnboarding, /profileImagePositionX: cleanOptionalInteger\(/);
+  assert.match(creatorOnboarding, /profileImagePositionY: cleanOptionalInteger\(/);
+  assert.match(creatorOnboarding, /profileImageZoom: cleanOptionalInteger\(/);
+  assert.match(creatorOnboarding, /profileImagePositionX: input\.profileImagePositionX/);
+  assert.match(creatorOnboarding, /profileImagePositionY: input\.profileImagePositionY/);
+  assert.match(creatorOnboarding, /profileImageZoom: input\.profileImageZoom/);
+  assert.match(creatorOnboarding, /objectPosition: getProfileImageObjectPosition/);
+  assert.match(creatorOnboarding, /profileImageZoom: getProfileImageZoomValue\(profile\.profileImageZoom, 100\)/);
+  assert.match(editorData, /profileImagePositionX: profile\.profileImagePositionX \?\? 50/);
+  assert.match(editorData, /profileImagePositionY: profile\.profileImagePositionY \?\? 50/);
+  assert.match(editorData, /profileImageZoom: profile\.profileImageZoom \?\? 135/);
   assert.match(creatorOnboarding, /mediaItems: getPublishedCreatorMediaItems\(profile\)/);
   assert.match(creatorOnboarding, /function getPublishedCreatorMediaItems/);
   assert.match(editor, /setMediaSaveStatus\("idle"\);\s+setProfileImageFileName/s);
+  assert.match(editor, /function update<K extends keyof EditableProfileState>/);
+  assert.match(editor, /setMediaSaveStatus\("idle"\);\s+setProfile\(\(current\) => \(\{ \.\.\.current, \[key\]: value \}\)\)/);
+  assert.match(editor, /async function saveProfileChanges/);
+  assert.match(editor, /formData\.set\(\s*"profileImagePositionX"/s);
+  assert.match(editor, /formData\.set\(\s*"profileImagePositionY"/s);
+  assert.match(editor, /formData\.set\("profileImageZoom"/);
+  assert.match(editor, /const \[savedSlotKeys, setSavedSlotKeys\]/);
+  assert.match(editor, /\[weekValue\]: savedSlotKeys/);
+  assert.match(editor, /disabled=\{saveStatus === "saving"\}/);
+  assert.doesNotMatch(editor, />Save media</);
+  assert.match(profileImageHelper, /export function getProfileImageTransform/);
+  assert.match(dynamicProfilePage, /export const dynamic = "force-dynamic"/);
   assert.match(dynamicProfilePage, /<CreatorMediaGallery items=\{creator\.mediaItems\} name=\{creator\.name\} \/>/);
   assert.match(ellaPage, /src=\{creator\.image \?\? "\/ella-profile\.jpg"\}/);
+  assert.match(ellaPage, /export const dynamic = "force-dynamic"/);
+  assert.match(ellaPage, /getProfileImageObjectPosition\(creator\)/);
+  assert.match(ellaPage, /getProfileImageTransform\(creator\)/);
   assert.match(ellaPage, /items=\{creator\.mediaItems\?\.length \? creator\.mediaItems : undefined\}/);
   assert.match(ellaGallery, /CreatorMediaGallery/);
   assert.match(creatorGallery, /className="amber-hero-gallery"/);
@@ -523,6 +573,9 @@ test("wires accepted creators to public profile publishing", async () => {
   assert.match(creatorOnboarding, /getAvailableCreatorPublicIdSuggestion/);
   assert.match(creatorOnboarding, /suffix = 1; suffix <= 99/);
   assert.match(creatorOnboarding, /isCreatorPublicIdTaken\(candidate, profile\.id\)/);
+  assert.match(creatorOnboarding, /if \(!creatorId\) \{/);
+  assert.doesNotMatch(creatorOnboarding, /!creatorId \|\| rules\.length === 0/);
+  assert.match(creatorOnboarding, /slot !== addMinutes\(previousSlot, 15\)/);
   assert.match(creatorOnboarding, /function createPublishedSeats/);
   assert.match(creatorOnboarding, /STRIPE_PRICE_\$\{envSafeCreatorId\}_\$\{minutes\}/);
   assert.match(dynamicProfilePage, /getPublicCreatorBySlug/);
@@ -830,17 +883,18 @@ test("removes starter metadata and preview dependencies", async () => {
   assert.doesNotMatch(css, /#020617|codex-preview|SkeletonPreview/i);
 });
 
-test("server-renders the mission page", async () => {
+test("server-renders the about page", async () => {
   const response = await render("/about");
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
 
   const html = await response.text();
-  assert.match(html, /<title>Our Mission \| Take a Seat<\/title>/i);
+  assert.match(html, /<title>About \| Take a Seat<\/title>/i);
+  assert.doesNotMatch(html, /Our Mission/i);
+  assert.doesNotMatch(html, /First seats/i);
+  assert.doesNotMatch(html, /Ella McLane/);
   assert.match(html, /cute, confident, and inspired/);
   assert.match(html, /Come take a seat with us/);
-  assert.match(html, /First seats/);
-  assert.match(html, /Ella McLane/);
   assert.match(html, /The idea/);
   assert.match(html, /Influencers know the good stuff/);
   assert.match(html, /Your question deserves context/);
@@ -863,6 +917,10 @@ test("server-renders Ella's profile page", async () => {
   assert.match(html, /Ella McLane/);
   assert.match(html, /@ellamclane2/);
   assert.match(html, /https:\/\/www\.instagram\.com\/ellamclane2\//);
+  assert.match(
+    html,
+    /<form(?=[^>]*action="\/sign-in")(?=[^>]*class="nav-action-form")(?=[^>]*method="get")[^>]*><button(?=[^>]*class="profile-sign-in-link")(?=[^>]*type="submit")[^>]*>Sign In<\/button><\/form>/,
+  );
   assert.match(html, /https:\/\/www\.tiktok\.com\/@ellamclane/);
   assert.doesNotMatch(html, /@ellamclane</);
   assert.match(html, /About/);

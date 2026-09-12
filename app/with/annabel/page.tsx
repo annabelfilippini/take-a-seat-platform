@@ -38,9 +38,11 @@ export default function AnnabelProfile() {
           <a className="reserve-nav-button" href="#reserve">
             Test booking
           </a>
-          <Link className="profile-sign-in-link" href="/sign-in">
-            Sign In
-          </Link>
+          <form action="/sign-in" className="nav-action-form" method="get">
+            <button className="profile-sign-in-link" type="submit">
+              Sign In
+            </button>
+          </form>
         </nav>
       </header>
 

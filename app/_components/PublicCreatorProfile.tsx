@@ -7,6 +7,10 @@ import type {
   EditableCreatorMediaItem,
   EditableCreatorProfile,
 } from "../admin/creator-profile-editor-preview/creator-profile-editor-data";
+import {
+  getProfileImageObjectPosition,
+  getProfileImageTransform,
+} from "../_lib/profile-image";
 
 const tiktokPlayerOptions = [
   "autoplay=1",
@@ -56,9 +60,11 @@ export function PublicCreatorProfile({
         </a>
         <nav className="profile-nav" aria-label={`${profile.name} profile navigation`}>
           <Link href="/creators/onboard">Apply</Link>
-          <Link className="profile-sign-in-link" href="/sign-in">
-            Sign In
-          </Link>
+          <form action="/sign-in" className="nav-action-form" method="get">
+            <button className="profile-sign-in-link" type="submit">
+              Sign In
+            </button>
+          </form>
         </nav>
       </header>
 
@@ -66,7 +72,14 @@ export function PublicCreatorProfile({
         <div className="amber-hero-copy">
           <span className="editable-profile-photo-frame public-profile-photo-frame">
             {profile.image ? (
-              <img alt={`${profile.name} profile`} src={profile.image} />
+              <img
+                alt={`${profile.name} profile`}
+                src={profile.image}
+                style={{
+                  objectPosition: getProfileImageObjectPosition(profile),
+                  transform: getProfileImageTransform(profile),
+                }}
+              />
             ) : (
               <b>{profile.name.slice(0, 2) || "TS"}</b>
             )}

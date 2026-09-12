@@ -22,6 +22,11 @@ import {
   normalizePhoneIdentity,
   type TakeASeatClerkUser,
 } from "./clerk-auth";
+import {
+  getProfileImageObjectPosition,
+  getProfileImagePercentValue,
+  getProfileImageZoomValue,
+} from "./profile-image";
 
 export type CreatorOnboardingInput = {
   bio: string;
@@ -43,7 +48,10 @@ export type CreatorProfileSettingsInput = CreatorOnboardingInput & {
   oneToOneReason: string;
   offer: string;
   profileGallery: string;
+  profileImagePositionX: number | null;
+  profileImagePositionY: number | null;
   profileImageUrl: string;
+  profileImageZoom: number | null;
   profileIntro: string;
   reviewSubmitted: boolean;
   seat15DurationMinutes: number;
@@ -193,8 +201,23 @@ export async function getCreatorProfileSettingsInput(
     phone,
     profileGallery: cleanProfileGallery(getString(formData, "profileGallery")),
     profileDetails,
+    profileImagePositionX: cleanOptionalInteger(
+      getString(formData, "profileImagePositionX"),
+      0,
+      100,
+    ),
+    profileImagePositionY: cleanOptionalInteger(
+      getString(formData, "profileImagePositionY"),
+      0,
+      100,
+    ),
     profileImageUrl:
       uploadedProfileImage ?? cleanProfileImageUrl(getString(formData, "profileImageUrl")) ?? "",
+    profileImageZoom: cleanOptionalInteger(
+      getString(formData, "profileImageZoom"),
+      100,
+      220,
+    ),
     profileIntro,
     reviewSubmitted: formData.get("reviewSubmittedAt") === "true",
     seat15Description:
@@ -233,7 +256,7 @@ export function getCreatorAvailabilityInput(
   const timezone = cleanTimezone(getString(formData, "timezone"));
   const rules = getAvailabilityRules(getString(formData, "availabilitySlots"));
 
-  if (!creatorId || rules.length === 0) {
+  if (!creatorId) {
     return null;
   }
 
@@ -352,7 +375,10 @@ export async function saveCreatorProfileSettings(
       phone: input.phone,
       profileGallery: input.profileGallery,
       profileDetails: input.profileDetails,
+      profileImagePositionX: input.profileImagePositionX,
+      profileImagePositionY: input.profileImagePositionY,
       profileImageUrl: input.profileImageUrl,
+      profileImageZoom: input.profileImageZoom,
       profileIntro: input.profileIntro,
       applicationStatus,
       reviewSubmittedAt,
@@ -386,7 +412,10 @@ export async function saveCreatorProfileSettings(
         profileGallery: input.profileGallery,
         phone: input.phone,
         profileDetails: input.profileDetails,
+        profileImagePositionX: input.profileImagePositionX,
+        profileImagePositionY: input.profileImagePositionY,
         profileImageUrl: input.profileImageUrl,
+        profileImageZoom: input.profileImageZoom,
         profileIntro: input.profileIntro,
         ...(input.reviewSubmitted ? { applicationStatus } : {}),
         reviewSubmittedAt,
@@ -1056,9 +1085,21 @@ export function createPublishedCreator(
     mediaItems: getPublishedCreatorMediaItems(profile),
     name: profile.name,
     note: firstSeat?.description ?? profile.bio,
-    objectPosition: "50% 50%",
+    objectPosition: getProfileImageObjectPosition({
+      profileImagePositionX: profile.profileImagePositionX,
+      profileImagePositionY: profile.profileImagePositionY,
+    }),
     offer: profile.offer || firstSeat?.name || "Private advice seat",
     price: firstSeat?.price ?? "Soon",
+    profileImagePositionX: getProfileImagePercentValue(
+      profile.profileImagePositionX,
+      50,
+    ),
+    profileImagePositionY: getProfileImagePercentValue(
+      profile.profileImagePositionY,
+      50,
+    ),
+    profileImageZoom: getProfileImageZoomValue(profile.profileImageZoom, 100),
     profile: {
       about,
       announcement: "Now booking on Take a Seat",
@@ -1219,22 +1260,24 @@ export async function saveCreatorAvailability(input: CreatorAvailabilityInput) {
     .delete(creatorAvailabilityRules)
     .where(eq(creatorAvailabilityRules.creatorId, input.creatorId));
 
-  await db.insert(creatorAvailabilityRules).values(
-    input.rules.map((rule) => ({
-      bufferMinutes: input.bufferMinutes,
-      createdAt: now,
-      creatorId: input.creatorId,
-      dayOfWeek: rule.dayOfWeek,
-      enabled: true,
-      endTime: rule.endTime,
-      maxBookingsPerDay: input.maxBookingsPerDay,
-      maxBookingsPerWeek: input.maxBookingsPerWeek,
-      minNoticeMinutes: input.minNoticeMinutes,
-      startTime: rule.startTime,
-      timezone: input.timezone,
-      updatedAt: now,
-    })),
-  );
+  if (input.rules.length > 0) {
+    await db.insert(creatorAvailabilityRules).values(
+      input.rules.map((rule) => ({
+        bufferMinutes: input.bufferMinutes,
+        createdAt: now,
+        creatorId: input.creatorId,
+        dayOfWeek: rule.dayOfWeek,
+        enabled: true,
+        endTime: rule.endTime,
+        maxBookingsPerDay: input.maxBookingsPerDay,
+        maxBookingsPerWeek: input.maxBookingsPerWeek,
+        minNoticeMinutes: input.minNoticeMinutes,
+        startTime: rule.startTime,
+        timezone: input.timezone,
+        updatedAt: now,
+      })),
+    );
+  }
 }
 
 export async function listCreatorAvailabilityRules(creatorId: string) {
@@ -1514,10 +1557,10 @@ function getAvailabilityRules(value: string | null): CreatorAvailabilityRuleInpu
     let previousSlot = sortedSlots[0];
 
     for (const slot of sortedSlots.slice(1)) {
-      if (slot !== addMinutes(previousSlot, 30)) {
+      if (slot !== addMinutes(previousSlot, 15)) {
         rules.push({
           dayOfWeek,
-          endTime: addMinutes(previousSlot, 30),
+          endTime: addMinutes(previousSlot, 15),
           startTime: rangeStart,
         });
         rangeStart = slot;
@@ -1529,7 +1572,7 @@ function getAvailabilityRules(value: string | null): CreatorAvailabilityRuleInpu
     if (rangeStart && previousSlot) {
       rules.push({
         dayOfWeek,
-        endTime: addMinutes(previousSlot, 30),
+        endTime: addMinutes(previousSlot, 15),
         startTime: rangeStart,
       });
     }

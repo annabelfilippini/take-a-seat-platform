@@ -1,6 +1,6 @@
 # Take a Seat Control Map
 
-Last updated: 2026-09-11
+Last updated: 2026-09-12
 
 This is the working source of truth for Take a Seat while the product is being
 organized. It should stay short, current, and operational.
@@ -150,6 +150,7 @@ Payments:
 D1 should own operational marketplace state:
 
 - Creator applications and published profile fields.
+- Creator profile image crop position and zoom.
 - Creator account links to Clerk users.
 - Creator invite tokens.
 - Creator Google Calendar connections.

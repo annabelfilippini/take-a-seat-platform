@@ -2,56 +2,23 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { PageHeader } from "../_components/PageHeader";
 
-/* eslint-disable @next/next/no-img-element */
-
 export const metadata: Metadata = {
-  title: "Our Mission | Take a Seat",
+  title: "About | Take a Seat",
   description:
     "Take a Seat helps you meet 1:1 with influencers whose style, beauty, and brand knowledge you already trust.",
 };
 
-const missionBelievers = [
-  {
-    image: "/ella-profile.jpg",
-    name: "Ella McLane",
-    role: "Outfits, shopping carts, and vacation packing",
-    position: "50% 50%",
-  },
-];
-
 export default function AboutPage() {
   return (
     <main className="about-page">
-      <PageHeader ctaLabel="Find a Seat" navLabel="Mission page navigation" />
+      <PageHeader ctaLabel="Find a Seat" navLabel="About page navigation" />
 
       <section className="about-mission" aria-labelledby="mission-heading">
-        <span>Our mission</span>
+        <span>Take a Seat</span>
         <h1 id="mission-heading">
           A platform built to make you feel cute, confident, and inspired.
         </h1>
         <p>Come take a seat with us.</p>
-      </section>
-
-      <section className="about-believers" aria-labelledby="believers-heading">
-        <div className="about-section-heading">
-          <h2 id="believers-heading">First seats</h2>
-          <p>
-            Meet 1:1 with the people whose knowledge you already look up to.
-          </p>
-        </div>
-        <div className="about-believer-grid">
-          {missionBelievers.map((item) => (
-            <article className="about-believer-card" key={item.name}>
-              <img
-                alt=""
-                src={item.image}
-                style={{ objectPosition: item.position }}
-              />
-              <strong>{item.name}</strong>
-              <span>{item.role}</span>
-            </article>
-          ))}
-        </div>
       </section>
 
       <section className="about-story" aria-labelledby="story-heading">
