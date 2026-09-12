@@ -22,6 +22,7 @@ type SignInClerkScreenProps = {
   phoneLabel?: string;
   redirectUrl?: string;
   routeByAccount?: boolean;
+  showSignedInContinue?: boolean;
   submitLabel?: string;
 };
 
@@ -43,6 +44,7 @@ export function SignInClerkScreen({
   phoneLabel = "Phone number",
   redirectUrl,
   routeByAccount = false,
+  showSignedInContinue = true,
   submitLabel = "Send code",
 }: SignInClerkScreenProps) {
   const {
@@ -321,8 +323,10 @@ export function SignInClerkScreen({
       <div id="clerk-captcha" />
       {requestStalled && submitting ? <p className="phone-auth-error" role="alert">The verification service is taking too long. Complete any browser security check, or <a href={typeof window === "undefined" ? "/sign-in" : window.location.href}>reload and try again</a>.</p> : null}
       {isSignedIn ? <div className="phone-auth-heading">
-        <p>You are already signed in. Continue to your profile, or use a different account.</p>
-        <a className="phone-auth-submit" href={targetUrl}>Continue to my profile</a>
+        <p>{showSignedInContinue
+          ? "You are already signed in. Continue to your profile, or use a different account."
+          : "Use a different account to sign in with your accepted application email."}</p>
+        {showSignedInContinue ? <a className="phone-auth-submit" href={targetUrl}>Continue to my profile</a> : null}
         <button className="phone-auth-text-button" type="button" onClick={() => signOut({ redirectUrl: window.location.href })}>Use a different account</button>
       </div> : step === "code" ? (
         <form className="phone-auth-form" onSubmit={verifyPhoneCode}>

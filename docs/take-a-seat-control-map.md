@@ -106,11 +106,23 @@ Auth:
   admin phones.
 - Creator access is based on accepted creator profile identity and creator
   account links in D1.
+- If an invitation matches a signed-in creator who already owns a profile from
+  an earlier application, the dashboard opens that existing profile. Duplicate
+  applications do not replace ownership or publish another card. A wrong-account
+  invitation shows account switching without a Continue link back into the error.
 
 Email:
 
 - Resend is used for transactional email.
 - Current branded sender: `Take a Seat <applications@takeaseatwith.com>`.
+- Resend requires DNS-only CNAME records in Cloudflare: `rsend` points to
+  `rsend.forge.rmta.net`, and `send` points to `send.forge.rmta.net`.
+  Both were restored on 2026-09-12; Resend reports the domain verified.
+- A successful send API response does not prove inbox delivery. Check Resend
+  email events for delivered, bounced, or suppressed status. After repairing
+  a bounce cause, clear the affected address's suppression before resending.
+- After the DNS repair and suppression cleanup, an admin setup-email resend
+  to the previously blocked test inbox was confirmed delivered in Resend.
 - Application recipient/admin email is configured through runtime values.
 - Creator applications send Annabel the admin review email and send the
   applicant a receipt email. A valid email is required to submit or accept.
