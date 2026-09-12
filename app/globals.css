@@ -5482,6 +5482,7 @@ button.availability-date-field:focus-visible {
   }
 
   .home-mobile-actions .hero-search-control {
+    color: var(--cream);
     width: 40px;
   }
 
