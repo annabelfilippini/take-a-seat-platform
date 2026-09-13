@@ -423,7 +423,8 @@ test("acceptance email keeps the one-use credential in the fragment and preserve
     assert.equal(link.searchParams.has("ticket"), false);
     assert.equal(new URLSearchParams(link.hash.slice(1)).get("ticket"), "synthetic-ticket");
     assert.deepEqual(payload.to, ["fresh@example.com"]);
-    assert.match(payload.text, /expires in 24 hours/);
+    assert.match(payload.text, /^Hi!\n/);
+    assert.match(payload.text, /We can’t wait for you to begin inspiring!!!/);
     assert.match(payload.html, /#ticket=synthetic-ticket&amp;email=/);
   } finally { globalThis.fetch = originalFetch; delete process.env.RESEND_API_KEY; delete process.env.TAKE_A_SEAT_EMAIL_FROM; }
 });
