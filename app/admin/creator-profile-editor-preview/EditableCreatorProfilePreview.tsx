@@ -129,19 +129,6 @@ type AvailabilityTimeSlot = {
   value: string;
 };
 
-type AvailabilityMonthOption = {
-  label: string;
-  month: number;
-  value: string;
-  year: number;
-};
-
-type AvailabilityWeekDay = {
-  dateLabel: string;
-  label: string;
-  value: number;
-};
-
 const availabilityTimeSlots = createAvailabilityTimeSlots(8, 21);
 const timezoneOptions = [
   "America/Los_Angeles",
@@ -1059,24 +1046,8 @@ function EditableAvailabilityPanel({
 }) {
   const calendarConnected = Boolean(calendarConnectedAt);
   const [timezone, setTimezone] = useState(initialTimezone);
-  const [today] = useState(() => new Date());
-  const [monthOptions] = useState(() => createAvailabilityMonthOptions(today, 13));
-  const firstMonth = monthOptions[0];
-  const firstWeek = createAvailabilityWeekOptionFromStart(getWeekStart(today));
-  const earliestWeekValue = firstWeek.value;
-  const [visibleMonthValue, setVisibleMonthValue] = useState(firstMonth?.value ?? "");
-  const [selectedWeekValue, setSelectedWeekValue] = useState(firstWeek?.value ?? "");
-  const [datePickerOpen, setDatePickerOpen] = useState(false);
-  const initialSlotKeys = useMemo(
-    () => getAvailabilitySlotKeysFromRules(initialRules),
-    [initialRules],
-  );
-  const [savedSlotKeys, setSavedSlotKeys] = useState(() => initialSlotKeys);
-  const [availabilityByWeek, setAvailabilityByWeek] = useState<Record<string, string[]>>(
-    () => ({
-      [firstWeek?.value ?? ""]:
-        initialSlotKeys.length > 0 ? initialSlotKeys : getDefaultAvailabilitySlotKeys(),
-    }),
+  const [selectedSlots, setSelectedSlots] = useState(
+    () => new Set(getAvailabilitySlotKeysFromRules(initialRules)),
   );
   const [saveStatus, setSaveStatus] = useState<"error" | "idle" | "saved" | "saving">(
     initialRules.length > 0 ? "saved" : "idle",
@@ -1085,59 +1056,6 @@ function EditableAvailabilityPanel({
   const paintStartRef = useRef<{ dayOfWeek: number; slotIndex: number } | null>(null);
   const paintedSlotsRef = useRef<Set<string>>(new Set());
 
-  const visibleMonth = monthOptions.find(
-    (option) => option.value === visibleMonthValue,
-  );
-  const visibleMonthIndex = monthOptions.findIndex(
-    (option) => option.value === visibleMonthValue,
-  );
-  const selectedWeek = useMemo(
-    () =>
-      selectedWeekValue
-        ? createAvailabilityWeekOptionFromStart(new Date(`${selectedWeekValue}T00:00:00`))
-        : firstWeek,
-    [firstWeek, selectedWeekValue],
-  );
-  const selectedSlots = useMemo(
-    () =>
-      new Set(
-        availabilityByWeek[selectedWeek?.value ?? ""] ?? savedSlotKeys,
-      ),
-    [availabilityByWeek, savedSlotKeys, selectedWeek],
-  );
-  const selectedWeekDays = selectedWeek?.days ?? availabilityDays.map((day) => ({
-    ...day,
-    dateLabel: "",
-  }));
-  const selectedWeekLabel = selectedWeek
-    ? formatAvailabilityWeekRange(selectedWeek.days)
-    : "Select a week";
-
-  function updateVisibleMonth(value: string) {
-    setVisibleMonthValue(value);
-  }
-
-  function moveVisibleMonth(direction: -1 | 1) {
-    const nextMonth = monthOptions[visibleMonthIndex + direction];
-
-    if (nextMonth) {
-      updateVisibleMonth(nextMonth.value);
-    }
-  }
-
-  function selectCalendarWeek(weekValue: string) {
-    setAvailabilityByWeek((current) =>
-      current[weekValue]
-        ? current
-        : {
-            ...current,
-            [weekValue]: savedSlotKeys,
-          },
-    );
-    setSelectedWeekValue(weekValue);
-    setDatePickerOpen(false);
-  }
-
   function paintSlot(key: string, action: "clear" | "select") {
     if (paintedSlotsRef.current.has(key)) {
       return;
@@ -1145,20 +1063,16 @@ function EditableAvailabilityPanel({
 
     paintedSlotsRef.current.add(key);
 
-    setAvailabilityByWeek((current) => {
-      const weekValue = selectedWeek?.value ?? "";
-      const nextWeekSlots = new Set(current[weekValue] ?? []);
+    setSelectedSlots((current) => {
+      const nextSlots = new Set(current);
 
       if (action === "clear") {
-        nextWeekSlots.delete(key);
+        nextSlots.delete(key);
       } else {
-        nextWeekSlots.add(key);
+        nextSlots.add(key);
       }
 
-      return {
-        ...current,
-        [weekValue]: sortAvailabilitySlotKeys(Array.from(nextWeekSlots)),
-      };
+      return nextSlots;
     });
     setSaveStatus("idle");
   }
@@ -1196,7 +1110,7 @@ function EditableAvailabilityPanel({
   }
 
   function handleAvailabilityPointerDown(event: PointerEvent<HTMLDivElement>) {
-    if (event.button !== 0 && event.pointerType === "mouse") {
+    if (saveStatus === "saving" || event.pointerType === "touch" || event.button !== 0) {
       return;
     }
 
@@ -1284,18 +1198,6 @@ function EditableAvailabilityPanel({
         throw new Error("Availability save failed.");
       }
 
-      const nextSavedSlotKeys = sortAvailabilitySlotKeys(Array.from(selectedSlots));
-      setSavedSlotKeys(nextSavedSlotKeys);
-      setAvailabilityByWeek((current) => {
-        const weekValue = selectedWeek?.value ?? "";
-        const nextAvailability = Object.fromEntries(
-          Object.keys(current).map((key) => [key, nextSavedSlotKeys]),
-        );
-
-        return weekValue
-          ? { ...nextAvailability, [weekValue]: nextSavedSlotKeys }
-          : nextAvailability;
-      });
       setSaveStatus("saved");
     } catch {
       setSaveStatus("error");
@@ -1306,7 +1208,7 @@ function EditableAvailabilityPanel({
     <div className="editable-editor-panel editable-wide-editor-panel">
       <div className="creator-form-header">
         <div className="editable-section-heading">
-          <h2>Availability</h2>
+          <h2>Weekly availability</h2>
         </div>
         <div className="editable-save-status-group">
           <span className={saveStatus === "saved" ? "dashboard-status-complete" : "dashboard-status"}>
@@ -1329,66 +1231,18 @@ function EditableAvailabilityPanel({
         </div>
       </div>
 
-      <section className="availability-date-picker" aria-label="Select availability week">
-        <button
-          aria-expanded={datePickerOpen}
-          className="availability-date-field"
-          onClick={() => setDatePickerOpen((current) => !current)}
-          type="button"
-        >
-          <span>Select date</span>
-          <strong>{selectedWeekLabel}</strong>
-          <span aria-hidden="true" className="availability-date-icon" />
-        </button>
-        {datePickerOpen ? (
-          <div className="availability-date-panel">
-            <div className="availability-calendar-nav">
-              <button
-                aria-label="Previous month"
-                disabled={visibleMonthIndex <= 0}
-                onClick={() => moveVisibleMonth(-1)}
-                type="button"
-              >
-                ‹
-              </button>
-              <select
-                aria-label="Visible month"
-                className="editable-profile-field editable-basic-input"
-                value={visibleMonthValue}
-                onChange={(event) => updateVisibleMonth(event.target.value)}
-              >
-                {monthOptions.map((month) => (
-                  <option key={month.value} value={month.value}>
-                    {month.label}
-                  </option>
-                ))}
-              </select>
-              <button
-                aria-label="Next month"
-                disabled={visibleMonthIndex >= monthOptions.length - 1}
-                onClick={() => moveVisibleMonth(1)}
-                type="button"
-              >
-                ›
-              </button>
-            </div>
-            {visibleMonth ? (
-              <AvailabilityMonthCalendar
-                earliestWeekValue={earliestWeekValue}
-                month={visibleMonth}
-                selectedWeekValue={selectedWeek?.value ?? ""}
-                selectWeek={selectCalendarWeek}
-              />
-            ) : null}
-          </div>
-        ) : null}
-      </section>
+      <p className="availability-instructions" id="weekly-availability-help">
+        These hours repeat every week in your selected timezone. Select the times
+        you can take calls, then save your availability. Tap a time to select it,
+        or use a mouse to drag across several times.
+      </p>
 
       <div className="availability-settings-row">
         <label className="availability-timezone-picker">
           <span>Timezone</span>
           <input
             className="editable-profile-field editable-basic-input"
+            disabled={saveStatus === "saving"}
             list="creator-timezone-options"
             placeholder="Search timezone"
             value={timezone}
@@ -1406,13 +1260,12 @@ function EditableAvailabilityPanel({
       </div>
 
       <div className="creator-availability-box">
-        <div className="availability-calendar">
+        <div className="availability-calendar" aria-describedby="weekly-availability-help">
           <div className="availability-days-row">
             <span className="availability-grid-corner">Time</span>
-            {selectedWeekDays.map((day) => (
+            {availabilityDays.map((day) => (
               <span className="availability-day-heading" key={day.value}>
                 <strong>{day.label}</strong>
-                <span>{day.dateLabel}</span>
               </span>
             ))}
           </div>
@@ -1425,6 +1278,7 @@ function EditableAvailabilityPanel({
           >
             {availabilityTimeSlots.map((slot, slotIndex) => (
               <EditableAvailabilityRow
+                disabled={saveStatus === "saving"}
                 key={slot.value}
                 selectedSlots={selectedSlots}
                 slot={slot}
@@ -1448,68 +1302,14 @@ function EditableAvailabilityPanel({
   );
 }
 
-function AvailabilityMonthCalendar({
-  earliestWeekValue,
-  month,
-  selectedWeekValue,
-  selectWeek,
-}: {
-  earliestWeekValue: string;
-  month: AvailabilityMonthOption;
-  selectedWeekValue: string;
-  selectWeek: (weekValue: string) => void;
-}) {
-  const days = createAvailabilityCalendarDays(
-    month.year,
-    month.month,
-    selectedWeekValue,
-  );
-
-  return (
-    <div className="availability-month-calendar">
-      <h3>{month.label}</h3>
-      <div className="availability-month-weekdays" aria-hidden="true">
-        {availabilityDays.map((day) => (
-          <span key={day.value}>{day.label.slice(0, 2)}</span>
-        ))}
-      </div>
-      <div className="availability-month-grid">
-        {days.map((day) => {
-          const disabled = day.weekValue < earliestWeekValue;
-          const classNames = [
-            "availability-date-button",
-            day.inVisibleMonth ? "" : "muted",
-            day.isSelectedWeek ? "selected" : "",
-            day.dayOfWeek === 0 ? "week-start" : "",
-            day.dayOfWeek === 6 ? "week-end" : "",
-          ]
-            .filter(Boolean)
-            .join(" ");
-
-          return (
-            <button
-              aria-pressed={day.isSelectedWeek}
-              className={classNames}
-              disabled={disabled}
-              key={day.dateKey}
-              onClick={() => selectWeek(day.weekValue)}
-              type="button"
-            >
-              {day.dayNumber}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
 function EditableAvailabilityRow({
+  disabled,
   selectedSlots,
   slot,
   slotIndex,
   toggleSlot,
 }: {
+  disabled: boolean;
   selectedSlots: Set<string>;
   slot: AvailabilityTimeSlot;
   slotIndex: number;
@@ -1545,10 +1345,18 @@ function EditableAvailabilityRow({
             aria-pressed={selected}
             className={classNames}
             data-availability-key={key}
+            disabled={disabled}
             key={day.value}
-            onKeyDown={(event) => {
-              if (event.key === " " || event.key === "Enter") {
-                event.preventDefault();
+            onPointerUp={(event) => {
+              // Scrolling cancels touch pointers; only a completed tap toggles.
+              if (event.pointerType === "touch" && !disabled) {
+                toggleSlot(day.value, slot.value);
+              }
+            }}
+            onClick={(event) => {
+              // Pointer selection is handled above; native clicks cover
+              // keyboard and assistive input without toggling a pointer twice.
+              if (event.detail === 0) {
                 toggleSlot(day.value, slot.value);
               }
             }}
@@ -2020,50 +1828,14 @@ function formatDurationLabel(value: EditableDurationValue) {
   return `${minutes} ${minutes === 1 ? "minute" : "minutes"}`;
 }
 
-function getDefaultAvailabilitySlotKeys() {
-  return [
-    "2|10:00",
-    "2|10:15",
-    "2|10:30",
-    "2|10:45",
-    "2|11:00",
-    "2|11:15",
-    "2|11:30",
-    "2|11:45",
-    "4|14:00",
-    "4|14:15",
-    "4|14:30",
-    "4|14:45",
-    "4|15:00",
-    "4|15:15",
-    "4|15:30",
-    "4|15:45",
-    "4|16:00",
-    "4|16:15",
-    "4|16:30",
-    "4|16:45",
-  ];
-}
-
 function getAvailabilitySlotKeysFromRules(rules: EditableAvailabilityRule[]) {
   const slotKeys = rules.flatMap((rule) => {
     if (rule.enabled === false) {
       return [];
     }
 
-    const startIndex = availabilityTimeSlots.findIndex(
-      (slot) => slot.value === rule.startTime,
-    );
-    const endIndex = availabilityTimeSlots.findIndex(
-      (slot) => slot.value === rule.endTime,
-    );
-
-    if (startIndex < 0 || endIndex < 0 || endIndex <= startIndex) {
-      return [];
-    }
-
     return availabilityTimeSlots
-      .slice(startIndex, endIndex)
+      .filter((slot) => slot.value >= rule.startTime && slot.value < rule.endTime)
       .map((slot) => getAvailabilitySlotKey(rule.dayOfWeek, slot.value));
   });
 
@@ -2184,124 +1956,6 @@ function createAvailabilityTimeSlots(startHour: number, endHour: number) {
   }
 
   return slots;
-}
-
-function createAvailabilityMonthOptions(
-  startDate: Date,
-  monthCount: number,
-): AvailabilityMonthOption[] {
-  const startMonth = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
-
-  return Array.from({ length: monthCount }, (_, index) => {
-    const date = new Date(startMonth.getFullYear(), startMonth.getMonth() + index, 1);
-
-    return {
-      label: date.toLocaleDateString("en-US", {
-        month: "long",
-        year: "numeric",
-      }),
-      month: date.getMonth(),
-      value: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`,
-      year: date.getFullYear(),
-    };
-  });
-}
-
-function createAvailabilityWeekOptionFromStart(weekStart: Date) {
-  const cleanWeekStart = getWeekStart(weekStart);
-  const weekEnd = addDays(cleanWeekStart, 6);
-
-  return {
-    days: createAvailabilityWeekDays(cleanWeekStart),
-    label: `${formatAvailabilityWeekDay(cleanWeekStart)}-${formatAvailabilityWeekDay(weekEnd)}`,
-    value: formatDateKey(cleanWeekStart),
-  };
-}
-
-function createAvailabilityWeekDays(weekStart: Date) {
-  return availabilityDays.map((day) => {
-    const date = addDays(weekStart, day.value);
-
-    return {
-      dateLabel: date.toLocaleDateString("en-US", {
-        day: "numeric",
-        month: "short",
-      }),
-      label: day.label,
-      value: day.value,
-    };
-  });
-}
-
-function createAvailabilityCalendarDays(
-  year: number,
-  month: number,
-  selectedWeekValue: string,
-) {
-  const firstDayOfMonth = new Date(year, month, 1);
-  const lastDayOfMonth = new Date(year, month + 1, 0);
-  const calendarStart = getWeekStart(firstDayOfMonth);
-  const calendarEnd = addDays(getWeekStart(lastDayOfMonth), 6);
-  const days: Array<{
-    dateKey: string;
-    dayNumber: number;
-    dayOfWeek: number;
-    inVisibleMonth: boolean;
-    isSelectedWeek: boolean;
-    weekValue: string;
-  }> = [];
-
-  for (
-    let currentDate = calendarStart;
-    currentDate <= calendarEnd;
-    currentDate = addDays(currentDate, 1)
-  ) {
-    const weekValue = formatDateKey(getWeekStart(currentDate));
-
-    days.push({
-      dateKey: formatDateKey(currentDate),
-      dayNumber: currentDate.getDate(),
-      dayOfWeek: currentDate.getDay(),
-      inVisibleMonth: currentDate.getMonth() === month,
-      isSelectedWeek: weekValue === selectedWeekValue,
-      weekValue,
-    });
-  }
-
-  return days;
-}
-
-function getWeekStart(date: Date) {
-  return addDays(date, -date.getDay());
-}
-
-function addDays(date: Date, dayCount: number) {
-  const nextDate = new Date(date);
-  nextDate.setDate(nextDate.getDate() + dayCount);
-
-  return nextDate;
-}
-
-function formatDateKey(date: Date) {
-  return [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, "0"),
-    String(date.getDate()).padStart(2, "0"),
-  ].join("-");
-}
-
-function formatAvailabilityWeekDay(date: Date) {
-  return date.toLocaleDateString("en-US", {
-    day: "numeric",
-    month: "short",
-  });
-}
-
-function formatAvailabilityWeekRange(days: AvailabilityWeekDay[]) {
-  const firstDay = days[0]?.dateLabel ?? "";
-  const lastDay = days[days.length - 1]?.dateLabel ?? "";
-
-  return `${firstDay} - ${lastDay}`;
 }
 
 function formatAvailabilityTime(value: string) {
