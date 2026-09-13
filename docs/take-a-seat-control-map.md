@@ -156,10 +156,12 @@ Payments:
 
 - Launch status: payment repairs are deployed from main `86a8fbe`; the test
   webhook subscribes to all six payment events and a signed sandbox delivery
-  returned HTTP 200. Live Connect's saved draft remains unresolved; no live
-  creator account or webhook is configured. A full booking/calendar rehearsal
-  is still required. See `docs/stripe-launch-readiness-2026-09-12.md` for evidence
-  and the remaining setup and approval blocks.
+  returned HTTP 200. Live Connect is accepted and live account creation is
+  enabled. The live webhook exists but is disabled; its signing secret is saved
+  under the staging name `STRIPE_LIVE_WEBHOOK_SECRET`, which current code does
+  not read. Live credentials, the first creator's account, deployment approval,
+  and a full booking/calendar rehearsal remain. See
+  `docs/stripe-launch-readiness-2026-09-12.md` for evidence and launch gates.
 
 - Stripe Connect is the chosen marketplace payment model.
 - Creators use Express connected accounts with Stripe-hosted onboarding and the
