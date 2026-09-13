@@ -154,9 +154,12 @@ Calendar:
 
 Payments:
 
-- Launch status: live Connect setup is incomplete and no live creator account or
-  webhook is configured. See `docs/stripe-launch-readiness-2026-09-12.md` for the
-  verified audit, prepared repairs, required event subscriptions, and launch gates.
+- Launch status: payment repairs are deployed from main `86a8fbe`; the test
+  webhook subscribes to all six payment events and a signed sandbox delivery
+  returned HTTP 200. Live Connect's saved draft remains unresolved; no live
+  creator account or webhook is configured. A full booking/calendar rehearsal
+  is still required. See `docs/stripe-launch-readiness-2026-09-12.md` for evidence
+  and the remaining setup and approval blocks.
 
 - Stripe Connect is the chosen marketplace payment model.
 - Creators use Express connected accounts with Stripe-hosted onboarding and the
