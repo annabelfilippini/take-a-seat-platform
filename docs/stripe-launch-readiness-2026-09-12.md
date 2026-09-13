@@ -16,22 +16,24 @@ creator will use a United States payout account, as confirmed by Annabel.
   six events listed below. A Stripe Shell sandbox `payment_intent.succeeded`
   event reached the deployed Worker and returned HTTP 200 with `received: true`.
   This verifies signed transport, not a complete booking or creator transfer.
-- Live Stripe Connect still has no connected accounts and account creation is
-  disabled. Annabel reports completing setup several times. The dashboard
-  initially showed Confirm final details; editing the industry from Website
-  building or hosting to On-demand services reopened the platform questionnaire.
-  It now shows two remaining steps. Do not assume Annabel skipped onboarding or
-  ask her to repeat the entire flow; inspect and resolve this saved draft.
-- Buyers purchasing from the platform and sellers being paid individually were
-  present in the initial summary. Stripe-hosted onboarding remains selected.
-  Automatic approval review blocked advancing the edited Connect configuration
-  because it changes consequential account settings that become locked.
-- Live Workbench has no event destination. A form is prepared for
+- Live Connect configuration was finalized with Annabel's explicit approval:
+  buyers purchase from the platform, sellers are paid individually, industry is
+  On-demand services, onboarding is hosted by Stripe, and sellers use Express.
+  The live connected-accounts page now enables Create. Annabel also confirmed
+  Stripe accepted Connect. There are still zero live connected accounts.
+- Live destination `we_1UF12i1B3wHKPpd6xd7cxxJt` now exists at
   `https://takeaseatwith.com/api/stripe/webhook`, named Take a Seat live payments,
-  using API version `2026-08-26.dahlia` and all six events below. Creation was
-  blocked by automatic approval review because it would enable live delivery
-  before the live signing secret, API key, and creator payout readiness were
-  verified. The endpoint was not created and no live secrets were changed.
+  using API version `2026-08-26.dahlia` and all six events below. It is disabled
+  pending the live credential switch, creator readiness, and booking rehearsal.
+- Its signing secret was saved encrypted in Cloudflare using the save-only
+  action as `STRIPE_LIVE_WEBHOOK_SECRET`. This is a staging name, not a binding
+  consumed by the current code. The runtime still reads `STRIPE_WEBHOOK_SECRET`.
+  Do not treat this saved value as an active live-mode configuration or enable
+  the live webhook yet. `STRIPE_SECRET_KEY` was not replaced or live-verified.
+- Automatic approval review initially blocked an ambiguous secret-reveal
+  selector; a refreshed tab and exact screenshot target resolved that ambiguity.
+  It separately blocked Add variable and deploy as requiring specific production
+  deployment approval. Save-only succeeded; no deployment was performed here.
 - No Google Calendar connection or weekly availability is saved for the current
   sandbox creator. Its profile remains private. These prerequisites prevent a
   full public booking and calendar rehearsal; no profile was published for QA.
@@ -60,30 +62,29 @@ deployed to production. Cloudflare Worker version:
 `7d958e65-5675-450d-b351-d0e45e9231fd`. This main commit also includes PR #10's
 creator invitation recovery. Required Worker secret names were verified and D1
 reported no pending migrations before deployment. No migration was required by
-the payment fixes. No real payment, refund, live key change, or account activation
-was performed. Stripe Shell created only a sandbox payment fixture.
+the payment fixes. No real payment, refund, or runtime key switch was performed.
+Stripe Shell created only a sandbox payment fixture. Connect finalization and
+the disabled live destination were completed afterward as described above.
 
 ## Required next steps
 
-1. Resolve the pending Connect draft without repeating completed onboarding.
-   Obtain approval for the specific edited industry and locked configuration
-   before advancing the action blocked by automatic approval review.
-2. Connect the sandbox creator's Google Calendar, save real test availability,
+1. Connect the sandbox creator's Google Calendar, save real test availability,
    and prepare a reviewable profile. Complete a real Stripe sandbox booking
    through the app before switching the runtime to live mode.
-3. Provision the corresponding live Worker key and a separate live webhook
-   signing secret. Verify the key belongs to the intended platform and has the
+2. Provision the corresponding live Worker key and install the staged webhook
+   signing secret under the runtime binding. Verify the key belongs to the intended platform and has the
    required Checkout, PaymentIntent read/capture, Accounts v2, and account-link
    permissions. Do not reuse test Price IDs or test connected-account IDs.
-4. Resolve the live-webhook approval block and create the destination for
-   `https://takeaseatwith.com/api/stripe/webhook` with:
+3. Obtain the specific deployment approval requested by automatic review before
+   activating the live configuration. Enable the existing live destination only
+   when runtime credentials and launch checks are ready. Its subscriptions are:
    `checkout.session.completed`, `checkout.session.async_payment_succeeded`,
    `checkout.session.expired`, `payment_intent.amount_capturable_updated`,
    `payment_intent.succeeded`, and `payment_intent.canceled`.
-5. Have the first creator complete live Stripe-hosted onboarding, including their
+4. Have the first creator complete live Stripe-hosted onboarding, including their
    own identity and bank details. Verify transfer capability and payout readiness
    in Stripe, rather than relying only on a successful return redirect.
-6. Rehearse buyer Checkout authorization, creator acceptance/capture, correct 15%
+5. Rehearse buyer Checkout authorization, creator acceptance/capture, correct 15%
    application fee and creator transfer, webhook delivery, notifications, and
    calendar confirmation. Rehearse decline, expiry, repeated delivery and refund
    with transfer reversal in test mode. A real-money check requires separate
