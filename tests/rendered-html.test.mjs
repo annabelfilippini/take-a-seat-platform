@@ -828,7 +828,7 @@ test("notifies accepted creators in email, text, and profile", async () => {
   assert.match(email, /Click this link to start working on your profile/);
   assert.match(email, /Start working on your profile/);
   assert.match(email, /email address from your accepted application/);
-  assert.match(email, /take you to your creator account/);
+  assert.match(email, /We can’t wait for you to begin inspiring!!!/);
   assert.match(email, /globalThis/);
   assert.match(email, /workerEnv/);
   assert.match(email, /CREATOR_PROFILE_EDITOR_URL\}\?invite=/);
@@ -856,7 +856,8 @@ test("sends creator-facing application receipt emails", async () => {
   assert.match(profileRoute, /Promise\.all/);
   assert.match(profileRoute, /creatorEmail: creatorEmail\.status/);
   assert.match(email, /We received your Take a Seat creator application/);
-  assert.match(email, /edit your starter profile/);
+  assert.match(email, /Thank you for applying to Take a Seat!/);
+  assert.match(email, /sign in and start building your profile!/);
   assert.match(email, /missing-recipient/);
   assert.match(onboardingPage, /creatorEmail: getStatus\(searchParams\?\.creatorEmail\)/);
   assert.match(onboardingForm, /confirmation email/i);

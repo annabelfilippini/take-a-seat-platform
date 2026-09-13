@@ -128,21 +128,20 @@ export async function sendCreatorApplicationReceivedEmail({
     return { reason: "missing-recipient", status: "skipped" };
   }
 
-  const firstName = input.name.trim().split(/\s+/u)[0] || "there";
   const subject = "We received your Take a Seat application";
   const text = [
-    `Hi ${firstName},`,
+    "Thank you for applying to Take a Seat!",
     "",
-    "We received your Take a Seat creator application. Annabel will review it and follow up by email.",
+    "We received your Take a Seat creator application.",
     "",
-    "If your application is accepted, you will receive a private setup link to sign in with an email verification code and edit your starter profile before anything goes live.",
+    "If your application is accepted, you will receive a setup link to sign in and start building your profile!",
     "",
     "Annabel",
   ].join("\n");
   const html = [
-    `<p>Hi ${escapeHtml(firstName)},</p>`,
-    "<p>We received your Take a Seat creator application. Annabel will review it and follow up by email.</p>",
-    "<p>If your application is accepted, you will receive a private setup link to sign in with an email verification code and edit your starter profile before anything goes live.</p>",
+    "<p>Thank you for applying to Take a Seat!</p>",
+    "<p>We received your Take a Seat creator application.</p>",
+    "<p>If your application is accepted, you will receive a setup link to sign in and start building your profile!</p>",
     "<p>Annabel</p>",
   ].join("");
 
@@ -160,7 +159,6 @@ export async function sendCreatorAcceptedEmail({
   email,
   emailNonce,
   inviteToken,
-  name,
   request,
   signInToken,
 }: CreatorAcceptedEmail): Promise<EmailResult> {
@@ -170,26 +168,28 @@ export async function sendCreatorAcceptedEmail({
       ? `/creators/email-sign-in?invite=${encodeURIComponent(inviteToken)}#${new URLSearchParams({ ticket: signInToken, email }).toString()}`
       : `${CREATOR_PROFILE_EDITOR_URL}?invite=${encodeURIComponent(inviteToken)}`,
   );
-  const instructions = signInToken
-    ? "This private link signs you in and opens your creator profile. It works once and expires in 24 hours. After that, you can sign in with an email code. If you already have a profile, your saved work will open. Save your profile when you are ready for your card to appear on the website."
-    : "Sign in with the email address from your accepted application. We will email you a verification code, then take you to your creator account. Save your profile when you are ready for your card to appear on the website.";
-  const firstName = name.trim().split(/\s+/u)[0] || "there";
   const subject = "Congratulations! You've been accepted into Take a Seat";
   const text = [
-    `Hi ${firstName},`,
+    "Hi!",
     "",
     "Congratulations! You've been accepted into Take a Seat. Click this link to start working on your profile.",
     "",
     `Start working on your profile: ${setupUrl}`,
-    instructions,
+    "Sign in with the email address from your accepted application.",
+    "",
+    "Save your profile when you are ready for your card to appear on the website.",
+    "",
+    "We can’t wait for you to begin inspiring!!!",
     "",
     "Annabel",
   ].join("\n");
   const html = [
-    `<p>Hi ${escapeHtml(firstName)},</p>`,
+    "<p>Hi!</p>",
     "<p>Congratulations! You've been accepted into Take a Seat. Click this link to start working on your profile.</p>",
     `<p><a href="${escapeHtml(setupUrl)}">Start working on your profile</a></p>`,
-    `<p>${escapeHtml(instructions)}</p>`,
+    "<p>Sign in with the email address from your accepted application.</p>",
+    "<p>Save your profile when you are ready for your card to appear on the website.</p>",
+    "<p>We can’t wait for you to begin inspiring!!!</p>",
     "<p>Annabel</p>",
   ].join("");
 
