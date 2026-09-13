@@ -1,7 +1,7 @@
 # Acceptance email sign-in
 
-Prepared September 13, 2026. Not deployed; production approval and live email
-rehearsal remain required.
+Deployed September 13, 2026 with Annabel’s explicit approval. The live
+acceptance-email sign-in rehearsal passed for an existing creator.
 
 Acceptance/resend now provisions an email-only Clerk identity when needed, or
 reuses the exact existing verified primary email. Clerk creates a one-use
@@ -63,3 +63,32 @@ one-use redemption. Do not save a test profile unless publication is intended.
 
 References: [Clerk sign-in tokens](https://clerk.com/docs/reference/backend/sign-in-tokens/create-sign-in-token)
 and [Clerk user provisioning](https://clerk.com/docs/reference/backend/user/create-user).
+
+
+## Production verification, September 13
+
+- PR #17 merged as `e134517`; its source tree matches tested `6857320`.
+- Deployed from clean main checkout `/private/tmp/tas-email-signin-release`.
+- Worker version `5a2e94b3-edab-4264-a398-63b3407de7cd` serves the production
+  custom domains. Previous version: `4f1d0fc8-a88c-41bf-bac8-fc70db7329f1`.
+- Public home, new email sign-in page, and dashboard entry returned HTTP 200.
+  The anonymous creator-account endpoint still returns HTTP 401.
+- Used the authenticated admin resend action for the user's accepted test
+  application. The new branded acceptance email arrived in the recipient's
+  Gmail Spam folder. Marking this expected conversation as not spam moved it
+  to Inbox; Gmail stated future mail from the sender would go to Inbox. This
+  is recipient-specific, not evidence of universal inbox placement.
+- Signed the existing creator out in Chrome, then clicked the actual newly
+  delivered email link. It established a Clerk session and opened the saved
+  profile with the exact invitation intact, without entering an email or code.
+  The sign-in ticket was removed from the destination URL.
+- The separate in-app browser admin session remained available. Chrome was
+  restored to the creator account through the tested link. No profile fields,
+  ownership links, application status or publication state were changed.
+- Sent a second acceptance email so the user has an unused link after the
+  rehearsal consumed the first one. Resend reports both messages Delivered;
+  the second message was not yet visible in the refreshed Gmail Inbox during
+  the final check, so inbox placement is not confirmed for that replacement.
+- A genuinely new live creator was not provisioned in this rehearsal. New-user
+  provisioning and private blank-profile behavior are covered by automated
+  tests; this live result specifically proves the repeated-email sign-in path.
