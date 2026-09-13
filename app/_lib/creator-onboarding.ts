@@ -183,8 +183,7 @@ export async function getCreatorProfileSettingsInput(
   const profileIntro = cleanField(getString(formData, "profileIntro")) ?? "";
   const bio =
     cleanField(getString(formData, "bio")) ??
-    (createCreatorCardSummary(profileIntro, about, profileDetails) ||
-      DEFAULT_CREATOR_APPLICATION_DETAILS);
+    createCreatorCardSummary(profileIntro, about);
   const uploadedProfileImage = await cleanUploadedProfileImage(
     formData.get("profileImageFile"),
   );
@@ -225,8 +224,7 @@ export async function getCreatorProfileSettingsInput(
     profileIntro,
     reviewSubmitted: formData.get("reviewSubmittedAt") === "true",
     seat15Description:
-      cleanField(getString(formData, "seat15Description")) ??
-      "A quick second opinion before someone commits.",
+      cleanField(getString(formData, "seat15Description")) ?? "",
     seat15DurationMinutes: cleanDurationMinutes(
       getString(formData, "seat15DurationMinutes"),
       15,
@@ -234,8 +232,7 @@ export async function getCreatorProfileSettingsInput(
     seat15Enabled: formData.get("seat15Enabled") === "on",
     seat15PriceAmount: cleanMoneyAmount(getString(formData, "seat15PriceAmount")),
     seat30Description:
-      cleanField(getString(formData, "seat30Description")) ??
-      "A longer private call with room to talk through the full question.",
+      cleanField(getString(formData, "seat30Description")) ?? "",
     seat30DurationMinutes: cleanDurationMinutes(
       getString(formData, "seat30DurationMinutes"),
       30,
@@ -1082,9 +1079,7 @@ export function createPublishedCreator(
   const firstSeat = seats[0] ?? null;
   const publicSlug = normalizeCreatorPublicId(profile.publicSlug) ?? profile.id;
   const intro = profile.profileIntro || profile.bio;
-  const about = splitProfileParagraphs(
-    profile.about || profile.profileDetails || profile.bio,
-  );
+  const about = splitProfileLines(profile.about || profile.bio);
   const helpItems = splitProfileLines(profile.helpItems);
   const firstName = profile.name.split(/\s+/u)[0] || profile.name;
 
@@ -1210,13 +1205,6 @@ function formatSeatPrice(unitAmount: number, currency: string) {
   } catch {
     return `$${Math.round(unitAmount / 100)}`;
   }
-}
-
-function splitProfileParagraphs(value: string | null) {
-  const paragraphs = splitProfileLines(value);
-  return paragraphs.length
-    ? paragraphs
-    : ["Bring the real question and leave with a clearer next step."];
 }
 
 function splitProfileLines(value: string | null) {

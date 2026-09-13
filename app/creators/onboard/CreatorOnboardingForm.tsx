@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
 type InitialStatuses = {
   availability: string | null;
@@ -34,14 +34,6 @@ export function CreatorOnboardingForm({
   const [expertise, setExpertise] = useState("");
 
   const name = `${firstName} ${lastName}`.trim();
-  const generated = useMemo(
-    () =>
-      generateProfileSections({
-        details: expertise,
-        name,
-      }),
-    [expertise, name],
-  );
 
   return (
     <section className="creator-apply-stage">
@@ -64,7 +56,6 @@ export function CreatorOnboardingForm({
             email={email}
             expertise={expertise}
             firstName={firstName}
-            generated={generated}
             instagramHandle={instagramHandle}
             lastName={lastName}
             name={name}
@@ -88,7 +79,6 @@ function ApplicationForm({
   email,
   expertise,
   firstName,
-  generated,
   instagramHandle,
   lastName,
   name,
@@ -105,7 +95,6 @@ function ApplicationForm({
   email: string;
   expertise: string;
   firstName: string;
-  generated: ReturnType<typeof generateProfileSections>;
   instagramHandle: string;
   lastName: string;
   name: string;
@@ -127,25 +116,14 @@ function ApplicationForm({
       className="creator-application-form"
       method="post"
     >
-      <input name="about" type="hidden" value={generated.about} />
-      <input name="bio" type="hidden" value={generated.cardSummary} />
       <input name="category" type="hidden" value="Style & Beauty" />
       <input name="currency" type="hidden" value="USD" />
-      <input name="helpItems" type="hidden" value={generated.helpItems.join("\n")} />
       <input name="instagramPlatform" type="hidden" value={primarySocialHandle} />
       <input name="location" type="hidden" value="" />
       <input name="name" type="hidden" value={name} />
-      <input name="offer" type="hidden" value="Private creator calls" />
-      <input name="profileIntro" type="hidden" value={generated.profileIntro} />
       <input name="reviewSubmittedAt" type="hidden" value="true" />
-      <input name="seat15Description" type="hidden" value={generated.seat15Description} />
       <input name="seat15DurationMinutes" type="hidden" value="15" />
-      <input name="seat15Enabled" type="hidden" value="on" />
-      <input name="seat15PriceAmount" type="hidden" value="45" />
-      <input name="seat30Description" type="hidden" value={generated.seat30Description} />
       <input name="seat30DurationMinutes" type="hidden" value="30" />
-      <input name="seat30Enabled" type="hidden" value="on" />
-      <input name="seat30PriceAmount" type="hidden" value="80" />
       <input name="timezone" type="hidden" value="America/Los_Angeles" />
 
       <div className="creator-apply-grid">
@@ -285,79 +263,4 @@ function getCreatorEmailSkipReason(detail: string | null) {
     default:
       return null;
   }
-}
-
-function generateProfileSections({
-  details,
-  name,
-}: {
-  details: string;
-  name: string;
-}) {
-  const creatorName = name.trim() || "This creator";
-  const firstName = creatorName.split(" ")[0] || "They";
-  const source =
-    details.trim() ||
-    "Followers can bring focused style questions and get a practical second opinion.";
-  const firstSentence = getFirstSentence(source);
-  const keywords = getKeywords(source);
-  const helpItems =
-    keywords.length >= 3
-      ? keywords.slice(0, 6).map((keyword) => `Talk through ${keyword}.`)
-      : [
-          "Decide what to do next with a focused style question.",
-          "Choose between options already in front of you.",
-          "Get a practical second opinion before spending more.",
-          "Turn scattered ideas into one clear next move.",
-        ];
-
-  return {
-    about: source,
-    cardSummary: `${creatorName} helps followers make clearer decisions in private calls.`,
-    helpItems,
-    oneToOneReason: `Sometimes followers do not need another post. They need ${firstName} to look at the real question in front of them and help them choose the next move.`,
-    profileIntro: `${creatorName} helps followers with style decisions in a private, focused call. ${firstSentence}`,
-    seat15Description:
-      "A quick second opinion for one focused question, decision, or almost-right option.",
-    seat30Description:
-      "More room to talk through a fuller question, compare options, and leave with a clearer plan.",
-  };
-}
-
-function getFirstSentence(value: string) {
-  const [sentence] = value.split(/(?<=[.!?])\s+/u);
-  return sentence ? sentence.slice(0, 220) : value.slice(0, 220);
-}
-
-function getKeywords(value: string) {
-  const stopWords = new Set([
-    "about",
-    "already",
-    "answer",
-    "because",
-    "before",
-    "between",
-    "creator",
-    "details",
-    "excited",
-    "followers",
-    "people",
-    "private",
-    "questions",
-    "really",
-    "someone",
-    "through",
-    "would",
-  ]);
-
-  return Array.from(
-    new Set(
-      value
-        .toLowerCase()
-        .replace(/[^a-z0-9\s-]/g, " ")
-        .split(/\s+/u)
-        .filter((word) => word.length > 4 && !stopWords.has(word))
-        .slice(0, 18),
-    ),
-  );
 }

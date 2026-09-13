@@ -115,41 +115,41 @@ export const annabelMockProfile: EditableCreatorProfile = {
 export function getEditableCreatorProfile(
   profile: CreatorOnboardingProfile,
 ): EditableCreatorProfile {
+  // Applications from earlier releases contain generated copy and sample prices.
+  // Until the first accepted-profile save, show only the applicant's identity.
+  const hasSavedProfile = Boolean(profile.profileSavedAt);
+
   return {
-    about: profile.about || profile.profileDetails || profile.bio,
-    bio: profile.bio,
+    about: hasSavedProfile ? profile.about ?? "" : "",
+    bio: hasSavedProfile ? profile.bio ?? "" : "",
     calendarConnectedAt: profile.calendarConnectedAt,
     category: profile.category ?? "Style & Beauty",
     currency: profile.currency ?? "USD",
     email: profile.email,
-    helpItems: profile.helpItems ?? "",
+    helpItems: hasSavedProfile ? profile.helpItems ?? "" : "",
     id: profile.id,
-    image: profile.profileImageUrl || "/amber-headshot.jpg",
+    image: hasSavedProfile ? profile.profileImageUrl ?? "" : "",
     instagramHandle: profile.instagramHandle ?? "",
     instagramUrl: getSocialUrl(profile.instagramHandle, "instagram"),
-    location: profile.location ?? "",
-    mediaItems: getEditableCreatorMediaItems(profile),
+    location: hasSavedProfile ? profile.location ?? "" : "",
+    mediaItems: hasSavedProfile ? getEditableCreatorMediaItems(profile) : [],
     name: profile.name,
-    oneToOneReason: profile.oneToOneReason ?? "",
-    offer: profile.offer ?? "Choose a Time",
+    oneToOneReason: hasSavedProfile ? profile.oneToOneReason ?? "" : "",
+    offer: hasSavedProfile ? profile.offer ?? "" : "",
     phone: profile.phone ?? "",
     profileImagePositionX: profile.profileImagePositionX ?? 50,
     profileImagePositionY: profile.profileImagePositionY ?? 50,
     profileImageZoom: profile.profileImageZoom ?? 135,
     profileDetails: profile.profileDetails,
-    profileIntro: profile.profileIntro ?? "",
-    seat15Description:
-      profile.seat15Description ??
-      "A quick second opinion before someone commits.",
+    profileIntro: hasSavedProfile ? profile.profileIntro ?? "" : "",
+    seat15Description: hasSavedProfile ? profile.seat15Description ?? "" : "",
     seat15DurationMinutes: profile.seat15DurationMinutes ?? 15,
-    seat15Enabled: profile.seat15Enabled ?? true,
-    seat15PriceAmount: getEditablePriceAmount(profile.seat15PriceAmount),
-    seat30Description:
-      profile.seat30Description ??
-      "A longer private call with room to talk through the full question.",
+    seat15Enabled: hasSavedProfile && (profile.seat15Enabled ?? false),
+    seat15PriceAmount: hasSavedProfile ? getEditablePriceAmount(profile.seat15PriceAmount) : "",
+    seat30Description: hasSavedProfile ? profile.seat30Description ?? "" : "",
     seat30DurationMinutes: profile.seat30DurationMinutes ?? 30,
-    seat30Enabled: profile.seat30Enabled ?? true,
-    seat30PriceAmount: getEditablePriceAmount(profile.seat30PriceAmount),
+    seat30Enabled: hasSavedProfile && (profile.seat30Enabled ?? false),
+    seat30PriceAmount: hasSavedProfile ? getEditablePriceAmount(profile.seat30PriceAmount) : "",
     stripeConnectedAt: profile.stripeConnectedAt,
     tiktokHandle: profile.tiktokHandle ?? "",
     tiktokUrl: getSocialUrl(profile.tiktokHandle, "tiktok"),

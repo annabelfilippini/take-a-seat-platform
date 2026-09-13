@@ -655,7 +655,7 @@ export function EditableCreatorProfilePreview({
         <div className="amber-hero-copy">
           <div className="editable-profile-photo-editor">
             <span
-              aria-label="Drag profile picture to reposition it"
+              aria-label={profile.image ? "Drag profile picture to reposition it" : "Profile picture placeholder"}
               className={`editable-profile-photo-frame${profile.image ? " is-draggable" : ""}`}
               onPointerCancel={stopProfileImageDrag}
               onPointerDown={startProfileImageDrag}
@@ -1651,6 +1651,8 @@ function EditableMediaGallery({
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
 
+  if (!items.length) return null;
+
   function scrollGallery(direction: -1 | 1) {
     const track = trackRef.current;
     if (!track) {
@@ -2070,7 +2072,7 @@ function getProfileSettingsFormData(profile: EditableProfileState) {
 
   formData.set("creatorId", profile.id);
   formData.set("about", profile.about);
-  formData.set("bio", profile.bio || profile.profileIntro || profile.about);
+  formData.set("bio", profile.profileIntro || profile.about);
   formData.set("category", profile.category);
   formData.set("currency", profile.currency);
   formData.set("email", profile.email ?? "");
