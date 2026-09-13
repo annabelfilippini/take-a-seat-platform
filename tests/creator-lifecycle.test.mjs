@@ -360,3 +360,74 @@ test("first-time creators receive a blank editor and cleared fields stay blank a
     delete process.env.TAKE_A_SEAT_DEV_ADMIN_ENABLED;
   }
 });
+
+
+test("email sign-in provisions a fresh identity and reuses an exact existing email", async () => {
+  const { createCreatorEmailSignIn } = await import("../app/_lib/creator-email-sign-in.ts");
+  const users = [];
+  const tokens = [];
+  const client = {
+    users: {
+      async getUserList({ emailAddress }) { return { data: users.filter(user => user.emailAddresses.some(address => address.emailAddress === emailAddress[0])) }; },
+      async createUser({ emailAddress }) {
+        const address = { emailAddress: emailAddress[0], verification: { status: "verified" } };
+        const user = { id: "user_email_link", primaryEmailAddress: address, emailAddresses: [address] };
+        users.push(user);
+        return user;
+      },
+    },
+    signInTokens: { async createSignInToken(params) { tokens.push(params); return { token: "synthetic-ticket" }; } },
+  };
+  assert.equal((await createCreatorEmailSignIn(" New@Example.com ", client)).token, "synthetic-ticket");
+  await createCreatorEmailSignIn("new@example.com", client);
+  assert.equal(users.length, 1);
+  assert.deepEqual(tokens, Array(2).fill({ userId: "user_email_link", expiresInSeconds: 86400 }));
+  users[0].banned = true;
+  await assert.rejects(createCreatorEmailSignIn("new@example.com", client));
+  users[0].banned = false;
+  users[0].primaryEmailAddress.verification.status = "unverified";
+  await assert.rejects(createCreatorEmailSignIn("new@example.com", client));
+  users[0].primaryEmailAddress = { emailAddress: "different@example.com", verification: { status: "verified" } };
+  await assert.rejects(createCreatorEmailSignIn("new@example.com", client));
+  assert.equal(tokens.length, 2);
+  await assert.rejects(createCreatorEmailSignIn("new@example.com", null));
+});
+
+test("email sign-in recovers concurrent creation without creating duplicate accounts", async () => {
+  const { createCreatorEmailSignIn } = await import("../app/_lib/creator-email-sign-in.ts");
+  const address = { emailAddress: "race@example.com", verification: { status: "verified" } };
+  const user = { id: "race-owner", primaryEmailAddress: address, emailAddresses: [address] };
+  let reads = 0;
+  const client = {
+    users: {
+      async getUserList() { return { data: reads++ ? [user] : [] }; },
+      async createUser() { throw new Error("Concurrent user already exists"); },
+    },
+    signInTokens: { async createSignInToken(params) { assert.equal(params.userId, "race-owner"); return { token: "race-ticket" }; } },
+  };
+  assert.equal((await createCreatorEmailSignIn(address.emailAddress, client)).token, "race-ticket");
+});
+
+test("acceptance email keeps the one-use credential in the fragment and preserves the invite", async () => {
+  const { sendCreatorAcceptedEmail } = await import("../app/_lib/email.ts");
+  const originalFetch = globalThis.fetch;
+  process.env.RESEND_API_KEY = "test-only";
+  process.env.TAKE_A_SEAT_EMAIL_FROM = "Take a Seat <applications@example.com>";
+  let payload;
+  globalThis.fetch = async (url, options) => { payload = JSON.parse(options.body); return Response.json({ id: "test-email" }); };
+  try {
+    await sendCreatorAcceptedEmail({ creatorId: "synthetic", email: "fresh@example.com", emailNonce: "test", expiresAt: "2026-09-14", inviteToken: "synthetic-invite", signInToken: "synthetic-ticket", name: "Fresh Creator", request: new Request("https://takeaseatwith.com") });
+    const link = new URL(payload.text.match(/https?:\/\/\S+/)[0]);
+    assert.equal(link.pathname, "/creators/email-sign-in");
+    assert.equal(link.searchParams.get("invite"), "synthetic-invite");
+    assert.equal(link.searchParams.has("ticket"), false);
+    assert.equal(new URLSearchParams(link.hash.slice(1)).get("ticket"), "synthetic-ticket");
+    assert.deepEqual(payload.to, ["fresh@example.com"]);
+    assert.match(payload.text, /expires in 24 hours/);
+    assert.match(payload.html, /#ticket=synthetic-ticket&amp;email=/);
+  } finally { globalThis.fetch = originalFetch; delete process.env.RESEND_API_KEY; delete process.env.TAKE_A_SEAT_EMAIL_FROM; }
+});
+
+test("unaccepted applications cannot generate a setup email or provision an identity", async () => {
+  assert.deepEqual(await sendCreatorAcceptedInviteEmail({ profile: { applicationStatus: "in_review", email: "test@example.com" }, request: new Request("http://localhost") }), { status: "skipped", reason: "setup-link-failed" });
+});

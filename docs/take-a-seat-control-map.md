@@ -96,7 +96,9 @@ Auth:
 - Frontend API: `clerk.takeaseatwith.com`; account portal: `accounts.takeaseatwith.com`.
 - Shared sign-in route: `/sign-in`.
 - Sign-in defaults to an email verification code using the application email.
-  Production uses email codes only. Phone-code requires a paid Clerk feature and
+  Acceptance emails use a one-use Clerk sign-in token valid for 24 hours at
+  `/creators/email-sign-in`; expired links fall back to email codes. A different
+  signed-in account requires an explicit switch. Phone-code requires a paid Clerk feature and
   is hidden unless `TAKE_A_SEAT_PHONE_SIGN_IN_ENABLED=true` and Clerk supports it.
 - Clerk identities must have a verified primary email or phone before they can
   claim an accepted D1 profile. Later sign-ins return to `/creators/dashboard`.
@@ -134,6 +136,10 @@ Email:
 - Blank creator setup is deployed (PR #15): retain application identity, but
   start profile content/media/prices empty and sessions disabled. Existing saved
   profiles retain their content. See `docs/blank-creator-profile.md`.
+- Accepted emails provision or reuse the exact verified primary-email Clerk
+  identity and send its sign-in token only to that inbox, in the URL fragment.
+  Existing D1 ownership and saved profiles are preserved for repeat applicants.
+  See `docs/creator-email-sign-in.md` for verification and release status.
 - Failed setup emails are visible to the admin and can be retried. An optional
   inbox notification failure does not misreport the acceptance as failed.
 
