@@ -499,9 +499,7 @@ test("preserves creator uploaded media for dashboard and public profiles", async
   assert.match(editorData, /profileImageZoom: profile\.profileImageZoom \?\? 135/);
   assert.match(creatorOnboarding, /mediaItems: getPublishedCreatorMediaItems\(profile\)/);
   assert.match(creatorOnboarding, /function getPublishedCreatorMediaItems/);
-  assert.match(editor, /setMediaSaveStatus\("idle"\);\s+setProfileImageFileName/s);
   assert.match(editor, /function update<K extends keyof EditableProfileState>/);
-  assert.match(editor, /setMediaSaveStatus\("idle"\);\s+setProfile\(\(current\) => \(\{ \.\.\.current, \[key\]: value \}\)\)/);
   assert.match(editor, /async function saveProfileChanges/);
   assert.match(editor, /formData\.set\(\s*"profileImagePositionX"/s);
   assert.match(editor, /formData\.set\(\s*"profileImagePositionY"/s);

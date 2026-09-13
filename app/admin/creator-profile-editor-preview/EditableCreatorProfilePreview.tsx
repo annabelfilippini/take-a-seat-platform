@@ -2,6 +2,7 @@
 
 /* eslint-disable @next/next/no-html-link-for-pages, @next/next/no-img-element */
 import {
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -237,15 +238,30 @@ export function EditableCreatorProfilePreview({
   const [mediaSaveStatus, setMediaSaveStatus] = useState<
     "error" | "idle" | "saved" | "saving"
   >("saved");
+  const profileEditRevision = useRef(0);
+  const profileSaveInFlight = useRef(false);
+  const [profileSaving, setProfileSaving] = useState(false);
   const profileSaveLabel =
-    mediaSaveStatus === "saving"
+    profileSaving
       ? "Saving"
       : mediaSaveStatus === "saved"
         ? "Saved"
         : mediaSaveStatus === "error"
           ? "Save failed"
           : "Unsaved";
-  const profileSaving = mediaSaveStatus === "saving";
+
+  const markProfileDirty = useCallback(() => {
+    profileEditRevision.current += 1;
+    setMediaSaveStatus("idle");
+  }, []);
+
+  const updateProfileImageZoom = useCallback((value: number) => {
+    markProfileDirty();
+    setProfile((current) => ({
+      ...current,
+      profileImageZoom: getZoomValue(value),
+    }));
+  }, [markProfileDirty]);
 
   useEffect(() => {
     const frame = profileImageFrameRef.current;
@@ -288,7 +304,7 @@ export function EditableCreatorProfilePreview({
       frame.removeEventListener("gesturechange", changeGestureZoom);
       frame.removeEventListener("gestureend", stopGestureZoom);
     };
-  }, [profile.image, profileImageZoom]);
+  }, [profile.image, profileImageZoom, updateProfileImageZoom]);
 
   const helpItems = useMemo(
     () =>
@@ -303,7 +319,7 @@ export function EditableCreatorProfilePreview({
     key: K,
     value: EditableProfileState[K],
   ) {
-    setMediaSaveStatus("idle");
+    markProfileDirty();
     setProfile((current) => ({ ...current, [key]: value }));
   }
 
@@ -311,13 +327,13 @@ export function EditableCreatorProfilePreview({
     key: "instagramUrl" | "tiktokUrl",
     value: string,
   ) {
-    setMediaSaveStatus("idle");
+    markProfileDirty();
     setProfile((current) => ({
       ...current,
       [key]: value,
       ...(key === "instagramUrl"
-        ? { instagramHandle: getSocialHandleFromUrl(value) || current.instagramHandle }
-        : { tiktokHandle: getSocialHandleFromUrl(value) || current.tiktokHandle }),
+        ? { instagramHandle: getSocialHandleFromUrl(value) }
+        : { tiktokHandle: getSocialHandleFromUrl(value) }),
     }));
   }
 
@@ -327,7 +343,7 @@ export function EditableCreatorProfilePreview({
     }
 
     readFileAsDataUrl(file, (source) => {
-      setMediaSaveStatus("idle");
+      markProfileDirty();
       setProfile((current) => ({
         ...current,
         mediaItems: current.mediaItems.map((item) =>
@@ -347,7 +363,7 @@ export function EditableCreatorProfilePreview({
   }
 
   function removeMediaItem(id: string) {
-    setMediaSaveStatus("idle");
+    markProfileDirty();
     setProfile((current) => ({
       ...current,
       mediaItems: current.mediaItems.filter((item) => item.id !== id),
@@ -379,7 +395,7 @@ export function EditableCreatorProfilePreview({
         },
       ],
     }));
-    setMediaSaveStatus("idle");
+    markProfileDirty();
     setDraftMedia((current) => ({
       ...current,
       fileName: "",
@@ -404,7 +420,7 @@ export function EditableCreatorProfilePreview({
         profileImagePositionY: 50,
         profileImageZoom: 135,
       }));
-      setMediaSaveStatus("idle");
+      markProfileDirty();
       setProfileImageFileName(file.name);
     });
   }
@@ -413,7 +429,7 @@ export function EditableCreatorProfilePreview({
     x?: number | string;
     y?: number | string;
   }) {
-    setMediaSaveStatus("idle");
+    markProfileDirty();
     setProfile((current) => ({
       ...current,
       profileImagePositionX: getPercentValue(
@@ -425,16 +441,8 @@ export function EditableCreatorProfilePreview({
     }));
   }
 
-  function updateProfileImageZoom(value: number) {
-    setMediaSaveStatus("idle");
-    setProfile((current) => ({
-      ...current,
-      profileImageZoom: getZoomValue(value),
-    }));
-  }
-
   function adjustProfileImageZoom(delta: number) {
-    setMediaSaveStatus("idle");
+    markProfileDirty();
     setProfile((current) => ({
       ...current,
       profileImageZoom: getZoomValue(getZoomValue(current.profileImageZoom) + delta),
@@ -442,7 +450,7 @@ export function EditableCreatorProfilePreview({
   }
 
   function panProfileImage(deltaX: number, deltaY: number) {
-    setMediaSaveStatus("idle");
+    markProfileDirty();
     setProfile((current) => ({
       ...current,
       profileImagePositionX: getPercentValue(
@@ -570,6 +578,13 @@ export function EditableCreatorProfilePreview({
   }
 
   async function saveProfileChanges() {
+    if (profileSaveInFlight.current) {
+      return;
+    }
+
+    profileSaveInFlight.current = true;
+    const savedRevision = profileEditRevision.current;
+    setProfileSaving(true);
     setMediaSaveStatus("saving");
 
     try {
@@ -583,9 +598,14 @@ export function EditableCreatorProfilePreview({
         throw new Error("Profile save failed.");
       }
 
-      setMediaSaveStatus("saved");
+      setMediaSaveStatus(
+        profileEditRevision.current === savedRevision ? "saved" : "idle",
+      );
     } catch {
       setMediaSaveStatus("error");
+    } finally {
+      profileSaveInFlight.current = false;
+      setProfileSaving(false);
     }
   }
 

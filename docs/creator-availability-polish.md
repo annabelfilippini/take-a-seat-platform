@@ -1,4 +1,4 @@
-# Creator Availability and Mobile Polish
+# Creator Setup and Profile Save Fixes
 
 Prepared September 12, 2026. Requires an approved production deployment.
 
@@ -16,15 +16,22 @@ Prepared September 12, 2026. Requires an approved production deployment.
 - The mobile application menu has an opaque background and moves the heading
   below the expanded menu. Shared header menus also use the opaque surface.
 - Shared creator cards no longer show stars or the hardcoded 5.0 rating.
+- Prices convert from stored cents once when reopening the editor. A $150 seat
+  reopens as $150 and stays $150 when another profile field is saved.
+- Profile saves track the submitted revision. Edits made during a pending save
+  remain unsaved when it finishes, and both save buttons stay disabled until that
+  request completes. Failed saves keep the draft available for retry.
+- Clearing an Instagram or TikTok URL clears its stored handle, so the removed
+  link stays removed after reopening the editor and on the public profile.
 - ESLint now excludes generated `.wrangler` files, consistent with Git's existing
   runtime-directory exclusion.
 
 ## Validation
 
-- `npm run lint` and `npm test` passed (build plus 50 tests), after rebasing onto
+- `npm run lint` and `npm test` passed (build plus 51 tests), after rebasing onto
   the latest main with the separately reviewed Stripe changes.
 - Local browser QA uses the actual React components and CSS with a demo profile.
-  Availability save responses are intercepted locally; no production profile,
+  Availability and profile save responses are intercepted locally; no production profile,
   application, email, or availability was changed.
 - Desktop: mouse drag, keyboard selection, failed save and retry, preservation
   across tab changes, and restoration of saved 8–9 PM slots.
@@ -32,6 +39,14 @@ Prepared September 12, 2026. Requires an approved production deployment.
   selecting slots; application menu open/closed and creator cards without ratings.
 - Additional 320 px viewport: no document overflow; expanded menu ends above the
   application heading. Desktop viewport: 1440 × 1000.
+
+- Profile regression uses the real save route and domain code with an in-memory
+  SQLite/D1 adapter: text, photo crop, gallery, social handles, public card output,
+  and prices from $0 through $1,000 survive saving and reopening. The fixture uses
+  local admin authentication; production Clerk sessions were not exercised.
+- Desktop and mobile profile QA: edit during a delayed save, disabled save buttons,
+  unsaved newer edits, save the newest draft, and cleared social handles in the
+  request. Desktop also covers a failed request and successful retry.
 
 ## Release Notes
 
