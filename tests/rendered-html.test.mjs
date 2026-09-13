@@ -1625,3 +1625,14 @@ test("accepts signed Stripe webhook events", async () => {
     },
   );
 });
+
+
+test("email sign-in page is private, has a referrer policy, and exposes no token in server HTML", async () => {
+  const response = await render("/creators/email-sign-in?invite=synthetic-invite");
+  assert.equal(response.status, 200);
+  const html = await response.text();
+  assert.match(html, /Let’s open your profile/);
+  assert.match(html, /noindex/);
+  assert.match(html, /no-referrer/);
+  assert.doesNotMatch(html, /strategy.*ticket/);
+});

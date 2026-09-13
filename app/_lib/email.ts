@@ -37,6 +37,7 @@ type CreatorApplicationEmail = {
 };
 
 type CreatorAcceptedEmail = {
+  signInToken?: string;
   creatorId: string;
   email: string;
   emailNonce: string;
@@ -161,11 +162,17 @@ export async function sendCreatorAcceptedEmail({
   inviteToken,
   name,
   request,
+  signInToken,
 }: CreatorAcceptedEmail): Promise<EmailResult> {
   const setupUrl = buildAbsoluteUrl(
     request,
-    `${CREATOR_PROFILE_EDITOR_URL}?invite=${encodeURIComponent(inviteToken)}`,
+    signInToken
+      ? `/creators/email-sign-in?invite=${encodeURIComponent(inviteToken)}#${new URLSearchParams({ ticket: signInToken, email }).toString()}`
+      : `${CREATOR_PROFILE_EDITOR_URL}?invite=${encodeURIComponent(inviteToken)}`,
   );
+  const instructions = signInToken
+    ? "This private link signs you in and opens your creator profile. It works once and expires in 24 hours. After that, you can sign in with an email code. If you already have a profile, your saved work will open. Save your profile when you are ready for your card to appear on the website."
+    : "Sign in with the email address from your accepted application. We will email you a verification code, then take you to your creator account. Save your profile when you are ready for your card to appear on the website.";
   const firstName = name.trim().split(/\s+/u)[0] || "there";
   const subject = "Congratulations! You've been accepted into Take a Seat";
   const text = [
@@ -174,7 +181,7 @@ export async function sendCreatorAcceptedEmail({
     "Congratulations! You've been accepted into Take a Seat. Click this link to start working on your profile.",
     "",
     `Start working on your profile: ${setupUrl}`,
-    "Sign in with the email address from your accepted application. We will email you a verification code, then take you to your creator account. Save your profile when you are ready for your card to appear on the website.",
+    instructions,
     "",
     "Annabel",
   ].join("\n");
@@ -182,7 +189,7 @@ export async function sendCreatorAcceptedEmail({
     `<p>Hi ${escapeHtml(firstName)},</p>`,
     "<p>Congratulations! You've been accepted into Take a Seat. Click this link to start working on your profile.</p>",
     `<p><a href="${escapeHtml(setupUrl)}">Start working on your profile</a></p>`,
-    "<p>Sign in with the email address from your accepted application. We will email you a verification code, then take you to your creator account. Save your profile when you are ready for your card to appear on the website.</p>",
+    `<p>${escapeHtml(instructions)}</p>`,
     "<p>Annabel</p>",
   ].join("");
 

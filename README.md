@@ -61,7 +61,8 @@ stay in ignored local env files or Cloudflare Worker secrets.
 
 - App/runtime: vinext on Cloudflare Workers.
 - Database: Cloudflare D1 via Drizzle schema in `db/schema.ts`.
-- Auth: Clerk production email-code sign-in at `/sign-in`. Phone sign-in is
+- Auth: Acceptance emails open `/creators/email-sign-in` with a one-use Clerk
+  sign-in link. Returning creators use email-code sign-in at `/sign-in`. Phone sign-in is
   hidden unless explicitly enabled in both Clerk and the Worker configuration.
 - Email: Resend transactional email.
 - Calendar: Google OAuth, encrypted token refresh, free/busy validation, and retry-safe Meet event creation. See `docs/calendar-rehearsal-2026-09-12.md` for the remaining live rehearsal gate.
@@ -90,6 +91,7 @@ Cloudflare production bindings are declared in `wrangler.deploy.jsonc`.
 - `/with/ella`, `/with/annabel`: profile/test routes that still
   need consolidation into the reusable route over time.
 - `/sign-in`: shared Clerk verification-code sign-in.
+- `/creators/email-sign-in`: acceptance-email sign-in and recovery.
 - `/creators/onboard`: creator application and setup entry.
 - `/creators/dashboard`: creator-owned profile, availability, payouts, and
   notifications dashboard for accepted creators.

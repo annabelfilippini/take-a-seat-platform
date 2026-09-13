@@ -20,6 +20,12 @@ export function isClerkConfigured() {
   return Boolean(getClerkPublishableKey() && getClerkSecretKey());
 }
 
+export function getClerkBackendClient() {
+  const secretKey = getClerkSecretKey();
+  const publishableKey = getClerkPublishableKey();
+  return secretKey && publishableKey ? createClerkClient({ secretKey, publishableKey }) : null;
+}
+
 export function isPhoneSignInEnabled() {
   return getRuntimeEnv("TAKE_A_SEAT_PHONE_SIGN_IN_ENABLED") === "true";
 }
