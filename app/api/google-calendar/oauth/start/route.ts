@@ -5,6 +5,7 @@ import {
   getCreatorFromQuery,
   getNonceCookieHeader,
   getRuntimeEnv,
+  getGoogleRedirectUri,
   getSafeReturnTo,
   redirectWithCalendarStatus,
 } from "../shared";
@@ -21,7 +22,7 @@ export async function GET(request: Request) {
 
   const clientId = getRuntimeEnv("GOOGLE_CLIENT_ID");
   const clientSecret = getRuntimeEnv("GOOGLE_CLIENT_SECRET");
-  const redirectUri = getRuntimeEnv("GOOGLE_OAUTH_REDIRECT_URI");
+  const redirectUri = getGoogleRedirectUri(request);
 
   if (!clientId || !clientSecret || !redirectUri) {
     return redirectWithCalendarStatus(request, returnTo, "setup-needed", "google-oauth");

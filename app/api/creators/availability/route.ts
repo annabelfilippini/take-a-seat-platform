@@ -1,3 +1,4 @@
+import { getSafeReturnTo } from "../../../_lib/safe-redirect";
 import {
   canManageCreatorProfile,
   getCreatorAvailabilityInput,
@@ -42,14 +43,6 @@ function availabilityStatusResponse(
 
 function wantsJson(request: Request) {
   return request.headers.get("accept")?.includes("application/json") ?? false;
-}
-
-function getSafeReturnTo(value: string | null | undefined, fallback: string) {
-  if (!value || !value.startsWith("/") || value.startsWith("//")) {
-    return fallback;
-  }
-
-  return value;
 }
 
 export async function POST(request: Request) {

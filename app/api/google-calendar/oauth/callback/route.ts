@@ -6,6 +6,7 @@ import {
   getCookie,
   getExpiredNonceCookieHeader,
   getRuntimeEnv,
+  getGoogleRedirectUri,
   GOOGLE_CALENDAR_SCOPES,
   GOOGLE_OAUTH_NONCE_COOKIE,
   GOOGLE_TOKEN_URL,
@@ -26,7 +27,7 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const clientId = getRuntimeEnv("GOOGLE_CLIENT_ID");
   const clientSecret = getRuntimeEnv("GOOGLE_CLIENT_SECRET");
-  const redirectUri = getRuntimeEnv("GOOGLE_OAUTH_REDIRECT_URI");
+  const redirectUri = getGoogleRedirectUri(request);
   const clearNonceHeaders = new Headers({
     "set-cookie": getExpiredNonceCookieHeader(),
   });
@@ -105,6 +106,10 @@ export async function GET(request: Request) {
         token.error ?? "invalid-token-response",
         clearNonceHeaders,
       );
+    }
+
+    if (token.scope && GOOGLE_CALENDAR_SCOPES.some((scope) => !token.scope!.split(" ").includes(scope))) {
+      return redirectWithCalendarStatus(request, returnTo, "error", "calendar-permissions", clearNonceHeaders);
     }
 
     const tokenEncryptionSecret = getRuntimeEnv("GOOGLE_TOKEN_ENCRYPTION_KEY") ?? clientSecret;
@@ -192,5 +197,6 @@ async function exchangeCodeForToken({
     method: "POST",
   });
 
+  if (!response.ok) throw new Error("Google token exchange failed.");
   return (await response.json()) as GoogleTokenResponse;
 }

@@ -83,7 +83,7 @@ function getRuntimeEnv(name: string) {
       : undefined;
   const processValue =
     typeof process === "object" && process.env ? process.env[name] : undefined;
-  const workerValue = (workerEnv as Record<string, unknown>)[name];
+  const workerValue = (workerEnv as unknown as Record<string, unknown>)[name];
   const value = typeof cloudflareValue === "string" ? cloudflareValue : typeof workerValue === "string" ? workerValue : processValue;
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }

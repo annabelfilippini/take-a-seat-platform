@@ -1,3 +1,4 @@
+import { getSafeReturnTo } from "../../../_lib/safe-redirect";
 import {
   getLocalAdminCookie,
   isLocalAdminDevEnabled,
@@ -20,12 +21,4 @@ export function GET(request: Request) {
     },
     status: 303,
   });
-}
-
-function getSafeReturnTo(value: string | null) {
-  if (!value || !value.startsWith("/") || value.startsWith("//")) {
-    return "/admin/applications";
-  }
-
-  return value;
 }

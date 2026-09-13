@@ -1,3 +1,4 @@
+import { getSafeReturnTo } from "../../../../_lib/safe-redirect";
 import {
   getCreatorApplication,
   getCreatorOnboardingProfileId,
@@ -32,14 +33,6 @@ function redirectWithStripeStatus(
     headers: { location: target.toString() },
     status: 303,
   });
-}
-
-function getSafeReturnTo(value: string | null, fallback: string) {
-  if (!value || !value.startsWith("/") || value.startsWith("//")) {
-    return fallback;
-  }
-
-  return value;
 }
 
 export async function GET(request: Request) {
@@ -90,18 +83,11 @@ export async function GET(request: Request) {
     }
 
     const existingConnection = await getCreatorStripeConnection(creatorId);
-    const account =
-      existingConnection ??
-      (await createConnectedAccount({
-        contactEmail,
-        country,
-        creatorId,
-        displayName,
-        secretKey,
-      }));
-    const stripeAccountId =
-      "stripeAccountId" in account ? account.stripeAccountId : account.id;
-    const livemode = Boolean("livemode" in account ? account.livemode : false);
+    const createdAccount = existingConnection ? null : await createConnectedAccount({
+      contactEmail, country, creatorId, displayName, secretKey,
+    });
+    const stripeAccountId = existingConnection?.stripeAccountId ?? createdAccount!.id;
+    const livemode = existingConnection?.livemode ?? createdAccount!.livemode;
 
     if (!existingConnection) {
       await saveCreatorStripeConnection({

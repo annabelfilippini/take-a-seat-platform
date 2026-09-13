@@ -1,3 +1,4 @@
+import { withSecureOrigin } from "../app/_lib/secure-origin";
 import { withClerkSessionRefresh } from "../app/_lib/clerk-session-refresh";
 /** Cloudflare Worker entry point for the vinext-starter template. */
 import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } from "vinext/server/image-optimization";
@@ -30,22 +31,24 @@ interface ExecutionContext {
 
 const worker = {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-    const url = new URL(request.url);
+    return withSecureOrigin(request, async (secureRequest) => {
+      const url = new URL(secureRequest.url);
 
-    if (url.pathname === "/_vinext/image") {
-      const allowedWidths = [...DEFAULT_DEVICE_SIZES, ...DEFAULT_IMAGE_SIZES];
-      return handleImageOptimization(request, {
-        fetchAsset: (path) => env.ASSETS.fetch(new Request(new URL(path, request.url))),
-        transformImage: async (body, { width, format, quality }) => {
-          const result = await env.IMAGES.input(body).transform(width > 0 ? { width } : {}).output({ format, quality });
-          return result.response();
-        },
-      }, allowedWidths);
-    }
+      if (url.pathname === "/_vinext/image") {
+        const allowedWidths = [...DEFAULT_DEVICE_SIZES, ...DEFAULT_IMAGE_SIZES];
+        return handleImageOptimization(secureRequest, {
+          fetchAsset: (path) => env.ASSETS.fetch(new Request(new URL(path, secureRequest.url))),
+          transformImage: async (body, { width, format, quality }) => {
+            const result = await env.IMAGES.input(body).transform(width > 0 ? { width } : {}).output({ format, quality });
+            return result.response();
+          },
+        }, allowedWidths);
+      }
 
-    return withClerkSessionRefresh(request, env, (authenticatedRequest) =>
-      handler.fetch(authenticatedRequest, env, ctx),
-    );
+      return withClerkSessionRefresh(secureRequest, env, (authenticatedRequest) =>
+        handler.fetch(authenticatedRequest, env, ctx),
+      );
+    });
   },
 };
 

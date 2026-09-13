@@ -615,7 +615,7 @@ test("wires accepted creators to public profile publishing", async () => {
   assert.match(dynamicProfilePage, /availabilityRules=\{creator\.availabilityRules\}/);
   assert.match(dynamicProfilePage, /won&apos;t be charged unless the creator accepts/);
   assert.match(requestRoute, /getBookableCreatorById/);
-  assert.match(requestRoute, /createBookingRequest/);
+  assert.match(requestRoute, /reserveBookingRequest/);
   assert.match(requestRoute, /isBookingSlotAvailable/);
   assert.match(checkoutRoute, /export \{ POST \} from "..\/..\/bookings\/request\/route"/);
   assert.match(customerBookingFlow, /Find Availability/);
@@ -639,7 +639,7 @@ test("wires accepted creators to public profile publishing", async () => {
   assert.match(requestRoute, /attachStripeCheckoutSession/);
   assert.ok(
     requestRoute.indexOf("const stripeReadiness = await getStripeCheckoutReadiness") <
-      requestRoute.indexOf("const bookingId = await createBookingRequest"),
+      requestRoute.indexOf("const bookingId = await reserveBookingRequest"),
   );
   assert.doesNotMatch(bookingApproveRoute, /sendAcceptedBookingPaymentStep/);
   assert.doesNotMatch(bookingApproveRoute, /sendCustomerBookingAcceptedPaymentEmail/);
@@ -1170,7 +1170,7 @@ test("starts Google Calendar OAuth for a creator", async () => {
       );
       assert.equal(
         authUrl.searchParams.get("redirect_uri"),
-        "http://localhost:3000/api/google-calendar/oauth/callback",
+        "http://localhost/api/google-calendar/oauth/callback",
       );
       assert.equal(authUrl.searchParams.get("access_type"), "offline");
       assert.equal(authUrl.searchParams.get("prompt"), "consent");

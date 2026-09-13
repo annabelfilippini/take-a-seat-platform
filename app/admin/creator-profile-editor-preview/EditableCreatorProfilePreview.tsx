@@ -180,11 +180,13 @@ const tiktokPlayerOptions = [
 ].join("&");
 
 export function EditableCreatorProfilePreview({
+  calendarStatus,
   initialAvailabilityRules = [],
   initialProfile,
   initialNotificationPreferences = defaultNotificationPreferences,
   initialNotifications = [],
 }: {
+  calendarStatus?: string;
   initialAvailabilityRules?: EditableAvailabilityRule[];
   initialProfile: EditableProfileState;
   initialNotificationPreferences?: EditableNotificationPreferences;
@@ -192,7 +194,7 @@ export function EditableCreatorProfilePreview({
 }) {
   const [profile, setProfile] = useState(initialProfile);
   const [activeCreatorTab, setActiveCreatorTab] =
-    useState<EditableCreatorTab>("profile");
+    useState<EditableCreatorTab>(calendarStatus ? "availability" : "profile");
   const [draftMedia, setDraftMedia] = useState<{
     fileName: string;
     kind: EditableGalleryItem["kind"];
@@ -611,6 +613,14 @@ export function EditableCreatorProfilePreview({
 
   return (
     <main className="platform-shell amber-profile-page editable-profile-page">
+      {calendarStatus ? (
+        <p role={calendarStatus === "connected" && profile.calendarConnectedAt ? "status" : "alert"} className="calendar-connection-notice">
+          {calendarStatus === "connected" && profile.calendarConnectedAt ? "Google Calendar connected. Your saved hours will be checked for calendar conflicts."
+            : calendarStatus === "cancelled" ? "Calendar connection was cancelled. You can connect again when you are ready."
+              : "Google Calendar could not connect. Please try Connect calendar again. Your saved profile has not changed."}
+        </p>
+      ) : null}
+
       <div className="profile-announcement">Your creator profile. Save when you are ready for your card to appear on the website.</div>
       <header className="topbar profile-topbar">
         <a className="brand-mark" href="/" aria-label="Take a Seat home">

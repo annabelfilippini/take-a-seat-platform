@@ -1,7 +1,8 @@
+import { getSafeReturnTo } from "../../../_lib/safe-redirect";
 import {
   attachStripeCheckoutSession,
   type BookingRequestInput,
-  createBookingRequest,
+  reserveBookingRequest,
   getBookingRequestInput,
   isBookingSlotAvailable,
 } from "../../../_lib/bookings";
@@ -72,21 +73,15 @@ function appendBookingStatus(
   return target.toString();
 }
 
-function getSafeReturnTo(value: string | undefined, fallback: string) {
-  if (!value || !value.startsWith("/") || value.startsWith("//")) {
-    return fallback;
-  }
-
-  return value;
-}
-
 async function readBookingRequestPayload(
   request: Request,
 ): Promise<BookingRequestPayload> {
   const contentType = request.headers.get("content-type") ?? "";
 
   if (contentType.includes("application/json")) {
-    const payload = (await request.json()) as Record<string, unknown>;
+    const raw: unknown = await request.json();
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error("Invalid booking request.");
+    const payload = raw as Record<string, unknown>;
     return {
       appointmentStartAt:
         typeof payload.appointmentStartAt === "string"
@@ -130,7 +125,9 @@ async function readBookingRequestPayload(
 }
 
 export async function POST(request: Request) {
-  const payload = await readBookingRequestPayload(request);
+  let payload: BookingRequestPayload;
+  try { payload = await readBookingRequestPayload(request); }
+  catch { return Response.json({ status: "error", detail: "invalid-body" }, { status: 400 }); }
   const creator = payload.creatorId
     ? await getBookableCreatorById(payload.creatorId)
     : null;
@@ -191,11 +188,13 @@ export async function POST(request: Request) {
       );
     }
 
-    const bookingId = await createBookingRequest({
+    const bookingId = await reserveBookingRequest({
       creator,
       input: bookingInput,
       seat,
     });
+
+    if (!bookingId) return redirectTo(appendBookingStatus(request, returnTo, "error", "availability"));
 
     const session = await createManualCaptureCheckoutSession({
       applicationFeeAmount: stripeReadiness.applicationFeeAmount,

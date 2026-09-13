@@ -286,7 +286,7 @@ export async function getConnectedAccountTransferStatus({
   );
 }
 
-async function stripeJson<T>(
+async function stripeJson<T extends object>(
   path: string,
   secretKey: string,
   body: Record<string, unknown>,
@@ -319,7 +319,7 @@ async function stripeJson<T>(
   return payload as T;
 }
 
-async function stripeGet<T>(path: string, secretKey: string) {
+async function stripeGet<T extends object>(path: string, secretKey: string) {
   const response = await fetch(`${STRIPE_API_BASE}${path}`, {
     headers: {
       Authorization: `Bearer ${secretKey}`,

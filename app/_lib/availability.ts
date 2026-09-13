@@ -16,6 +16,7 @@ export type ViewerAvailabilitySlot = {
 };
 
 export type MatchedAvailabilitySlot = {
+  bufferMinutes: number;
   appointmentEndUtc: Date;
   appointmentStartUtc: Date;
   creatorDate: string;
@@ -25,6 +26,7 @@ export type MatchedAvailabilitySlot = {
 };
 
 type SourceAvailabilitySlot = {
+  bufferMinutes: number;
   date: string;
   maxBookingsPerDay: number | null;
   maxBookingsPerWeek: number | null;
@@ -132,6 +134,7 @@ export function getMatchedAvailabilitySlot({
   }
 
   return {
+    bufferMinutes: matchedSlot.bufferMinutes,
     appointmentEndUtc: addMinutes(requestedStartUtc, durationMinutes),
     appointmentStartUtc: requestedStartUtc,
     creatorDate: matchedSlot.date,
@@ -178,7 +181,7 @@ function getSourceAvailabilitySlots({
 }) {
   const sourceSlots = availabilityRules.length
     ? getRuleAvailabilitySlots(availabilityRules, seat, windowStart, now)
-    : getFallbackAvailabilitySlots(creatorId);
+    : getFallbackAvailabilitySlots(creatorId).filter((slot) => slot.startsAtUtc >= now.getTime() && slot.startsAtUtc >= windowStart.getTime());
 
   return sourceSlots.sort((first, second) => first.startsAtUtc - second.startsAtUtc);
 }
@@ -194,6 +197,7 @@ function getFallbackAvailabilitySlots(creatorId: string): SourceAvailabilitySlot
 
       return {
         date: day.date,
+        bufferMinutes: 0,
         maxBookingsPerDay: null,
         maxBookingsPerWeek: null,
         startsAtUtc: zonedTimeToUtc(day.date, time, timezone).getTime(),
@@ -232,6 +236,7 @@ function getRuleAvailabilitySlots(
 
         slots.push({
           date: dateValue,
+          bufferMinutes: rule.bufferMinutes ?? 0,
           maxBookingsPerDay: rule.maxBookingsPerDay ?? null,
           maxBookingsPerWeek: rule.maxBookingsPerWeek ?? null,
           startsAtUtc,

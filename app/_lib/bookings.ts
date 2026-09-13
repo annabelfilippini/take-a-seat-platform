@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { customerBookings } from "../../db/schema";
 import {
   getDateValueInTimezone,
@@ -94,10 +94,12 @@ export async function isBookingSlotAvailable({
   creator,
   input,
   seat,
+  bookings,
 }: {
   creator: Creator;
   input: BookingRequestInput;
   seat: Seat;
+  bookings?: CustomerBooking[];
 }) {
   const matchedSlot = getMatchedAvailabilitySlot({
     appointmentStartAt: input.appointmentStartAt,
@@ -115,7 +117,7 @@ export async function isBookingSlotAvailable({
     return true;
   }
 
-  const existingBookings = await listCreatorBookings(creator.id);
+  const existingBookings = bookings ?? await listCreatorBookings(creator.id);
   const blockingBookings = existingBookings.filter(isBlockingBooking);
   let bookingsOnDay = 0;
   let bookingsInWeek = 0;
@@ -136,8 +138,8 @@ export async function isBookingSlotAvailable({
       intervalsOverlap(
         matchedSlot.appointmentStartUtc,
         matchedSlot.appointmentEndUtc,
-        existingStart,
-        existingEnd,
+        new Date(existingStart.getTime() - matchedSlot.bufferMinutes * 60_000),
+        new Date(existingEnd.getTime() + matchedSlot.bufferMinutes * 60_000),
       )
     ) {
       return false;
@@ -542,14 +544,14 @@ function isBlockingBooking(booking: CustomerBooking) {
 
   if (
     booking.status !== BOOKING_STATUS.checkoutStarted &&
-    !(
-      booking.status === BOOKING_STATUS.requested &&
-      booking.stripeCheckoutSessionId
-    )
+    booking.status !== BOOKING_STATUS.requested
   ) {
     return false;
   }
 
+  // A completed authorization webhook can arrive after Checkout's expiry time.
+  // Once a session exists, release only on its verified terminal webhook.
+  if (booking.stripeCheckoutSessionId) return true;
   return Date.parse(booking.createdAt) > Date.now() - CHECKOUT_SLOT_HOLD_MINUTES * 60_000;
 }
 
@@ -597,4 +599,41 @@ function isBookingId(value: string) {
 
 function isTestBookingStoreEnabled() {
   return process.env[TEST_BOOKINGS_ENV] === "true";
+}
+
+// Optimistic reservation: the availability check and conditional insert share a
+// snapshot. D1 executes this INSERT as one statement; competing requests cannot
+// both reserve based on the same state. No network request runs inside a lock.
+export async function reserveBookingRequest({ creator, input, seat }: {
+  creator: Creator; input: BookingRequestInput; seat: Seat;
+}) {
+  if (isTestBookingStoreEnabled()) return createBookingRequest({ creator, input, seat });
+  const bookings = await listCreatorBookings(creator.id);
+  if (!await isBookingSlotAvailable({ creator, input, seat, bookings })) return null;
+  const slot = getMatchedAvailabilitySlot({ appointmentStartAt: input.appointmentStartAt,
+    availabilityRules: creator.availabilityRules ?? [], creatorId: creator.id, seat, timezone: input.timezone });
+  if (!slot) return null;
+  const { isCreatorCalendarFree } = await import("./google-calendar");
+  const padding = slot.bufferMinutes * 60_000;
+  if (!await isCreatorCalendarFree(creator.id, new Date(slot.appointmentStartUtc.getTime() - padding),
+    new Date(slot.appointmentEndUtc.getTime() + padding))) return null;
+  const snapshot = JSON.stringify(bookings.sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
+    .map((b) => [b.id, b.status, b.updatedAt, b.stripeCheckoutSessionId, b.appointmentStartAt, b.appointmentEndAt, b.timezone]));
+  const id = `booking_${crypto.randomUUID()}`;
+  const now = new Date().toISOString();
+  const { getDb } = await import("../../db");
+  const rows = await getDb().all<{ id: string }>(sql`
+    INSERT INTO customer_bookings (id, creator_id, creator_name, seat_id, seat_name,
+      customer_name, customer_email, customer_note, appointment_start_at, appointment_end_at,
+      timezone, status, created_at, updated_at)
+    SELECT ${id}, ${creator.id}, ${creator.name}, ${seat.id}, ${seat.name},
+      ${input.customerName}, ${input.customerEmail}, ${input.customerNote}, ${input.appointmentStartAt},
+      ${addMinutesToLocalDateTime(input.appointmentStartAt, getSeatDurationMinutes(seat))},
+      ${input.timezone}, 'requested', ${now}, ${now}
+    WHERE ${snapshot} = (SELECT json_group_array(json_array(id, status, updated_at,
+      stripe_checkout_session_id, appointment_start_at, appointment_end_at, timezone))
+      FROM (SELECT * FROM customer_bookings WHERE creator_id = ${creator.id} ORDER BY id))
+    RETURNING id
+  `);
+  return rows[0]?.id ?? null;
 }
