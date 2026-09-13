@@ -709,22 +709,6 @@ img {
   min-width: 0;
 }
 
-.rating {
-  align-items: center;
-  color: var(--ink);
-  display: flex;
-  flex: 0 0 auto;
-  font-size: 16px;
-  font-weight: 700;
-  gap: 6px;
-}
-
-.rating span {
-  color: #ffb000;
-  font-size: 18px;
-  line-height: 1;
-}
-
 .expert-category {
   color: #6f6a68;
   display: block;
@@ -3799,8 +3783,7 @@ img {
   width: min(100%, 280px);
 }
 
-.availability-timezone-picker > span,
-.availability-date-field > span:first-child {
+.availability-timezone-picker > span {
   color: #7f5b36;
   font-size: 12px;
   font-weight: 900;
@@ -3813,222 +3796,12 @@ img {
   padding: 8px 10px;
 }
 
-.availability-date-picker {
-  display: grid;
-  gap: 10px;
-  max-width: 380px;
-  position: relative;
-}
-
-.availability-date-field {
-  align-items: center;
-  background: #fffdf8;
-  border: 1px solid rgba(124, 63, 53, 0.34);
-  border-radius: 8px;
-  display: grid;
-  gap: 4px 12px;
-  grid-template-columns: 1fr auto;
-  min-height: 52px;
-  padding: 8px 12px;
-  text-align: left;
-  width: min(100%, 380px);
-}
-
-button.availability-date-field {
-  cursor: pointer;
-}
-
-button.availability-date-field:focus-visible {
-  border-color: var(--rosewood);
-  box-shadow: 0 0 0 3px rgba(124, 63, 53, 0.12);
-  outline: 0;
-}
-
-.availability-date-field strong {
-  color: var(--ink);
-  font-size: 17px;
-  line-height: 1;
-}
-
-.availability-date-icon {
-  border: 2px solid var(--rosewood);
-  border-radius: 5px;
-  display: block;
-  grid-column: 2;
-  grid-row: 1 / span 2;
-  height: 23px;
-  position: relative;
-  width: 23px;
-}
-
-.availability-date-icon::before {
-  background: var(--rosewood);
-  content: "";
-  height: 2px;
-  left: 3px;
-  position: absolute;
-  right: 3px;
-  top: 7px;
-}
-
-.availability-date-panel {
-  background: #fffdf8;
-  border: 1px solid rgba(222, 210, 191, 0.96);
-  border-radius: 8px;
-  box-shadow: 0 18px 42px rgba(31, 29, 26, 0.06);
-  display: grid;
-  gap: 14px;
-  padding: 14px;
-  width: min(100%, 380px);
-}
-
-.availability-calendar-nav {
-  align-items: center;
-  display: grid;
-  gap: 8px;
-  grid-template-columns: 34px minmax(0, 220px) 34px;
-  justify-content: space-between;
-}
-
-.availability-calendar-nav button {
-  align-items: center;
-  background: transparent;
-  border: 0;
-  border-radius: 999px;
+.availability-instructions {
   color: var(--muted);
-  cursor: pointer;
-  display: flex;
-  font-size: 28px;
-  height: 34px;
-  justify-content: center;
-  line-height: 1;
-  padding: 0;
-  width: 34px;
-}
-
-.availability-calendar-nav button:disabled {
-  cursor: not-allowed;
-  opacity: 0.34;
-}
-
-.availability-calendar-nav select {
-  background: transparent;
-  border-color: transparent;
-  font-size: 13px;
-  justify-self: center;
-  padding-inline: 6px 24px;
-  text-align: center;
-  text-align-last: center;
-  width: 100%;
-}
-
-.availability-month-calendar {
-  min-width: 0;
-}
-
-.availability-month-calendar h3 {
-  border-bottom: 1px solid rgba(222, 210, 191, 0.88);
-  color: var(--ink);
-  font-size: 16px;
-  line-height: 1.2;
-  margin: 0 0 12px;
-  padding-bottom: 12px;
-  text-align: center;
-}
-
-.availability-month-weekdays,
-.availability-month-grid {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(32px, 1fr));
-}
-
-.availability-month-weekdays {
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 700;
-  margin-bottom: 8px;
-  text-align: center;
-}
-
-.availability-month-grid {
-  gap: 6px 0;
-}
-
-.availability-date-button {
-  align-items: center;
-  appearance: none;
-  background: transparent;
-  border: 0;
-  border-radius: 0;
-  color: var(--ink);
-  cursor: pointer;
-  display: flex;
   font-size: 14px;
-  font-weight: 750;
-  height: 32px;
-  justify-content: center;
-  padding: 0;
-}
-
-.availability-date-button.muted {
-  color: rgba(115, 106, 95, 0.38);
-}
-
-.availability-date-button.selected {
-  background: #fff0c1;
-  color: var(--ink);
-}
-
-.availability-date-button.selected.week-start {
-  background: var(--rosewood);
-  border-bottom-left-radius: 999px;
-  border-top-left-radius: 999px;
-  color: var(--cream);
-}
-
-.availability-date-button.selected.week-end {
-  border-bottom-right-radius: 999px;
-  border-top-right-radius: 999px;
-}
-
-.availability-date-button:disabled {
-  color: rgba(115, 106, 95, 0.24);
-  cursor: not-allowed;
-}
-
-.availability-date-button:focus-visible {
-  outline: 2px solid var(--rosewood);
-  outline-offset: -2px;
-}
-
-.availability-week-controls {
-  align-items: center;
-  display: flex;
-  gap: 10px;
-}
-
-.availability-week-controls button {
-  align-items: center;
-  background: var(--paper);
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  color: var(--ink);
-  cursor: pointer;
-  display: flex;
-  font-size: 16px;
-  font-weight: 800;
-  height: 38px;
-  justify-content: center;
-  width: 38px;
-}
-
-.availability-week-controls span {
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 800;
-  min-width: 128px;
-  text-align: center;
-  text-transform: uppercase;
+  line-height: 1.6;
+  margin: 0;
+  max-width: 64ch;
 }
 
 .availability-calendar {
@@ -4058,7 +3831,7 @@ button.availability-date-field:focus-visible {
 
 .availability-grid {
   grid-auto-rows: 18px;
-  touch-action: none;
+  touch-action: pan-x pan-y;
   user-select: none;
 }
 
@@ -5652,7 +5425,21 @@ button.availability-date-field:focus-visible {
   }
 
   .about-topbar.mobile-nav-open .about-nav {
+    background: var(--cream);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    box-shadow: 0 12px 32px rgba(31, 29, 26, 0.2);
     display: grid;
+    padding: 8px;
+  }
+
+  .about-topbar.mobile-nav-open .about-nav button {
+    color: var(--ink);
+    text-shadow: none;
+  }
+
+  .creator-onboard-page .about-topbar.mobile-nav-open + .creator-apply-stage {
+    padding-top: 330px;
   }
 
   .about-nav .header-search-control {
@@ -5838,13 +5625,8 @@ button.availability-date-field:focus-visible {
     font-size: 18px;
   }
 
-  .rating,
   .expert-rate {
     font-size: 14px;
-  }
-
-  .rating span {
-    font-size: 17px;
   }
 
   .expert-copy p {
@@ -5899,15 +5681,10 @@ button.availability-date-field:focus-visible {
     font-size: 17px;
   }
 
-  .rating,
   .expert-rate,
   .expert-category,
   .expert-note {
     font-size: 12px;
-  }
-
-  .rating span {
-    font-size: 14px;
   }
 
   .expert-note {
@@ -6113,23 +5890,8 @@ button.availability-date-field:focus-visible {
     display: grid;
   }
 
-  .availability-timezone-picker,
-  .availability-date-picker,
-  .availability-date-field {
+  .availability-timezone-picker {
     width: 100%;
-  }
-
-  .availability-date-panel {
-    padding: 14px;
-  }
-
-  .availability-calendar-nav {
-    grid-template-columns: 36px minmax(0, 1fr) 36px;
-  }
-
-  .availability-calendar-nav button {
-    height: 36px;
-    width: 36px;
   }
 
   .availability-calendar {

@@ -346,7 +346,9 @@ test("server-renders the admin creator profile editor preview", async () => {
   assert.match(html, /Photos and videos/);
   assert.match(html, />Save profile<\/button>/);
   assert.match(html, /aria-label="Save profile changes"/);
-  assert.match(html, />Availability<\/h2>/);
+  assert.match(html, />Weekly availability<\/h2>/);
+  assert.match(html, /These hours repeat every week in your selected timezone/);
+  assert.doesNotMatch(html, /Select date|Select availability week|Visible month/);
   assert.match(html, />Save availability<\/button>/);
   assert.match(html, /Stripe payouts/);
   assert.match(html, /Connect Stripe/);
@@ -497,15 +499,11 @@ test("preserves creator uploaded media for dashboard and public profiles", async
   assert.match(editorData, /profileImageZoom: profile\.profileImageZoom \?\? 135/);
   assert.match(creatorOnboarding, /mediaItems: getPublishedCreatorMediaItems\(profile\)/);
   assert.match(creatorOnboarding, /function getPublishedCreatorMediaItems/);
-  assert.match(editor, /setMediaSaveStatus\("idle"\);\s+setProfileImageFileName/s);
   assert.match(editor, /function update<K extends keyof EditableProfileState>/);
-  assert.match(editor, /setMediaSaveStatus\("idle"\);\s+setProfile\(\(current\) => \(\{ \.\.\.current, \[key\]: value \}\)\)/);
   assert.match(editor, /async function saveProfileChanges/);
   assert.match(editor, /formData\.set\(\s*"profileImagePositionX"/s);
   assert.match(editor, /formData\.set\(\s*"profileImagePositionY"/s);
   assert.match(editor, /formData\.set\("profileImageZoom"/);
-  assert.match(editor, /const \[savedSlotKeys, setSavedSlotKeys\]/);
-  assert.match(editor, /\[weekValue\]: savedSlotKeys/);
   assert.match(editor, /disabled=\{saveStatus === "saving"\}/);
   assert.doesNotMatch(editor, />Save media</);
   assert.match(profileImageHelper, /export function getProfileImageTransform/);

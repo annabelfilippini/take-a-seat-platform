@@ -196,3 +196,99 @@ test("duplicate acceptance links return the matching creator to their existing p
   assert.equal((await getCreatorDashboardAccountFromInvite(owner, originalInvite.token)).profile.id, "invite-original");
   assert.equal((await getCreatorDashboardAccountFromInvite(owner)).profile.id, "invite-original");
 });
+
+test("profile edits, prices, and cleared social links survive save and reload", async () => {
+  const { getEditableCreatorProfile } = await import("../app/admin/creator-profile-editor-preview/creator-profile-editor-data.ts");
+  const creatorId = "onboard_profile_save_regression";
+  const edits = {
+    creatorId,
+    email: "profile-save@example.com",
+    name: "Edited Creator",
+    about: "Updated about paragraph",
+    profileIntro: "Updated introduction",
+    helpItems: "Wardrobe planning\nEvent styling",
+    oneToOneReason: "Personal advice for your next event",
+    category: "Style & Beauty",
+    location: "New York",
+    instagramHandle: "updatedcreator",
+    tiktokHandle: "updatedcreator2",
+    profileImageUrl: "/ella-profile.jpg",
+    profileImagePositionX: "27",
+    profileImagePositionY: "62",
+    profileImageZoom: "160",
+    profileGallery: "/ella-profile.jpg\n/ella-reference-sundress.jpg",
+    seat15Enabled: "on",
+    seat15PriceAmount: "75",
+    seat15DurationMinutes: "15",
+    seat15Description: "Updated short call",
+    seat30Enabled: "on",
+    seat30PriceAmount: "150",
+    seat30DurationMinutes: "30",
+    seat30Description: "Updated long call",
+    timezone: "America/New_York",
+  };
+  const input = await domain.getCreatorProfileSettingsInput(await formRequest("/", edits).formData());
+  await domain.saveCreatorProfileSettings(creatorId, input);
+  const accepted = await domain.acceptCreatorApplication(creatorId, "profile-save-regression");
+  edits.creatorId = accepted.id;
+  const invite = await domain.createCreatorInvite(accepted);
+  const owner = { userId: "user_profile_save", email: edits.email, phone: null, sessionId: "session_profile_save" };
+  assert.equal((await domain.claimCreatorInvite(invite.token, owner)).status, "claimed");
+
+  process.env.TAKE_A_SEAT_DEV_ADMIN_ENABLED = "true";
+  try {
+    const response = await submit(formRequest("/api/creators/profile", edits, true));
+    const result = await response.json();
+    assert.equal(response.status, 200, JSON.stringify(result));
+    assert.equal(result.status, "saved");
+    const stored = (await domain.getCreatorDashboardAccount(owner)).profile;
+    for (const key of ["name", "about", "profileIntro", "oneToOneReason", "category", "location", "instagramHandle", "tiktokHandle", "profileImageUrl", "profileGallery", "seat15Description", "seat30Description", "timezone"]) {
+      assert.equal(stored[key], edits[key], key);
+    }
+    assert.equal(stored.profileImagePositionX, 27);
+    assert.equal(stored.profileImagePositionY, 62);
+    assert.equal(stored.profileImageZoom, 160);
+    assert.equal(stored.seat15PriceAmount, 7500);
+    assert.equal(stored.seat30PriceAmount, 15000);
+    const restored = getEditableCreatorProfile(stored);
+    assert.equal(restored.seat15PriceAmount, 75);
+    assert.equal(restored.seat30PriceAmount, 150);
+    assert.equal(restored.mediaItems.length, 2);
+    const publicCreator = await domain.getPublishedCreatorBySlug(stored.publicSlug);
+    assert.equal(publicCreator.name, edits.name);
+    assert.equal(publicCreator.profile.intro, edits.profileIntro);
+    assert.deepEqual(publicCreator.seats.map(seat => seat.unitAmount), [7500, 15000]);
+
+    // Saving a different field after reopening must not change either price.
+    const resave = await submit(formRequest("/api/creators/profile", {
+      ...edits,
+      name: "Updated again",
+      seat15PriceAmount: String(restored.seat15PriceAmount),
+      seat30PriceAmount: String(restored.seat30PriceAmount),
+      instagramHandle: "",
+      tiktokHandle: "",
+    }, true));
+    assert.equal(resave.status, 200);
+    const reloaded = (await domain.getCreatorDashboardAccount(owner)).profile;
+    assert.equal(reloaded.seat30PriceAmount, 15000);
+    const editor = getEditableCreatorProfile(reloaded);
+    assert.equal(editor.instagramUrl, "");
+    assert.equal(editor.tiktokUrl, "");
+    const published = await domain.getPublishedCreatorBySlug(reloaded.publicSlug);
+    assert.equal(published.name, "Updated again");
+    assert.equal(published.instagramUrl, undefined);
+    assert.equal(published.tiktokUrl, undefined);
+
+    for (const amount of [0, 99.99, 100, 100.01, 150, 250.75, 1000]) {
+      const priceSave = await submit(formRequest("/api/creators/profile", {
+        ...edits, seat30PriceAmount: String(amount),
+      }, true));
+      assert.equal(priceSave.status, 200);
+      const saved = (await domain.getCreatorDashboardAccount(owner)).profile;
+      assert.equal(saved.seat30PriceAmount, Math.round(amount * 100));
+      assert.equal(getEditableCreatorProfile(saved).seat30PriceAmount, amount);
+    }
+  } finally {
+    delete process.env.TAKE_A_SEAT_DEV_ADMIN_ENABLED;
+  }
+});

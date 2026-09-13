@@ -176,14 +176,10 @@ function getEditableCreatorMediaItems(profile: CreatorOnboardingProfile) {
 }
 
 function getEditablePriceAmount(value: number | null) {
-  let amount = Number(value ?? 0);
+  const amount = Number(value ?? 0);
 
   if (!Number.isFinite(amount) || amount <= 0) {
     return 0;
-  }
-
-  while (amount > 10000) {
-    amount /= 100;
   }
 
   return Number((amount / 100).toFixed(2));

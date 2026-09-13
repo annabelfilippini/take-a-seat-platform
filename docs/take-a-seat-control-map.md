@@ -32,6 +32,9 @@ Creator backend:
 - Lets creators edit profile content that affects buyer confidence.
 - Lets creators set 15 minute and 30 minute seat pricing.
 - Lets creators manage weekly availability and booking limits.
+- Availability is one recurring weekly pattern, with weekday columns and an
+  explicit repeat notice. New creators start with no selected hours; touch users
+  tap to select and swipe to scroll. Date-specific exceptions are not supported.
 - Lets creators connect Google Calendar.
 - Lets creators connect Stripe payouts.
 - Shows request, booking, and setup notifications.

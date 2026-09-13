@@ -125,9 +125,6 @@ export function CreatorDirectory({
                   <div className="expert-copy">
                     <div className="expert-topline">
                       <strong>{creator.name}</strong>
-                      <span className="rating">
-                        <span aria-hidden="true">&#9733;</span> 5.0
-                      </span>
                     </div>
                     <span className="expert-category">{creator.category}</span>
                     <span className="expert-rate">
