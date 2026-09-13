@@ -159,7 +159,7 @@ test("application, invitation, saved profile, OAuth, reservation, authorization,
         assert.equal(saved.status, 200, await saved.clone().text());
         const creator = await domain.getPublishedCreatorBySlug("rehearsal-creator");
         assert.ok(creator);
-        await domain.saveCreatorAvailability({ creatorId: creator.id, timezone: "America/New_York", bufferMinutes: 15, minNoticeMinutes: 0, maxBookingsPerDay: null, maxBookingsPerWeek: null, rules: [{ dayOfWeek: 4, startTime: "09:00", endTime: "12:00" }] });
+        await domain.saveCreatorAvailability({ weekStart: "2026-09-27", creatorId: creator.id, timezone: "America/New_York", bufferMinutes: 15, minNoticeMinutes: 0, maxBookingsPerDay: null, maxBookingsPerWeek: null, rules: [{ dayOfWeek: 4, startTime: "09:00", endTime: "12:00" }] });
         const started = await start(new Request("http://localhost/api/google-calendar/oauth/start?creatorId=" + creator.id + "&returnTo=/creators/dashboard", { headers: { cookie: "tas_local_admin=1" } }));
         assert.equal(started.status, 303);
         const oauth = new URL(started.headers.get("location"));

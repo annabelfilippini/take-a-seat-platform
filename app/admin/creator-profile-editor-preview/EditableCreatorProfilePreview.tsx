@@ -10,6 +10,7 @@ import {
   type PointerEvent,
   type WheelEvent,
 } from "react";
+import { addCalendarDays, availabilityDateBounds, availabilityWeekStart, isCalendarDate, rulesForAvailabilityWeek } from "../../_lib/availability-weeks";
 import { CREATOR_PROFILE_EDITOR_URL } from "../../_lib/creator-destination";
 
 type EditableGalleryItem = {
@@ -83,6 +84,7 @@ export type EditableCreatorNotification = {
 };
 
 type EditableAvailabilityRule = {
+  weekStart?: string | null;
   bufferMinutes?: number | null;
   dayOfWeek: number;
   enabled?: boolean;
@@ -1075,19 +1077,53 @@ function EditableAvailabilityPanel({
   timezone: string;
 }) {
   const calendarConnected = Boolean(calendarConnectedAt);
-  const [timezone, setTimezone] = useState(initialTimezone);
+  const [weekStart, setWeekStart] = useState(() => availabilityWeekStart(availabilityDateBounds(initialTimezone).today));
+  const weekRules = rulesForAvailabilityWeek(initialRules, weekStart);
+  const [timezone, setTimezone] = useState(weekRules[0]?.timezone ?? initialTimezone);
+  let bounds;
+  try { bounds = availabilityDateBounds(timezone); } catch { bounds = availabilityDateBounds(initialTimezone); }
+  const { today, end } = bounds;
+  const disabledDays = availabilityDays.filter((day) => {
+    const date = addCalendarDays(weekStart, day.value);
+    return date < today || date > end;
+  }).map((day) => day.value);
   const [selectedSlots, setSelectedSlots] = useState(
-    () => new Set(getAvailabilitySlotKeysFromRules(initialRules)),
+    () => new Set(getAvailabilitySlotKeysFromRules(weekRules)),
   );
-  const [saveStatus, setSaveStatus] = useState<"error" | "idle" | "saved" | "saving">(
-    initialRules.length > 0 ? "saved" : "idle",
+  const [saveStatus, setSaveStatus] = useState<"empty" | "error" | "idle" | "saved" | "saving">(
+    weekRules.length > 0 ? "saved" : "empty",
   );
+  const [weekDrafts, setWeekDrafts] = useState(new Map<string, { slots: Set<string>; timezone: string; status: typeof saveStatus }>());
+
+  function showWeek(date: string) {
+    if (saveStatus === "saving" || !isCalendarDate(date)) return;
+    const nextWeek = availabilityWeekStart(date);
+    if (nextWeek < availabilityWeekStart(today) || nextWeek > availabilityWeekStart(end)) return;
+    setWeekDrafts(new Map(weekDrafts).set(weekStart, { slots: selectedSlots, timezone, status: saveStatus }));
+    const draft = weekDrafts.get(nextWeek);
+    const rules = rulesForAvailabilityWeek(initialRules, nextWeek);
+    setSelectedSlots(draft?.slots ?? new Set(getAvailabilitySlotKeysFromRules(rules)));
+    setTimezone(draft?.timezone ?? rules[0]?.timezone ?? initialTimezone);
+    setSaveStatus(draft?.status ?? (rules.length ? "saved" : "empty"));
+    setWeekStart(nextWeek);
+  }
+
+  useEffect(() => {
+    const warnIfUnsaved = (event: BeforeUnloadEvent) => {
+      if ((saveStatus !== "saved" && saveStatus !== "empty") || [...weekDrafts.entries()].some(([week, draft]) => week !== weekStart && draft.status !== "saved" && draft.status !== "empty")) {
+        event.preventDefault();
+        event.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", warnIfUnsaved);
+    return () => window.removeEventListener("beforeunload", warnIfUnsaved);
+  }, [saveStatus, weekDrafts, weekStart]);
   const paintActionRef = useRef<"clear" | "select" | null>(null);
   const paintStartRef = useRef<{ dayOfWeek: number; slotIndex: number } | null>(null);
   const paintedSlotsRef = useRef<Set<string>>(new Set());
 
   function paintSlot(key: string, action: "clear" | "select") {
-    if (paintedSlotsRef.current.has(key)) {
+    if (disabledDays.includes(Number(key.split("|")[0])) || paintedSlotsRef.current.has(key)) {
       return;
     }
 
@@ -1216,9 +1252,10 @@ function EditableAvailabilityPanel({
       const response = await fetch("/api/creators/availability", {
         body: getAvailabilityFormData({
           creatorId,
-          initialRules,
-          selectedSlots,
+          initialRules: weekRules,
+          selectedSlots: new Set([...selectedSlots].filter((key) => !disabledDays.includes(Number(key.split("|")[0])))),
           timezone,
+          weekStart,
         }),
         headers: { accept: "application/json" },
         method: "POST",
@@ -1228,6 +1265,7 @@ function EditableAvailabilityPanel({
         throw new Error("Availability save failed.");
       }
 
+      setWeekDrafts(new Map(weekDrafts).set(weekStart, { slots: selectedSlots, timezone, status: "saved" }));
       setSaveStatus("saved");
     } catch {
       setSaveStatus("error");
@@ -1248,7 +1286,7 @@ function EditableAvailabilityPanel({
                 ? "Saved"
                 : saveStatus === "error"
                   ? "Needs attention"
-                  : "Unsaved"}
+                  : saveStatus === "empty" ? "No hours yet" : "Unsaved"}
           </span>
           <a
             className="seat-secondary-button compact-form-button"
@@ -1262,12 +1300,29 @@ function EditableAvailabilityPanel({
       </div>
 
       <p className="availability-instructions" id="weekly-availability-help">
-        These hours repeat every week in your selected timezone. Select the times
-        you can take calls, then save your availability. Tap a time to select it,
-        or use a mouse to drag across several times.
+        Set different hours each week, up to a year ahead. Tap a time or drag with
+        a mouse, then save this week. Other weeks stay unchanged.
+        {weekRules.some((rule) => !rule.weekStart) && " This week starts with your existing repeating hours."}
       </p>
 
+      <div className="availability-week-navigation">
+        <button type="button" aria-label="Previous week" className="seat-secondary-button"
+          disabled={saveStatus === "saving" || weekStart <= availabilityWeekStart(today)}
+          onClick={() => showWeek(addCalendarDays(weekStart, -7))}>←</button>
+        <strong aria-live="polite">{formatAvailabilityWeek(weekStart)}</strong>
+        <button type="button" aria-label="Next week" className="seat-secondary-button"
+          disabled={saveStatus === "saving" || weekStart >= availabilityWeekStart(end)}
+          onClick={() => showWeek(addCalendarDays(weekStart, 7))}>→</button>
+      </div>
       <div className="availability-settings-row">
+        <label className="availability-timezone-picker">
+          <span>Jump to date</span>
+          <input type="date" aria-label="Jump to availability date"
+            className="editable-profile-field editable-basic-input"
+            disabled={saveStatus === "saving"} min={today} max={end}
+            value={weekStart < today ? today : weekStart}
+            onChange={(event) => showWeek(event.target.value)} />
+        </label>
         <label className="availability-timezone-picker">
           <span>Timezone</span>
           <input
@@ -1296,6 +1351,7 @@ function EditableAvailabilityPanel({
             {availabilityDays.map((day) => (
               <span className="availability-day-heading" key={day.value}>
                 <strong>{day.label}</strong>
+                <span>{formatAvailabilityDate(addCalendarDays(weekStart, day.value))}</span>
               </span>
             ))}
           </div>
@@ -1309,6 +1365,8 @@ function EditableAvailabilityPanel({
             {availabilityTimeSlots.map((slot, slotIndex) => (
               <EditableAvailabilityRow
                 disabled={saveStatus === "saving"}
+                disabledDays={disabledDays}
+                weekStart={weekStart}
                 key={slot.value}
                 selectedSlots={selectedSlots}
                 slot={slot}
@@ -1320,13 +1378,25 @@ function EditableAvailabilityPanel({
         </div>
       </div>
 
+      <p className="availability-instructions" role="status">
+        {saveStatus === "error" ? "Could not save this week. Check your timezone and connection, then try again. Your selections are still here."
+          : saveStatus === "saved" ? "This week is saved."
+          : "Save each week when you finish. Unsaved selections stay here while you browse other weeks."}
+        {[...weekDrafts.entries()].some(([week, draft]) => week !== weekStart && draft.status !== "saved" && draft.status !== "empty")
+          && " You have unsaved selections in another week."}
+      </p>
+      <button type="button" className="seat-secondary-button compact-form-button"
+        disabled={saveStatus === "saving" || selectedSlots.size === 0}
+        onClick={() => { setSelectedSlots(new Set()); setSaveStatus("idle"); }}>
+        Clear this week
+      </button>
       <button
         className="editable-primary-button editable-save-button"
         disabled={saveStatus === "saving"}
         onClick={saveAvailability}
         type="button"
       >
-        {saveStatus === "saving" ? "Saving availability" : "Save availability"}
+        {saveStatus === "saving" ? "Saving this week" : "Save this week"}
       </button>
     </div>
   );
@@ -1334,12 +1404,16 @@ function EditableAvailabilityPanel({
 
 function EditableAvailabilityRow({
   disabled,
+  disabledDays,
+  weekStart,
   selectedSlots,
   slot,
   slotIndex,
   toggleSlot,
 }: {
   disabled: boolean;
+  disabledDays: number[];
+  weekStart: string;
   selectedSlots: Set<string>;
   slot: AvailabilityTimeSlot;
   slotIndex: number;
@@ -1352,7 +1426,8 @@ function EditableAvailabilityRow({
       </span>
       {availabilityDays.map((day) => {
         const key = getAvailabilitySlotKey(day.value, slot.value);
-        const selected = selectedSlots.has(key);
+        const dayDisabled = disabled || disabledDays.includes(day.value);
+        const selected = !disabledDays.includes(day.value) && selectedSlots.has(key);
         const previousSelected =
           slotIndex > 0 &&
           selectedSlots.has(getAvailabilitySlotKey(day.value, availabilityTimeSlots[slotIndex - 1].value));
@@ -1371,22 +1446,22 @@ function EditableAvailabilityRow({
 
         return (
           <button
-            aria-label={`${day.label} ${slot.label}`}
+            aria-label={`${day.label} ${addCalendarDays(weekStart, day.value)} ${slot.label}`}
             aria-pressed={selected}
             className={classNames}
             data-availability-key={key}
-            disabled={disabled}
+            disabled={dayDisabled}
             key={day.value}
             onPointerUp={(event) => {
               // Scrolling cancels touch pointers; only a completed tap toggles.
-              if (event.pointerType === "touch" && !disabled) {
+              if (event.pointerType === "touch" && !dayDisabled) {
                 toggleSlot(day.value, slot.value);
               }
             }}
             onClick={(event) => {
               // Pointer selection is handled above; native clicks cover
               // keyboard and assistive input without toggling a pointer twice.
-              if (event.detail === 0) {
+              if (event.detail === 0 && !dayDisabled) {
                 toggleSlot(day.value, slot.value);
               }
             }}
@@ -1879,15 +1954,18 @@ function getAvailabilityFormData({
   initialRules,
   selectedSlots,
   timezone,
+  weekStart,
 }: {
   creatorId: string;
   initialRules: EditableAvailabilityRule[];
   selectedSlots: Set<string>;
   timezone: string;
+  weekStart: string;
 }) {
   const formData = new FormData();
-  const firstRule = initialRules.find((rule) => rule.enabled !== false);
+  const firstRule = initialRules[0];
 
+  formData.set("weekStart", weekStart);
   formData.set("creatorId", creatorId);
   formData.set("timezone", timezone);
   formData.set("returnTo", CREATOR_PROFILE_EDITOR_URL);
@@ -2285,4 +2363,13 @@ function getTikTokVideoId(source: string) {
   } catch {
     return null;
   }
+}
+
+function formatAvailabilityDate(value: string) {
+  return new Intl.DateTimeFormat("en-US", { timeZone: "UTC", month: "short", day: "numeric" }).format(new Date(`${value}T00:00:00Z`));
+}
+
+function formatAvailabilityWeek(value: string) {
+  const format = new Intl.DateTimeFormat("en-US", { timeZone: "UTC", month: "short", day: "numeric", year: "numeric" });
+  return format.formatRange(new Date(`${value}T00:00:00Z`), new Date(`${addCalendarDays(value, 6)}T00:00:00Z`));
 }

@@ -1,3 +1,4 @@
+import { availabilityDateBounds, availabilityWeekStart, rulesForAvailabilityWeek } from "./availability-weeks";
 import type { CreatorAvailabilityRule, Seat } from "./creators";
 
 export type ViewerAvailabilityDay = {
@@ -35,7 +36,8 @@ type SourceAvailabilitySlot = {
   timezone: string;
 };
 
-const defaultAvailabilityWindowDays = 75;
+// Include both sides of the date line and leap-year anniversaries.
+const defaultAvailabilityWindowDays = 371;
 const ellaAvailability = [
   { date: "2026-09-17", times: ["09:30", "11:00"] },
   { date: "2026-09-22", times: ["10:00", "12:30", "15:00"] },
@@ -116,7 +118,7 @@ export function getMatchedAvailabilitySlot({
 }): MatchedAvailabilitySlot | null {
   const requestedStartUtc = localDateTimeToUtc(appointmentStartAt, timezone);
 
-  if (!requestedStartUtc) {
+  if (!requestedStartUtc || !Number.isFinite(requestedStartUtc.getTime())) {
     return null;
   }
 
@@ -159,7 +161,12 @@ export function localDateTimeToUtc(value: string, timezone: string) {
     return null;
   }
 
-  return zonedTimeToUtc(match[1], match[2], timezone);
+  try {
+    const instant = zonedTimeToUtc(match[1], match[2], timezone);
+    return Number.isFinite(instant.getTime()) ? instant : null;
+  } catch {
+    return null;
+  }
 }
 
 export function getDateValueInTimezone(date: Date, timezone: string) {
@@ -214,23 +221,26 @@ function getRuleAvailabilitySlots(
   windowStart: Date,
   now: Date,
 ): SourceAvailabilitySlot[] {
-  const enabledRules = rules.filter((rule) => rule.enabled !== false);
+  const boundsByTimezone = new Map(rules.map((rule) => [rule.timezone, availabilityDateBounds(rule.timezone, now)]));
   const slots: SourceAvailabilitySlot[] = [];
   const durationMinutes = getSeatDurationMinutes(seat);
 
   for (let index = 0; index < defaultAvailabilityWindowDays; index += 1) {
-    const date = addDays(windowStart, index);
+    const date = addDays(windowStart, index - 2);
     const dateValue = formatLocalDateValue(date);
-    const dateRules = enabledRules.filter((rule) => rule.dayOfWeek === date.getDay());
+    const dateRules = rulesForAvailabilityWeek(rules, availabilityWeekStart(dateValue))
+      .filter((rule) => rule.enabled !== false && rule.dayOfWeek === date.getDay());
 
     for (const rule of dateRules) {
+      const bounds = boundsByTimezone.get(rule.timezone)!;
+      if (dateValue < bounds.today || dateValue > bounds.end) continue;
       const minNoticeMinutes = Math.max(0, rule.minNoticeMinutes ?? 0);
       const minimumStart = now.getTime() + minNoticeMinutes * 60_000;
 
       for (const time of getAvailabilityTimesForRule(rule, durationMinutes)) {
         const startsAtUtc = zonedTimeToUtc(dateValue, time, rule.timezone).getTime();
 
-        if (startsAtUtc < minimumStart) {
+        if (!Number.isFinite(startsAtUtc) || startsAtUtc < minimumStart) {
           continue;
         }
 
@@ -331,9 +341,15 @@ function zonedTimeToUtc(dateValue: string, timeValue: string, timezone: string) 
   const [year, month, day] = dateValue.split("-").map(Number);
   const [hours, minutes] = timeValue.split(":").map(Number);
   const utcGuess = new Date(Date.UTC(year, month - 1, day, hours, minutes));
-  const offset = getTimezoneOffset(utcGuess, timezone);
-
-  return new Date(utcGuess.getTime() - offset);
+  let instant = utcGuess;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const next = new Date(utcGuess.getTime() - getTimezoneOffset(instant, timezone));
+    if (next.getTime() === instant.getTime()) break;
+    instant = next;
+  }
+  // Spring-forward gaps and impossible dates must never shift into another slot.
+  return formatLocalDateTimeInTimezone(instant, timezone) === `${dateValue}T${timeValue}:00`
+    ? instant : new Date(Number.NaN);
 }
 
 function getTimezoneOffset(date: Date, timezone: string) {
@@ -377,8 +393,13 @@ function formatTimeInTimezone(date: Date, timezone: string) {
   }).format(date);
 }
 
+// Immutable formatters are reusable; bound the cache for arbitrary viewer timezones.
+const dateTimeFormatters = new Map<string, Intl.DateTimeFormat>();
+
 function getDateTimeParts(date: Date, timezone: string) {
-  const formatter = new Intl.DateTimeFormat("en-US", {
+  let formatter = dateTimeFormatters.get(timezone);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat("en-US", {
     day: "2-digit",
     hour: "2-digit",
     hour12: false,
@@ -387,7 +408,10 @@ function getDateTimeParts(date: Date, timezone: string) {
     second: "2-digit",
     timeZone: timezone,
     year: "numeric",
-  });
+    });
+    if (dateTimeFormatters.size >= 64) dateTimeFormatters.clear();
+    dateTimeFormatters.set(timezone, formatter);
+  }
   const parts = Object.fromEntries(
     formatter.formatToParts(date).map((part) => [part.type, part.value]),
   );

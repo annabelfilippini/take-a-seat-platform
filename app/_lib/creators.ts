@@ -13,6 +13,7 @@ export type Seat = {
 };
 
 export type CreatorAvailabilityRule = {
+  weekStart?: string | null;
   bufferMinutes?: number | null;
   dayOfWeek: number;
   enabled?: boolean;

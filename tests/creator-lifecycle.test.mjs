@@ -432,3 +432,119 @@ test("acceptance email keeps the one-use credential in the fragment and preserve
 test("unaccepted applications cannot generate a setup email or provision an identity", async () => {
   assert.deepEqual(await sendCreatorAcceptedInviteEmail({ profile: { applicationStatus: "in_review", email: "test@example.com" }, request: new Request("http://localhost") }), { status: "skipped", reason: "setup-link-failed" });
 });
+const weeks = await import('../app/_lib/availability-weeks.ts');
+const availability = await import('../app/_lib/availability.ts');
+const { POST: saveAvailabilityRoute } = await import('../app/api/creators/availability/route.ts');
+const availabilitySeat = { id: 'qa-seat', name: '15 minutes', unitAmount: 1000 };
+function availabilityForm(weekStart, slots = [], extra = {}) {
+  return new URLSearchParams({ creatorId: 'onboard_week_test', timezone: 'America/Los_Angeles', weekStart,
+    availabilitySlots: JSON.stringify(slots), minNoticeMinutes: '0', bufferMinutes: '0', ...extra });
+}
+async function availabilityInput(weekStart, slots, extra) {
+  return domain.getCreatorAvailabilityInput(await new Request('http://localhost', { method: 'POST', body: availabilityForm(weekStart, slots, extra) }).formData());
+}
+function viewerDays(rules) {
+  return availability.getViewerAvailability({ availabilityRules: rules, creatorId: 'onboard_week_test', seat: availabilitySeat,
+    viewerTimezone: 'America/Los_Angeles', windowStart: availability.getAvailabilityWindowStart() });
+}
+
+test('dated availability saves and reloads independent weeks, preserves defaults, and closes an empty week', async () => {
+  const firstWeek = weeks.addCalendarDays(weeks.availabilityWeekStart(weeks.availabilityDateBounds('America/Los_Angeles').today), 7);
+  const secondWeek = weeks.addCalendarDays(firstWeek, 7);
+  const first = await availabilityInput(firstWeek, [2,3,4].map(dayOfWeek => ({ dayOfWeek, startTime: '10:00' })));
+  const second = await availabilityInput(secondWeek, [0,5,6].map(dayOfWeek => ({ dayOfWeek, startTime: '11:00' })));
+  // Existing creators retain their repeating baseline until that week is customized.
+  await domain.saveCreatorAvailability({ ...first, weekStart: null, rules: [{ dayOfWeek: 1, startTime:'09:00', endTime:'10:00' }] });
+  await domain.saveCreatorAvailability(first);
+  await domain.saveCreatorAvailability(second);
+  let saved = await domain.listCreatorAvailabilityRules(first.creatorId);
+  assert.equal(saved.filter(rule => rule.weekStart === firstWeek).length, 3);
+  assert.equal(saved.filter(rule => rule.weekStart === secondWeek).length, 3);
+  assert.equal(saved.filter(rule => rule.weekStart === null).length, 1);
+  let dates = viewerDays(saved).map(day => day.date);
+  for (const day of [2,3,4]) assert.ok(dates.includes(weeks.addCalendarDays(firstWeek, day)));
+  assert.ok(!dates.includes(weeks.addCalendarDays(firstWeek, 1)), 'weekly override replaces the default Monday');
+  for (const day of [0,5,6]) assert.ok(dates.includes(weeks.addCalendarDays(secondWeek, day)));
+  await domain.saveCreatorAvailability(await availabilityInput(firstWeek, []));
+  saved = await domain.listCreatorAvailabilityRules(first.creatorId);
+  assert.equal(saved.find(rule => rule.weekStart === firstWeek).enabled, false);
+  dates = viewerDays(saved).map(day => day.date);
+  assert.ok(!dates.some(date => weeks.availabilityWeekStart(date) === firstWeek));
+  assert.ok(dates.includes(weeks.addCalendarDays(secondWeek, 5)));
+  assert.ok(dates.includes(weeks.addCalendarDays(secondWeek, 8)), 'untouched week still uses legacy baseline');
+});
+
+test('availability rejects malformed payloads, missing week, invalid timezone, past weeks and dates beyond a year', async () => {
+  const { today, end } = weeks.availabilityDateBounds('America/Los_Angeles');
+  const current = weeks.availabilityWeekStart(today);
+  for (const bad of ['', '2027-02-30', weeks.addCalendarDays(current, 1), weeks.addCalendarDays(current, -7), weeks.addCalendarDays(weeks.availabilityWeekStart(end), 7)]) {
+    assert.equal(await availabilityInput(bad, []), null, bad);
+  }
+  for (const raw of ['', '{', '{}', '[null]', '[{"dayOfWeek":2,"startTime":"25:00"}]', '[{"dayOfWeek":2,"startTime":"10:01"}]']) {
+    assert.equal(await availabilityInput(current, [], { availabilitySlots: raw }), null);
+  }
+  assert.equal(await availabilityInput(current, [], {timezone:'Not/A_Zone'}), null);
+  const afterEnd = weeks.addCalendarDays(end, 1);
+  assert.equal(await availabilityInput(weeks.availabilityWeekStart(afterEnd), [{dayOfWeek:new Date(afterEnd+'T00:00:00Z').getUTCDay(),startTime:'10:00'}]), null);
+  const unauthorized = await saveAvailabilityRoute(new Request('http://localhost/api/creators/availability', {
+    method:'POST', body:availabilityForm(current), headers:{accept:'application/json'},
+  }));
+  assert.equal(unauthorized.status, 400);
+  assert.equal((await unauthorized.json()).detail, 'creator-access');
+});
+
+test('a failed availability insertion rolls back the deletion', async () => {
+  const week = weeks.addCalendarDays(weeks.availabilityWeekStart(weeks.availabilityDateBounds('UTC').today), 14);
+  const input = await availabilityInput(week, [{dayOfWeek:2,startTime:'12:00'}]);
+  await domain.saveCreatorAvailability(input);
+  const before = await domain.listCreatorAvailabilityRules(input.creatorId);
+  sqlite.exec("CREATE TRIGGER fail_availability_insert BEFORE INSERT ON creator_availability_rules BEGIN SELECT RAISE(ABORT, 'simulated write failure'); END");
+  try { await assert.rejects(domain.saveCreatorAvailability({...input,rules:[]})); }
+  finally { sqlite.exec('DROP TRIGGER fail_availability_insert'); }
+  assert.deepEqual(await domain.listCreatorAvailabilityRules(input.creatorId), before);
+});
+
+test('customer selection and server validation reach the anniversary with notice, buffer and timezone intact', async () => {
+  const { end } = weeks.availabilityDateBounds('America/Los_Angeles');
+  const input = await availabilityInput(weeks.availabilityWeekStart(end), [{dayOfWeek:new Date(end+'T00:00:00Z').getUTCDay(),startTime:'12:00'}]);
+  await domain.saveCreatorAvailability(input);
+  const saved = await domain.listCreatorAvailabilityRules(input.creatorId);
+  const found = viewerDays(saved).find(day => day.date === end);
+  assert.ok(found);
+  const matched = availability.getMatchedAvailabilitySlot({ appointmentStartAt:`${end}T12:00:00`, timezone:'America/Los_Angeles',
+    creatorId:input.creatorId, seat:availabilitySeat, availabilityRules:saved });
+  assert.equal(matched.creatorDate, end);
+  assert.equal(matched.appointmentEndUtc - matched.appointmentStartUtc, 15 * 60_000);
+  const future = weeks.addCalendarDays(end, 1);
+  assert.equal(availability.getMatchedAvailabilitySlot({appointmentStartAt:`${future}T12:00:00`,timezone:'America/Los_Angeles',creatorId:input.creatorId,seat:availabilitySeat,availabilityRules:saved}),null);
+  const repeating = [{dayOfWeek:2,startTime:'10:00',endTime:'11:00',timezone:'America/Los_Angeles',bufferMinutes:15,minNoticeMinutes:0,maxBookingsPerDay:2,maxBookingsPerWeek:4}];
+  const firstDay = viewerDays(repeating)[0];
+  assert.deepEqual(firstDay.slots.map(slot=>slot.sourceAppointmentStartAt.slice(11,16)), ['10:00','10:30']);
+  const match = availability.getMatchedAvailabilitySlot({appointmentStartAt:firstDay.slots[0].sourceAppointmentStartAt,timezone:'America/Los_Angeles',creatorId:input.creatorId,seat:availabilitySeat,availabilityRules:repeating});
+  assert.equal(match.maxBookingsPerDay,2); assert.equal(match.maxBookingsPerWeek,4);
+  assert.deepEqual(viewerDays([{...repeating[0],minNoticeMinutes:600000}]), []);
+});
+
+test('calendar-year and daylight-saving boundaries never shift selected wall times', () => {
+  assert.deepEqual(weeks.availabilityDateBounds('UTC', new Date('2028-02-29T12:00:00Z')), {today:'2028-02-29',end:'2029-02-28'});
+  assert.equal(weeks.availabilityDateBounds('America/Los_Angeles',new Date('2026-09-13T01:00:00Z')).today,'2026-09-12');
+  assert.equal(availability.localDateTimeToUtc('2027-03-14T10:00:00','America/Los_Angeles').toISOString(),'2027-03-14T17:00:00.000Z');
+  assert.equal(availability.localDateTimeToUtc('2026-11-01T10:00:00','America/Los_Angeles').toISOString(),'2026-11-01T18:00:00.000Z');
+  assert.equal(availability.localDateTimeToUtc('2027-03-14T02:30:00','America/Los_Angeles'), null);
+});
+
+test('fragmented hours save without exceeding D1 parameter limits', async () => {
+  const week = weeks.addCalendarDays(weeks.availabilityWeekStart(weeks.availabilityDateBounds('UTC').today), 21);
+  const slots = Array.from({length:7},(_,dayOfWeek) => Array.from({length:13},(_,hour) => ({dayOfWeek,startTime:`${String(hour+8).padStart(2,'0')}:00`}))).flat();
+  const input = await availabilityInput(week,slots);
+  const originalPrepare = globalThis.__lifecycleEnv.DB.prepare;
+  globalThis.__lifecycleEnv.DB.prepare = (sql) => {
+    const statement = originalPrepare(sql);
+    const originalBind = statement.bind;
+    statement.bind = (...values) => { assert.ok(values.length <= 100, `${values.length} bound parameters`); return originalBind(...values); };
+    return statement;
+  };
+  try { await domain.saveCreatorAvailability(input); }
+  finally { globalThis.__lifecycleEnv.DB.prepare = originalPrepare; }
+  assert.equal((await domain.listCreatorAvailabilityRules(input.creatorId)).filter(rule=>rule.weekStart===week).length,91);
+});

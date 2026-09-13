@@ -42,6 +42,7 @@ export async function getSignedInCreatorEditorAccount(
 
     return {
       availabilityRules: account.availabilityRules.map((rule) => ({
+        weekStart: rule.weekStart,
         bufferMinutes: rule.bufferMinutes,
         dayOfWeek: rule.dayOfWeek,
         enabled: rule.enabled,

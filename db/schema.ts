@@ -102,6 +102,7 @@ export const creatorCalendarConnections = sqliteTable(
 );
 
 export const creatorAvailabilityRules = sqliteTable("creator_availability_rules", {
+  weekStart: text("week_start"),
   id: integer("id").primaryKey({ autoIncrement: true }),
   creatorId: text("creator_id").notNull(),
   timezone: text("timezone").notNull(),

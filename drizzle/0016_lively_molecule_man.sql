@@ -1,0 +1,1 @@
+ALTER TABLE `creator_availability_rules` ADD `week_start` text;

@@ -23,6 +23,7 @@ export async function GET(request: Request) {
 
       return Response.json({
         availabilityRules: account.availabilityRules.map((rule) => ({
+          weekStart: rule.weekStart,
           bufferMinutes: rule.bufferMinutes,
           dayOfWeek: rule.dayOfWeek,
           enabled: rule.enabled,

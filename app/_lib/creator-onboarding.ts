@@ -1,4 +1,5 @@
-import { and, desc, eq, isNotNull, or, sql } from "drizzle-orm";
+import { addCalendarDays, availabilityDateBounds, availabilityWeekStart, isCalendarDate } from "./availability-weeks";
+import { and, desc, eq, isNull, isNotNull, or, sql } from "drizzle-orm";
 import {
   creatorAvailabilityRules,
   creatorAccounts,
@@ -67,6 +68,7 @@ export type CreatorProfileSettingsInput = CreatorOnboardingInput & {
 };
 
 export type CreatorAvailabilityInput = {
+  weekStart: string | null;
   bufferMinutes: number;
   creatorId: string;
   maxBookingsPerDay: number | null;
@@ -254,14 +256,32 @@ export function getCreatorAvailabilityInput(
   formData: FormData,
 ): CreatorAvailabilityInput | null {
   const creatorId = getCreatorSettingsId(formData);
-  const timezone = cleanTimezone(getString(formData, "timezone"));
-  const rules = getAvailabilityRules(getString(formData, "availabilitySlots"));
+  const timezone = getString(formData, "timezone")?.trim() ?? "";
+  if (!timezone) return null;
+  const rawSlots = getString(formData, "availabilitySlots");
+  let parsedSlots: unknown;
+  try { parsedSlots = JSON.parse(rawSlots ?? ""); } catch { return null; }
+  if (!Array.isArray(parsedSlots) || parsedSlots.length > 672 || parsedSlots.some((slot) =>
+    !slot || typeof slot !== "object" || !Number.isInteger(slot.dayOfWeek)
+    || slot.dayOfWeek < 0 || slot.dayOfWeek > 6
+    || typeof slot.startTime !== "string" || !/^(?:[01]\d|2[0-3]):(?:00|15|30|45)$/u.test(slot.startTime)
+  )) return null;
+  const rules = getAvailabilityRules(rawSlots);
+  const weekStart = getString(formData, "weekStart");
+  // Require an explicit week for new writes. Existing recurring rows are read-only defaults.
+  if (!weekStart || !isCalendarDate(weekStart) || availabilityWeekStart(weekStart) !== weekStart) return null;
+  try { new Intl.DateTimeFormat("en-US", { timeZone: timezone }); } catch { return null; }
+  const { today, end } = availabilityDateBounds(timezone);
+  if (weekStart < availabilityWeekStart(today) || weekStart > availabilityWeekStart(end)) return null;
+  if (rules.some((rule) => addCalendarDays(weekStart, rule.dayOfWeek) < today
+    || addCalendarDays(weekStart, rule.dayOfWeek) > end)) return null;
 
   if (!creatorId) {
     return null;
   }
 
   return {
+    weekStart,
     bufferMinutes: cleanInteger(getString(formData, "bufferMinutes"), 0, 240, 15),
     creatorId,
     maxBookingsPerDay: cleanOptionalInteger(
@@ -1086,6 +1106,7 @@ export function createPublishedCreator(
   return {
     accent: getCreatorAccent(profile.category),
     availabilityRules: availabilityRules.map((rule) => ({
+      weekStart: rule.weekStart,
       bufferMinutes: rule.bufferMinutes,
       dayOfWeek: rule.dayOfWeek,
       enabled: rule.enabled,
@@ -1271,28 +1292,31 @@ export async function saveCreatorAvailability(input: CreatorAvailabilityInput) {
   const db = getDb();
   const now = new Date().toISOString();
 
-  await db
-    .delete(creatorAvailabilityRules)
-    .where(eq(creatorAvailabilityRules.creatorId, input.creatorId));
-
-  if (input.rules.length > 0) {
-    await db.insert(creatorAvailabilityRules).values(
-      input.rules.map((rule) => ({
-        bufferMinutes: input.bufferMinutes,
-        createdAt: now,
-        creatorId: input.creatorId,
-        dayOfWeek: rule.dayOfWeek,
-        enabled: true,
-        endTime: rule.endTime,
-        maxBookingsPerDay: input.maxBookingsPerDay,
-        maxBookingsPerWeek: input.maxBookingsPerWeek,
-        minNoticeMinutes: input.minNoticeMinutes,
-        startTime: rule.startTime,
-        timezone: input.timezone,
-        updatedAt: now,
-      })),
-    );
+  const scope = and(
+    eq(creatorAvailabilityRules.creatorId, input.creatorId),
+    input.weekStart ? eq(creatorAvailabilityRules.weekStart, input.weekStart) : isNull(creatorAvailabilityRules.weekStart),
+  );
+  const rules = input.rules.length ? input.rules : [{ dayOfWeek: 0, startTime: "00:00", endTime: "00:00" }];
+  const values = rules.map((rule) => ({
+    ...rule,
+    weekStart: input.weekStart,
+    bufferMinutes: input.bufferMinutes,
+    createdAt: now,
+    creatorId: input.creatorId,
+    enabled: input.rules.length > 0,
+    maxBookingsPerDay: input.maxBookingsPerDay,
+    maxBookingsPerWeek: input.maxBookingsPerWeek,
+    minNoticeMinutes: input.minNoticeMinutes,
+    timezone: input.timezone,
+    updatedAt: now,
+  }));
+  // Keep each statement below D1's bound-parameter limit, even for fragmented hours.
+  const inserts = [];
+  for (let index = 0; index < values.length; index += 6) {
+    inserts.push(db.insert(creatorAvailabilityRules).values(values.slice(index, index + 6)));
   }
+  // D1 batches are atomic: a failed insert must not erase the previous schedule.
+  await db.batch([db.delete(creatorAvailabilityRules).where(scope), ...inserts]);
 }
 
 export async function listCreatorAvailabilityRules(creatorId: string) {

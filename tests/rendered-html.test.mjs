@@ -347,9 +347,10 @@ test("server-renders the admin creator profile editor preview", async () => {
   assert.match(html, />Save profile<\/button>/);
   assert.match(html, /aria-label="Save profile changes"/);
   assert.match(html, />Weekly availability<\/h2>/);
-  assert.match(html, /These hours repeat every week in your selected timezone/);
-  assert.doesNotMatch(html, /Select date|Select availability week|Visible month/);
-  assert.match(html, />Save availability<\/button>/);
+  assert.match(html, /Set different hours each week, up to a year ahead/);
+  assert.match(html, /aria-label="Next week"/);
+  assert.match(html, /aria-label="Jump to availability date"/);
+  assert.match(html, />Save this week<\/button>/);
   assert.match(html, /Stripe payouts/);
   assert.match(html, /Connect Stripe/);
   assert.match(
