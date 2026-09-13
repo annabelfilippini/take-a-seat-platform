@@ -461,7 +461,7 @@ function getRuntimeEnv(name: string) {
     globalEnv && typeof globalEnv === "object"
       ? (globalEnv as Record<string, unknown>)[name]
       : undefined;
-  const workerValue = (workerEnv as Record<string, unknown>)[name];
+  const workerValue = (workerEnv as unknown as Record<string, unknown>)[name];
   const processValue =
     typeof process === "object" && process.env ? process.env[name] : undefined;
   const value =

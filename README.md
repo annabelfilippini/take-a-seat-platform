@@ -42,6 +42,8 @@ Useful commands:
 npm install
 npm run dev
 npm run build
+npm run lint
+npm run typecheck
 npm test
 ```
 
@@ -62,7 +64,7 @@ stay in ignored local env files or Cloudflare Worker secrets.
 - Auth: Clerk production email-code sign-in at `/sign-in`. Phone sign-in is
   hidden unless explicitly enabled in both Clerk and the Worker configuration.
 - Email: Resend transactional email.
-- Calendar: Google Calendar OAuth groundwork.
+- Calendar: Google OAuth, encrypted token refresh, free/busy validation, and retry-safe Meet event creation. See `docs/calendar-rehearsal-2026-09-12.md` for the remaining live rehearsal gate.
 - Payments: Stripe Connect and Stripe Checkout groundwork, with test-mode
   webhook handling and inline Checkout pricing for accepted creators.
 

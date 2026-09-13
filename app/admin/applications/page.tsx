@@ -25,7 +25,7 @@ export default async function AdminApplicationsPage({
     return <AdminLocked />;
   }
 
-  let applications = [];
+  let applications: Awaited<ReturnType<typeof listCreatorApplications>> = [];
   let setupError = false;
 
   try {

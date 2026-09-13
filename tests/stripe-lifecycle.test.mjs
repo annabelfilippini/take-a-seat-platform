@@ -57,6 +57,10 @@ const { getCustomerBooking } = await import("../app/_lib/bookings.ts");
 process.env.STRIPE_SECRET_KEY = "sk_test_lifecycle";
 process.env.STRIPE_WEBHOOK_SECRET = "whsec_lifecycle";
 process.env.TAKE_A_SEAT_DEV_ADMIN_ENABLED = "true";
+process.env.GOOGLE_TOKEN_ENCRYPTION_KEY = "test-calendar-secret";
+const { encryptToken } = await import("../app/_lib/token-encryption.ts");
+sqlite.prepare("INSERT INTO creator_calendar_connections(creator_id,scopes,access_token_encrypted,expires_at) VALUES('test-creator','calendar',?,?)").run(await encryptToken("test-token",process.env.GOOGLE_TOKEN_ENCRYPTION_KEY),Date.now()+3600000);
+
 
 function seed(id) {
   const bookingId = `booking_${id}`;
@@ -168,6 +172,7 @@ test("only an authorized creator/admin can capture, and repeated approvals do no
   await withStripe(session(id), async () => { await event("checkout.session.completed", session(id)); });
   const original = globalThis.fetch; const captures = [];
   globalThis.fetch = async (url, options) => {
+    if (String(url).endsWith("/freeBusy")) return Response.json({calendars:{primary:{busy:[]}}});
     assert.match(String(url), /payment_intents\/pi_approve\/capture$/);
     captures.push(options.headers["idempotency-key"]);
     return Response.json({ id: "pi_approve", status: "succeeded" });
@@ -205,7 +210,8 @@ test("a successful HTTP response without a successful capture cannot mark a book
   const id = "processingcapture"; const bookingId = seed(id);
   await withStripe(session(id), async () => { await event("checkout.session.completed", session(id)); });
   const original = globalThis.fetch;
-  globalThis.fetch = async () => Response.json({ id: `pi_${id}`, status: "processing" });
+  globalThis.fetch = async (url) => String(url).endsWith("/freeBusy")
+    ? Response.json({calendars:{primary:{busy:[]}}}) : Response.json({ id: `pi_${id}`, status: "processing" });
   try {
     const response = await approve(new Request("http://localhost/api/bookings/approve", { method: "POST", body: new URLSearchParams({ bookingId }), headers: { cookie: "tas_local_admin=1" } }));
     assert.match(response.headers.get("location"), /detail=capture/);

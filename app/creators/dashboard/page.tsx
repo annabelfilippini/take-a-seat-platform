@@ -28,9 +28,10 @@ export default async function CreatorDashboardPage({
     inviteToken,
   );
 
-  if (creatorAccount?.profile) {
+  if (creatorAccount && "profile" in creatorAccount) {
     return (
       <EditableCreatorProfilePreview
+        calendarStatus={typeof searchParams?.calendar === "string" ? searchParams.calendar : undefined}
         initialAvailabilityRules={creatorAccount.availabilityRules}
         initialNotificationPreferences={creatorAccount.notificationPreferences}
         initialNotifications={creatorAccount.notifications}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   getAvailabilityWindowStart,
@@ -35,6 +35,20 @@ export function CustomerBookingFlow({
   const [socialHandle, setSocialHandle] = useState("");
   const [topic, setTopic] = useState("");
   const [isOpen, setIsOpen] = useState(false);
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!isOpen || !dialog) return;
+    const trigger = document.activeElement;
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    dialog.showModal();
+    return () => {
+      dialog.close();
+      document.body.style.overflow = originalOverflow;
+      if (trigger instanceof HTMLElement && trigger.isConnected) trigger.focus();
+    };
+  }, [isOpen]);
   const [availabilityWindowStart] = useState(() => getAvailabilityWindowStart());
   const [selectedDate, setSelectedDate] = useState("");
   const [selectedSlotId, setSelectedSlotId] = useState("");
@@ -107,11 +121,27 @@ export function CustomerBookingFlow({
 
   const bookingDialog =
     isOpen && activeSeat ? (
-      <div
+      <dialog
+        ref={dialogRef}
+        onCancel={() => setIsOpen(false)}
+        onKeyDown={(event) => {
+          if (event.key !== "Tab") return;
+          const controls = Array.from(event.currentTarget.querySelectorAll<HTMLElement>(
+            'button:not([disabled]), input:not([type="hidden"]):not([disabled]), textarea:not([disabled]), select:not([disabled]), a[href], [tabindex="0"]',
+          ));
+          const first = controls[0];
+          const last = controls.at(-1);
+          if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last?.focus();
+          } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first?.focus();
+          }
+        }}
         aria-labelledby="customer-booking-title"
         aria-modal="true"
         className="customer-booking-overlay"
-        role="dialog"
       >
         <div className="customer-booking-modal">
           <header className="customer-booking-header">
@@ -132,6 +162,7 @@ export function CustomerBookingFlow({
           </header>
 
           <div className="customer-booking-summary">
+            <span>{`Times shown in ${viewerTimezone.replaceAll("_", " ")}`}</span>
             <strong>1:1 Video Consultation</strong>
             <span>
               {activeSeat.name} - private request - {activeSeat.price}
@@ -308,7 +339,7 @@ export function CustomerBookingFlow({
             </section>
           </div>
         </div>
-      </div>
+      </dialog>
     ) : null;
 
   return (

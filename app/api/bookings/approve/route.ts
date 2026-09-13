@@ -1,3 +1,4 @@
+import { getSafeReturnTo } from "../../../_lib/safe-redirect";
 import { getRequestAdminEmail } from "../../../_lib/admin-auth";
 import {
   canManageCreatorProfile,
@@ -7,7 +8,7 @@ import {
   getCustomerBooking,
   markBookingPaid,
 } from "../../../_lib/bookings";
-import { approveBookingAndSendGoogleInvite } from "../../../_lib/google-calendar";
+import { approveBookingAndSendGoogleInvite, canConfirmBookingCalendar } from "../../../_lib/google-calendar";
 import {
   getStripeSecretKey,
   STRIPE_API_VERSION,
@@ -79,6 +80,12 @@ export async function POST(request: Request) {
       return redirectWithStatus(request, safeReturnTo, "setup-needed", "stripe-secret");
     }
 
+    try {
+      if (!await canConfirmBookingCalendar(booking)) return redirectWithStatus(request, safeReturnTo, "error", "calendar-conflict");
+    } catch {
+      return redirectWithStatus(request, safeReturnTo, "setup-needed", "google-calendar");
+    }
+
     let paidBooking = null;
 
     try {
@@ -118,14 +125,6 @@ export async function POST(request: Request) {
   }
 
   return redirectWithStatus(request, safeReturnTo, "error", "booking-status");
-}
-
-function getSafeReturnTo(value: string | null | undefined, fallback: string) {
-  if (!value || !value.startsWith("/") || value.startsWith("//")) {
-    return fallback;
-  }
-
-  return value;
 }
 
 async function capturePaymentIntent(paymentIntentId: string, secretKey: string) {

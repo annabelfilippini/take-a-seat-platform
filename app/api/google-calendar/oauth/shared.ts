@@ -19,19 +19,15 @@ type OAuthStatePayload = {
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
-export function getRuntimeEnv(name: string) {
-  const processValue = process.env[name];
-  return typeof processValue === "string" && processValue.trim()
-    ? processValue.trim()
-    : null;
-}
+export { encryptToken } from "../../../_lib/token-encryption";
+export { getRuntimeEnv } from "../../../_lib/runtime-env";
+export { getSafeReturnTo } from "../../../_lib/safe-redirect";
 
-export function getSafeReturnTo(value: string | null | undefined, fallback: string) {
-  if (!value || !value.startsWith("/") || value.startsWith("//")) {
-    return fallback;
-  }
-
-  return value;
+// The callback must share the host that sets the nonce cookie. The canonical
+// public site controls production; an old secret must not send users elsewhere.
+export function getGoogleRedirectUri(request: Request) {
+  const origin = new URL(request.url).origin;
+  return `${origin}/api/google-calendar/oauth/callback`;
 }
 
 export function redirectWithCalendarStatus(
@@ -69,7 +65,7 @@ export function getCookie(request: Request, name: string) {
     .map((cookie) => cookie.trim())
     .find((cookie) => cookie.startsWith(`${name}=`));
 
-  return match ? decodeURIComponent(match.slice(name.length + 1)) : null;
+  try { return match ? decodeURIComponent(match.slice(name.length + 1)) : null; } catch { return null; }
 }
 
 export function getNonceCookieHeader(request: Request, nonce: string) {
@@ -121,17 +117,6 @@ export async function parseOAuthState(state: string, secret: string) {
   }
 }
 
-export async function encryptToken(value: string, secret: string) {
-  const iv = new Uint8Array(12);
-  crypto.getRandomValues(iv);
-  const key = await getTokenEncryptionKey(secret);
-  const ciphertext = new Uint8Array(
-    await crypto.subtle.encrypt({ iv, name: "AES-GCM" }, key, encoder.encode(value)),
-  );
-
-  return `v1.${base64UrlEncode(iv)}.${base64UrlEncode(ciphertext)}`;
-}
-
 export function buildGoogleAuthorizationUrl({
   clientId,
   redirectUri,
@@ -163,11 +148,6 @@ async function sign(body: string, secret: string) {
   );
   const signature = await crypto.subtle.sign("HMAC", key, encoder.encode(body));
   return base64UrlEncode(new Uint8Array(signature));
-}
-
-async function getTokenEncryptionKey(secret: string) {
-  const hash = await crypto.subtle.digest("SHA-256", encoder.encode(secret));
-  return crypto.subtle.importKey("raw", hash, "AES-GCM", false, ["encrypt"]);
 }
 
 function base64UrlEncode(bytes: Uint8Array) {

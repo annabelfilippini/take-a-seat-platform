@@ -1,3 +1,4 @@
+import { getSafeReturnTo } from "./safe-redirect";
 import { env as workerEnv } from "cloudflare:workers";
 import { headers } from "next/headers";
 import { getSignedInClerkUser, normalizePhoneIdentity } from "./clerk-auth";
@@ -118,14 +119,6 @@ function requestUrlFromHeaders(requestHeaders: Headers) {
   return `${protocol}://${host}/admin/applications`;
 }
 
-function getSafeReturnTo(value: string) {
-  if (!value.startsWith("/") || value.startsWith("//")) {
-    return "/admin/applications";
-  }
-
-  return value;
-}
-
 function getRequestHostname(requestHeaders: Headers, requestUrl?: string) {
   if (requestUrl) {
     try {
@@ -148,7 +141,7 @@ function getRuntimeEnv(name: string) {
       : undefined;
   const processValue =
     typeof process === "object" && process.env ? process.env[name] : undefined;
-  const workerValue = (workerEnv as Record<string, unknown>)[name];
+  const workerValue = (workerEnv as unknown as Record<string, unknown>)[name];
   const value = typeof cloudflareValue === "string" ? cloudflareValue : typeof workerValue === "string" ? workerValue : processValue;
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }

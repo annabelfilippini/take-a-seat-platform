@@ -1,3 +1,6 @@
+import { encryptToken, decryptToken } from "./token-encryption";
+import { getRuntimeEnv } from "./runtime-env";
+import { localDateTimeToUtc } from "./availability";
 import { eq } from "drizzle-orm";
 import { creatorCalendarConnections } from "../../db/schema";
 import {
@@ -20,12 +23,15 @@ type GoogleTokenResponse = {
 type GoogleCalendarEvent = {
   htmlLink?: string;
   id: string;
+  status?: string;
+  conferenceData?: {
+    createRequest?: { status?: { statusCode?: string } };
+    entryPoints?: { entryPointType?: string; uri?: string }[];
+  };
+  extendedProperties?: { private?: { bookingId?: string } };
 };
 
 type CreatorCalendarConnection = typeof creatorCalendarConnections.$inferSelect;
-
-const encoder = new TextEncoder();
-const decoder = new TextDecoder();
 
 export async function approveBookingAndSendGoogleInvite(bookingId: string) {
   const booking = await getCustomerBooking(bookingId);
@@ -44,11 +50,26 @@ export async function approveBookingAndSendGoogleInvite(bookingId: string) {
     throw new Error("Creator Google Calendar is not connected.");
   }
 
-  const event = await insertGoogleCalendarEvent({
+  let event = await insertGoogleCalendarEvent({
     accessToken: access.accessToken,
     booking,
     calendarId: access.calendarId,
   });
+
+  // Google creates Meet details asynchronously. Keep a paid booking recoverable
+  // until the event has a video link; retries retrieve the same event ID.
+  if (!hasVideoConference(event)) {
+    const response = await fetch(`${GOOGLE_CALENDAR_API_BASE}/calendars/${encodeURIComponent(access.calendarId)}/events/${event.id}`, {
+      headers: { authorization: `Bearer ${access.accessToken}` },
+    });
+    if (!response.ok) throw new Error("Calendar conference lookup failed.");
+    const confirmed = await response.json() as GoogleCalendarEvent;
+    if (confirmed.id !== event.id || confirmed.status === "cancelled" || confirmed.extendedProperties?.private?.bookingId !== booking.id) {
+      throw new Error("Calendar event does not match the booking.");
+    }
+    event = confirmed;
+  }
+  if (!hasVideoConference(event)) throw new Error("Google Meet is not ready. Retry calendar confirmation.");
 
   await markBookingApprovedWithCalendar({
     bookingId: booking.id,
@@ -102,6 +123,9 @@ async function getCreatorCalendarAccessToken(creatorId: string) {
     .set({
       accessTokenEncrypted: await encryptToken(refreshed.access_token, secret),
       expiresAt: expiresAtNext,
+      refreshTokenEncrypted: refreshed.refresh_token
+        ? await encryptToken(refreshed.refresh_token, secret)
+        : connection.refreshTokenEncrypted,
       tokenType: refreshed.token_type ?? connection.tokenType,
       updatedAt: now,
     })
@@ -128,8 +152,11 @@ async function insertGoogleCalendarEvent({
   url.searchParams.set("conferenceDataVersion", "1");
   url.searchParams.set("sendUpdates", "all");
 
+  const eventId = await getBookingEventId(booking.id);
   const response = await fetch(url, {
     body: JSON.stringify({
+      id: eventId,
+      extendedProperties: { private: { bookingId: booking.id } },
       attendees: [
         {
           displayName: booking.customerName ?? undefined,
@@ -162,11 +189,23 @@ async function insertGoogleCalendarEvent({
     method: "POST",
   });
 
-  if (!response.ok) {
-    throw new Error(`Google Calendar insert failed with ${response.status}`);
+  // A retry after Google succeeded but persistence/network failed reuses the
+  // same event. Never send a second invitation for the same booking.
+  if (response.status === 409) {
+    const existing = await fetch(`${GOOGLE_CALENDAR_API_BASE}/calendars/${encodeURIComponent(calendarId)}/events/${eventId}`, {
+      headers: { authorization: `Bearer ${accessToken}` },
+    });
+    if (!existing.ok) throw new Error("Calendar event recovery failed.");
+    const event = await existing.json() as GoogleCalendarEvent;
+    if (event.id !== eventId || event.status === "cancelled" || event.extendedProperties?.private?.bookingId !== booking.id) {
+      throw new Error("Calendar event does not match the booking.");
+    }
+    return event;
   }
-
-  return (await response.json()) as GoogleCalendarEvent;
+  if (!response.ok) throw new Error(`Google Calendar insert failed with ${response.status}`);
+  const event = await response.json() as GoogleCalendarEvent;
+  if (event.id !== eventId) throw new Error("Google did not confirm the requested event.");
+  return event;
 }
 
 async function refreshAccessToken({
@@ -200,34 +239,6 @@ async function refreshAccessToken({
   return (await response.json()) as GoogleTokenResponse;
 }
 
-async function encryptToken(value: string, secret: string) {
-  const iv = new Uint8Array(12);
-  crypto.getRandomValues(iv);
-  const key = await getTokenEncryptionKey(secret);
-  const ciphertext = new Uint8Array(
-    await crypto.subtle.encrypt({ iv, name: "AES-GCM" }, key, encoder.encode(value)),
-  );
-
-  return `v1.${base64UrlEncode(iv)}.${base64UrlEncode(ciphertext)}`;
-}
-
-async function decryptToken(value: string, secret: string) {
-  const [, encodedIv, encodedCiphertext] = value.split(".");
-
-  if (!encodedIv || !encodedCiphertext) {
-    throw new Error("Unsupported encrypted token format.");
-  }
-
-  const key = await getTokenEncryptionKey(secret);
-  const plaintext = await crypto.subtle.decrypt(
-    { iv: base64UrlDecode(encodedIv), name: "AES-GCM" },
-    key,
-    base64UrlDecode(encodedCiphertext),
-  );
-
-  return decoder.decode(plaintext);
-}
-
 function buildEventDescription(booking: CustomerBooking) {
   return [
     "Take a Seat booking.",
@@ -254,31 +265,41 @@ function getTokenEncryptionSecret() {
   return tokenSecret ?? clientSecret ?? "";
 }
 
-function getRuntimeEnv(name: string) {
-  const processValue = process.env[name];
-  return typeof processValue === "string" && processValue.trim()
-    ? processValue.trim()
-    : null;
+export async function getBookingEventId(bookingId: string) {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(bookingId));
+  return `tas${Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("")}`;
 }
 
-function base64UrlEncode(bytes: Uint8Array) {
-  let binary = "";
-  bytes.forEach((byte) => {
-    binary += String.fromCharCode(byte);
+export async function isCreatorCalendarFree(creatorId: string, start: Date, end: Date) {
+  const access = await getCreatorCalendarAccessToken(creatorId);
+  if (!access) throw new Error("Connect Google Calendar before accepting bookings.");
+  const response = await fetch(`${GOOGLE_CALENDAR_API_BASE}/freeBusy`, {
+    method: "POST",
+    headers: { authorization: `Bearer ${access.accessToken}`, "content-type": "application/json" },
+    body: JSON.stringify({ timeMin: start.toISOString(), timeMax: end.toISOString(), items: [{ id: access.calendarId }] }),
   });
-
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/u, "");
+  if (!response.ok) throw new Error("Calendar availability is temporarily unavailable.");
+  const payload = await response.json() as { calendars?: Record<string, { busy?: { start: string; end: string }[]; errors?: unknown[] }> };
+  const calendar = payload.calendars?.[access.calendarId];
+  if (!calendar || calendar.errors?.length || !Array.isArray(calendar.busy)) throw new Error("Calendar availability could not be verified.");
+  return !calendar.busy.some((busy) => {
+    const from = Date.parse(busy.start), to = Date.parse(busy.end);
+    if (!Number.isFinite(from) || !Number.isFinite(to) || from >= to) throw new Error("Invalid calendar availability response.");
+    return from < end.getTime() && to > start.getTime();
+  });
 }
 
-function base64UrlDecode(value: string) {
-  const base64 = value.replace(/-/g, "+").replace(/_/g, "/");
-  const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, "=");
-  const binary = atob(padded);
-  const bytes = new Uint8Array(binary.length);
+export async function canConfirmBookingCalendar(booking: CustomerBooking) {
+  const start = localDateTimeToUtc(booking.appointmentStartAt, booking.timezone);
+  const end = localDateTimeToUtc(booking.appointmentEndAt, booking.timezone);
+  if (!start || !end || start.getTime() <= Date.now()) return false;
+  const { listCreatorAvailabilityRules } = await import("./creator-onboarding");
+  const rules = await listCreatorAvailabilityRules(booking.creatorId);
+  const padding = Math.max(0, ...rules.map((rule) => rule.bufferMinutes)) * 60_000;
+  return isCreatorCalendarFree(booking.creatorId, new Date(start.getTime() - padding), new Date(end.getTime() + padding));
+}
 
-  for (let index = 0; index < binary.length; index += 1) {
-    bytes[index] = binary.charCodeAt(index);
-  }
-
-  return bytes;
+function hasVideoConference(event: GoogleCalendarEvent) {
+  return event.conferenceData?.createRequest?.status?.statusCode !== "failure" &&
+    Boolean(event.conferenceData?.entryPoints?.some((entry) => entry.entryPointType === "video" && entry.uri?.startsWith("https://meet.google.com/")));
 }
