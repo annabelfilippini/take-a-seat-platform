@@ -148,7 +148,19 @@ Calendar:
 - Take a Seat owns public availability rules.
 - Google Calendar supplies real busy/free conflicts and creator-owned event
   creation.
-- OAuth routes exist, but launch booking flow still needs final reliability work.
+- OAuth callbacks use the initiating origin; canonical public GETs redirect to
+  `takeaseatwith.com`. Google must authorize its exact callback URL. The legacy
+  `GOOGLE_OAUTH_REDIRECT_URI` secret is no longer read.
+- Shared v1 token encryption supports stored tokens and refresh. Partial granted
+  scopes fail closed. Requests and pre-capture acceptance check Google free/busy
+  with the saved booking buffer.
+- Conditional D1 reservations prevent simultaneous requests sharing a slot or
+  exceeding a creator limit. Attached Checkout sessions hold until a verified
+  terminal webhook; session-less failed requests release after 30 minutes.
+- Calendar retries reuse a deterministic event ID. A booking stays paid until
+  Google provides its Meet link, then becomes approved.
+- Local integration and desktop/mobile verification are recorded in
+  `docs/calendar-rehearsal-2026-09-12.md`; live inbox/calendar proof still gates launch.
 - Booking request and Stripe Checkout routes server-validate submitted times
   against creator availability before creating a booking.
 - Public creator profiles collect the request first, then send the customer to
@@ -318,7 +330,6 @@ Required or expected production secrets:
 - `TWILIO_MESSAGING_SERVICE_SID` or `TWILIO_FROM_PHONE_NUMBER`
 - `GOOGLE_CLIENT_ID`
 - `GOOGLE_CLIENT_SECRET`
-- `GOOGLE_OAUTH_REDIRECT_URI`
 - `GOOGLE_TOKEN_ENCRYPTION_KEY`
 - `STRIPE_SECRET_KEY`
 - `STRIPE_WEBHOOK_SECRET`
