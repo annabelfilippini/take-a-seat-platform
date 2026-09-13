@@ -131,9 +131,9 @@ Email:
   applicant a receipt email. A valid email is required to submit or accept.
 - Acceptance reserves a public slug and prepares a private starter profile, then
   emails the applicant a setup link. `published_at` remains null until profile save.
-- Blank creator setup is prepared in `docs/blank-creator-profile.md`: retain
-  application identity, but start profile content/media/prices empty and sessions
-  disabled. Requires production deployment approval.
+- Blank creator setup is deployed (PR #15): retain application identity, but
+  start profile content/media/prices empty and sessions disabled. Existing saved
+  profiles retain their content. See `docs/blank-creator-profile.md`.
 - Failed setup emails are visible to the admin and can be retried. An optional
   inbox notification failure does not misreport the acceptance as failed.
 

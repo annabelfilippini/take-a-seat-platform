@@ -1,6 +1,6 @@
 # Blank creator profiles
 
-Prepared September 12, 2026. Production deployment requires Annabel's approval.
+Deployed September 12, 2026, with Annabel's explicit approval.
 
 New accepted creators start with their application name, contact details and
 social links. Photos, gallery, intro, About, help topics, location, one-to-one
@@ -30,4 +30,18 @@ Verification:
   viewport has no horizontal document overflow.
 - Browser save responses use a local stub; persistence is separately tested
   through the real route/domain code with SQLite using the D1 statement API.
-- No production application, email, identity, profile or deployment was changed.
+- No production application, email, identity or profile was changed during QA.
+
+## Production release
+
+- PR #15 merged to main as `bd93506` (source identical to tested `54e508d`).
+- Deployed from clean checkout `/private/tmp/tas-blank-release-20260912`.
+- Worker version: `4f1d0fc8-a88c-41bf-bac8-fc70db7329f1`, serving 100% of traffic.
+- Previous version for rollback: `4a969948-12d5-4cbf-9ff8-646ec5c0dc08`.
+- Before deployment, D1 reported no pending migrations and all required Worker
+  secret names were present. No secret values were read or changed.
+- Production build succeeded. Public home, application, sign-in, dashboard entry
+  and directory HTTP checks succeeded. The live browser application form omits
+  generated profile copy, descriptions, sample prices and enabled offerings.
+- The deployed editor JavaScript matches the release artifact byte for byte.
+  No new live application, emailed invitation, OTP, or profile save was rehearsed.
