@@ -53,6 +53,7 @@ const { POST: submit } = await import("../app/api/creators/profile/route.ts");
 const { POST: accept } = await import("../app/api/creators/applications/accept/route.ts");
 const { sendCreatorAcceptedInviteEmail } = await import("../app/_lib/creator-accepted-invite.ts");
 const { getRequestAdminEmail } = await import("../app/_lib/admin-auth.ts");
+const { getEditableCreatorProfile } = await import("../app/admin/creator-profile-editor-preview/creator-profile-editor-data.ts");
 
 function formRequest(path, values, admin = false) {
   return new Request(`http://localhost${path}`, { method: "POST", body: new URLSearchParams(values), headers: { accept: "application/json", ...(admin ? { cookie: "tas_local_admin=1" } : {}) } });
@@ -288,6 +289,73 @@ test("profile edits, prices, and cleared social links survive save and reload", 
       assert.equal(saved.seat30PriceAmount, Math.round(amount * 100));
       assert.equal(getEditableCreatorProfile(saved).seat30PriceAmount, amount);
     }
+  } finally {
+    delete process.env.TAKE_A_SEAT_DEV_ADMIN_ENABLED;
+  }
+});
+
+test("first-time creators receive a blank editor and cleared fields stay blank after saving", async () => {
+  const { createElement } = await import("react");
+  const { renderToStaticMarkup } = await import("react-dom/server");
+  const { CreatorOnboardingForm } = await import("../app/creators/onboard/CreatorOnboardingForm.tsx");
+  const html = renderToStaticMarkup(createElement(CreatorOnboardingForm));
+  for (const field of ["about", "bio", "profileIntro", "helpItems", "offer", "seat15Description", "seat30Description", "seat15PriceAmount", "seat30PriceAmount", "seat15Enabled", "seat30Enabled"]) {
+    assert.equal(html.includes(`name="${field}"`), false, `application must not generate ${field}`);
+  }
+  const application = { name: "New Creator", email: "blank-profile@example.com", phone: "+15555550999", instagramHandle: "newcreator", profileDetails: "Private application answer", reviewSubmittedAt: "true" };
+  const response = await submit(formRequest("/api/creators/profile", application));
+  assert.equal(response.status, 200);
+  let profile = (await domain.listCreatorApplications()).find(item => item.email === application.email);
+  assert.equal(profile.about, "");
+  assert.equal(profile.bio, "");
+  assert.equal(profile.seat15Description, "");
+  assert.equal(profile.seat15Enabled, false);
+
+  // An application submitted before this release may still contain prototype defaults.
+  sqlite.prepare("UPDATE creator_onboarding_profiles SET about = 'Generated about', bio = 'Generated bio', profile_intro = 'Generated intro', help_items = 'Generated help', seat_15_description = 'Sample call', seat_15_price_amount = 4500, seat_15_enabled = 1 WHERE id = ?").run(profile.id);
+  profile = await domain.acceptCreatorApplication(profile.id, "blank-profile-test");
+  const invite = await domain.createCreatorInvite(profile);
+  const owner = { userId: "user_blank_profile", email: application.email, phone: null, sessionId: "session_blank_profile" };
+  assert.equal((await domain.claimCreatorInvite(invite.token, owner)).status, "claimed");
+  const editor = getEditableCreatorProfile((await domain.getCreatorDashboardAccount(owner)).profile);
+  assert.equal(editor.name, application.name);
+  assert.equal(editor.email, application.email);
+  assert.equal(editor.phone, application.phone);
+  assert.match(editor.instagramUrl, /newcreator$/);
+  for (const key of ["about", "bio", "profileIntro", "helpItems", "oneToOneReason", "offer", "location", "image", "seat15Description", "seat30Description", "seat15PriceAmount", "seat30PriceAmount"]) {
+    assert.equal(editor[key], "", key);
+  }
+  assert.deepEqual(editor.mediaItems, []);
+  assert.equal(editor.seat15Enabled, false);
+  assert.equal(editor.seat30Enabled, false);
+  assert.equal(await domain.getPublishedCreatorBySlug(profile.publicSlug), null);
+
+  process.env.TAKE_A_SEAT_DEV_ADMIN_ENABLED = "true";
+  try {
+    const values = { ...application, creatorId: profile.id, reviewSubmittedAt: "false", about: "My own profile copy", profileIntro: "My own introduction", seat15Enabled: "on", seat15PriceAmount: "75", seat15DurationMinutes: "15", seat15Description: "My own session description" };
+    assert.equal((await submit(formRequest("/api/creators/profile", values, true))).status, 200);
+    let restored = getEditableCreatorProfile((await domain.getCreatorDashboardAccount(owner)).profile);
+    assert.equal(restored.about, values.about);
+    assert.equal(restored.profileIntro, values.profileIntro);
+    assert.equal(restored.seat15PriceAmount, 75);
+    assert.equal(restored.seat15Description, values.seat15Description);
+    assert.equal(restored.image, "");
+    assert.deepEqual(restored.mediaItems, []);
+
+    // Clearing real content must not restore application text, stock photos or generic descriptions.
+    assert.equal((await submit(formRequest("/api/creators/profile", { ...values, about: "", profileIntro: "", seat15Description: "" }, true))).status, 200);
+    const stored = (await domain.getCreatorDashboardAccount(owner)).profile;
+    restored = getEditableCreatorProfile(stored);
+    assert.equal(restored.about, "");
+    assert.equal(restored.profileIntro, "");
+    assert.equal(restored.bio, "");
+    assert.equal(restored.seat15Description, "");
+    assert.equal(restored.image, "");
+    assert.equal(stored.profileDetails, application.profileDetails);
+    const published = await domain.getPublishedCreatorBySlug(stored.publicSlug);
+    assert.deepEqual(published.profile.about, []);
+    assert.equal(published.profile.intro, "");
+    assert.equal(published.image, null);
   } finally {
     delete process.env.TAKE_A_SEAT_DEV_ADMIN_ENABLED;
   }
