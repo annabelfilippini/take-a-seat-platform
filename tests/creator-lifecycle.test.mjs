@@ -59,6 +59,11 @@ function formRequest(path, values, admin = false) {
   return new Request(`http://localhost${path}`, { method: "POST", body: new URLSearchParams(values), headers: { accept: "application/json", ...(admin ? { cookie: "tas_local_admin=1" } : {}) } });
 }
 
+function readyConnections(creatorId) {
+  sqlite.prepare("UPDATE creator_onboarding_profiles SET calendar_connected_at = '2026-09-13', stripe_connected_at = '2026-09-13' WHERE id = ?").run(creatorId);
+  sqlite.prepare("INSERT INTO creator_availability_rules (creator_id, timezone, day_of_week, start_time, end_time) VALUES (?, 'America/Los_Angeles', 1, '09:00', '17:00')").run(creatorId);
+}
+
 test("application → review email → acceptance → verified owner → saved public card", async () => {
   process.env.TAKE_A_SEAT_DEV_ADMIN_ENABLED = "true";
   process.env.RESEND_API_KEY = "test-only";
@@ -103,8 +108,11 @@ test("application → review email → acceptance → verified owner → saved p
     const forbidden = await submit(formRequest("/api/creators/profile", { ...values, creatorId: profile.id, reviewSubmittedAt: "false" }));
     assert.equal((await forbidden.json()).detail, "creator-access");
 
-    const input = await domain.getCreatorProfileSettingsInput(await formRequest("/", { ...values, reviewSubmittedAt: "false" }).formData());
+    const input = await domain.getCreatorProfileSettingsInput(await formRequest("/", { ...values, reviewSubmittedAt: "false", about: "My profile", helpItems: "Styling", profileImageUrl: "/ella-profile.jpg", seat15Enabled: "on", seat15PriceAmount: "75" }).formData());
     await domain.saveCreatorProfileSettings(profile.id, input);
+    assert.equal(await domain.getPublishedCreatorBySlug(profile.publicSlug), null);
+    readyConnections(profile.id);
+    assert.equal((await domain.publishCreatorProfile(profile.id)).status, "saved");
     const publicCreator = await domain.getPublishedCreatorBySlug(profile.publicSlug);
     assert.equal(publicCreator.name, values.name);
     assert.ok((await domain.listPublicMarketplaceCreators()).some((creator) => creator.id === profile.id));
@@ -243,18 +251,22 @@ test("profile edits, prices, and cleared social links survive save and reload", 
     assert.equal(response.status, 200, JSON.stringify(result));
     assert.equal(result.status, "saved");
     const stored = (await domain.getCreatorDashboardAccount(owner)).profile;
-    for (const key of ["name", "about", "profileIntro", "oneToOneReason", "category", "location", "instagramHandle", "tiktokHandle", "profileImageUrl", "profileGallery", "seat15Description", "seat30Description", "timezone"]) {
-      assert.equal(stored[key], edits[key], key);
+    const draft = JSON.parse(stored.profileDraft);
+    for (const key of ["name", "about", "profileIntro", "oneToOneReason", "category", "location", "instagramHandle", "tiktokHandle", "profileImageUrl", "profileGallery", "seat15Description", "seat30Description"]) {
+      assert.equal(draft[key], edits[key], key);
     }
-    assert.equal(stored.profileImagePositionX, 27);
-    assert.equal(stored.profileImagePositionY, 62);
-    assert.equal(stored.profileImageZoom, 160);
-    assert.equal(stored.seat15PriceAmount, 7500);
-    assert.equal(stored.seat30PriceAmount, 15000);
+    assert.equal(draft.profileImagePositionX, 27);
+    assert.equal(draft.profileImagePositionY, 62);
+    assert.equal(draft.profileImageZoom, 160);
+    assert.equal(draft.seat15PriceAmount, 7500);
+    assert.equal(draft.seat30PriceAmount, 15000);
     const restored = getEditableCreatorProfile(stored);
     assert.equal(restored.seat15PriceAmount, 75);
     assert.equal(restored.seat30PriceAmount, 150);
     assert.equal(restored.mediaItems.length, 2);
+    assert.equal(await domain.getPublishedCreatorBySlug(stored.publicSlug), null);
+    readyConnections(stored.id);
+    assert.equal((await domain.publishCreatorProfile(stored.id)).status, "saved");
     const publicCreator = await domain.getPublishedCreatorBySlug(stored.publicSlug);
     assert.equal(publicCreator.name, edits.name);
     assert.equal(publicCreator.profile.intro, edits.profileIntro);
@@ -275,6 +287,10 @@ test("profile edits, prices, and cleared social links survive save and reload", 
     const editor = getEditableCreatorProfile(reloaded);
     assert.equal(editor.instagramUrl, "");
     assert.equal(editor.tiktokUrl, "");
+    const stillPublished = await domain.getPublishedCreatorBySlug(reloaded.publicSlug);
+    assert.equal(stillPublished.name, edits.name);
+    assert.ok(stillPublished.instagramUrl);
+    assert.equal((await domain.publishCreatorProfile(reloaded.id)).status, "saved");
     const published = await domain.getPublishedCreatorBySlug(reloaded.publicSlug);
     assert.equal(published.name, "Updated again");
     assert.equal(published.instagramUrl, undefined);
@@ -286,7 +302,8 @@ test("profile edits, prices, and cleared social links survive save and reload", 
       }, true));
       assert.equal(priceSave.status, 200);
       const saved = (await domain.getCreatorDashboardAccount(owner)).profile;
-      assert.equal(saved.seat30PriceAmount, Math.round(amount * 100));
+      assert.equal(JSON.parse(saved.profileDraft).seat30PriceAmount, Math.round(amount * 100));
+      assert.equal(saved.seat30PriceAmount, 15000, "Live price stays unchanged while drafts are saved");
       assert.equal(getEditableCreatorProfile(saved).seat30PriceAmount, amount);
     }
   } finally {
@@ -364,9 +381,8 @@ test("first-time creators receive a blank editor and cleared fields stay blank a
     assert.equal(restored.image, "");
     assert.equal(stored.profileDetails, application.profileDetails);
     const published = await domain.getPublishedCreatorBySlug(stored.publicSlug);
-    assert.deepEqual(published.profile.about, []);
-    assert.equal(published.profile.intro, "");
-    assert.equal(published.image, null);
+    assert.equal(published, null);
+    assert.equal((await domain.publishCreatorProfile(stored.id)).status, "error");
   } finally {
     delete process.env.TAKE_A_SEAT_DEV_ADMIN_ENABLED;
   }
@@ -442,4 +458,59 @@ test("acceptance email keeps the one-use credential in the fragment and preserve
 
 test("unaccepted applications cannot generate a setup email or provision an identity", async () => {
   assert.deepEqual(await sendCreatorAcceptedInviteEmail({ profile: { applicationStatus: "in_review", email: "test@example.com" }, request: new Request("http://localhost") }), { status: "skipped", reason: "setup-link-failed" });
+});
+
+test("publish requires accepted ownership and complete setup; drafts never leak into live cards or prices", async () => {
+  process.env.TAKE_A_SEAT_DEV_ADMIN_ENABLED = "true";
+  try {
+    const values = { creatorId: "onboard_private_draft", name: "Public Name", email: "private-draft@example.com", about: "Public about", helpItems: "Public topic", profileImageUrl: "/ella-profile.jpg", seat15Enabled: "on", seat15PriceAmount: "50" };
+    const input = await domain.getCreatorProfileSettingsInput(await formRequest("/", values).formData());
+    await domain.saveCreatorProfileSettings(values.creatorId, input);
+    assert.equal((await submit(formRequest("/api/creators/profile", { ...values, intent: "publish" }, true))).status, 400);
+    const accepted = await domain.acceptCreatorApplication(values.creatorId, "private-draft-test");
+    values.creatorId = accepted.id;
+    assert.equal((await submit(formRequest("/api/creators/profile", values, true))).status, 200);
+    assert.equal((await submit(formRequest("/api/creators/profile", { ...values, intent: "publish" }))).status, 400);
+    assert.equal((await submit(formRequest("/api/creators/profile", { ...values, intent: "publish" }, true))).status, 400);
+    assert.equal(await domain.getPublishedCreatorBySlug(accepted.publicSlug), null);
+    readyConnections(accepted.id);
+    const firstPublish = await submit(formRequest("/api/creators/profile", { ...values, intent: "publish" }, true));
+    assert.equal(firstPublish.status, 200);
+    assert.equal((await firstPublish.json()).publicPath, "/with/private-draft-test");
+    assert.equal((await domain.getPublishedCreatorBySlug(accepted.publicSlug)).name, "Public Name");
+    await submit(formRequest("/api/creators/profile", { ...values, name: "Private Name", about: "Private about", seat15PriceAmount: "99", profileImageUrl: "/amber-headshot.jpg" }, true));
+    let live = await domain.getPublishedCreatorBySlug(accepted.publicSlug);
+    assert.equal(live.name, "Public Name");
+    assert.equal(live.seats[0].unitAmount, 5000);
+    assert.equal(live.image, "/ella-profile.jpg");
+    assert.doesNotMatch(JSON.stringify(await domain.listPublicMarketplaceCreators()), /Private Name|Private about|profileDraft/);
+    const restored = getEditableCreatorProfile(await domain.getCreatorApplication(accepted.id));
+    assert.equal(restored.name, "Private Name");
+    assert.equal(restored.seat15PriceAmount, 99);
+    // Publish reads the saved snapshot, never unreviewed fields from the publish request.
+    assert.equal((await submit(formRequest("/api/creators/profile", { ...values, intent: "publish", name: "Unsaved payload" }, true))).status, 200);
+    live = await domain.getPublishedCreatorBySlug(accepted.publicSlug);
+    assert.equal(live.name, "Private Name");
+    assert.equal(live.seats[0].unitAmount, 9900);
+    await submit(formRequest("/api/creators/profile", { ...values, seat15PriceAmount: "0" }, true));
+    assert.equal((await domain.publishCreatorProfile(accepted.id)).status, "error");
+    assert.equal((await domain.getPublishedCreatorBySlug(accepted.publicSlug)).seats[0].unitAmount, 9900);
+  } finally { delete process.env.TAKE_A_SEAT_DEV_ADMIN_ENABLED; }
+});
+
+
+test("availability uses the same verified admin or creator access as the shared profile editor", async () => {
+  const { POST: saveAvailability } = await import("../app/api/creators/availability/route.ts");
+  const values = { creatorId: "onboard_private_draft", timezone: "Europe/London", availabilitySlots: JSON.stringify([{ dayOfWeek: 2, startTime: "10:00" }]) };
+  const denied = await saveAvailability(formRequest("/api/creators/availability", values));
+  assert.equal(denied.status, 400);
+  assert.equal((await denied.json()).detail, "creator-access");
+  process.env.TAKE_A_SEAT_DEV_ADMIN_ENABLED = "true";
+  try {
+    const response = await saveAvailability(formRequest("/api/creators/availability", values, true));
+    assert.equal(response.status, 200);
+    const rules = await domain.listCreatorAvailabilityRules(values.creatorId);
+    assert.equal(rules[0].timezone, "Europe/London");
+    assert.equal(rules[0].startTime, "10:00");
+  } finally { delete process.env.TAKE_A_SEAT_DEV_ADMIN_ENABLED; }
 });

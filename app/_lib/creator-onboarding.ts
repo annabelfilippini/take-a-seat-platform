@@ -351,6 +351,16 @@ export async function saveCreatorProfileSettings(
   const { getDb } = await import("../../db");
   const db = getDb();
   const now = new Date().toISOString();
+  const existing = await getCreatorApplication(creatorId);
+  if (existing?.applicationStatus === "accepted") {
+    // Accepted creators edit a private snapshot. Public fields remain untouched.
+    await db.update(creatorOnboardingProfiles).set({
+      profileDraft: JSON.stringify(getPublishableProfileFields(input)),
+      draftSavedAt: now,
+      updatedAt: now,
+    }).where(and(eq(creatorOnboardingProfiles.id, creatorId), eq(creatorOnboardingProfiles.applicationStatus, "accepted")));
+    return;
+  }
   const applicationStatus = input.reviewSubmitted ? "in_review" : "draft";
   const reviewSubmittedAt = input.reviewSubmitted ? now : undefined;
 
@@ -419,8 +429,6 @@ export async function saveCreatorProfileSettings(
         profileImageZoom: input.profileImageZoom,
         profileIntro: input.profileIntro,
         applicationStatus: sql`case when ${creatorOnboardingProfiles.applicationStatus} = 'accepted' then 'accepted' else ${applicationStatus} end`,
-        profileSavedAt: sql`case when ${creatorOnboardingProfiles.applicationStatus} = 'accepted' then ${now} else ${creatorOnboardingProfiles.profileSavedAt} end`,
-        publishedAt: sql`case when ${creatorOnboardingProfiles.applicationStatus} = 'accepted' then coalesce(${creatorOnboardingProfiles.publishedAt}, ${now}) else ${creatorOnboardingProfiles.publishedAt} end`,
         reviewSubmittedAt,
         seat15Description: input.seat15Description,
         seat15DurationMinutes: input.seat15DurationMinutes,
@@ -435,7 +443,64 @@ export async function saveCreatorProfileSettings(
         updatedAt: now,
       },
       target: creatorOnboardingProfiles.id,
+      setWhere: sql`${creatorOnboardingProfiles.applicationStatus} != 'accepted'`,
     });
+}
+
+function getPublishableProfileFields(input: CreatorProfileSettingsInput) {
+  return {
+    name: input.name, about: input.about, bio: input.about.slice(0, 180),
+    category: input.category, currency: input.currency, helpItems: input.helpItems,
+    instagramHandle: input.instagramHandle, tiktokHandle: input.tiktokHandle,
+    location: input.location, offer: input.offer, oneToOneReason: input.oneToOneReason,
+    profileGallery: input.profileGallery, profileImageUrl: input.profileImageUrl,
+    profileImagePositionX: input.profileImagePositionX, profileImagePositionY: input.profileImagePositionY,
+    profileImageZoom: input.profileImageZoom, profileIntro: input.profileIntro,
+    seat15DurationMinutes: input.seat15DurationMinutes, seat15Enabled: input.seat15Enabled,
+    seat15PriceAmount: input.seat15PriceAmount, seat15Description: input.seat15Description,
+    seat30DurationMinutes: input.seat30DurationMinutes, seat30Enabled: input.seat30Enabled,
+    seat30PriceAmount: input.seat30PriceAmount, seat30Description: input.seat30Description,
+  };
+}
+
+export async function publishCreatorProfile(creatorId: string) {
+  const profile = await getCreatorApplication(creatorId);
+  if (!profile || profile.applicationStatus !== "accepted" || !profile.publicSlug) {
+    return { status: "error", detail: "Only accepted creators can publish a profile." };
+  }
+  if (!profile.profileDraft) {
+    return { status: "error", detail: "Save your profile draft before publishing." };
+  }
+  const draft = JSON.parse(profile.profileDraft) as ReturnType<typeof getPublishableProfileFields>;
+  if (!draft.name.trim() || !draft.about.trim() || !draft.helpItems.trim() || !draft.profileImageUrl) {
+    return { status: "error", detail: "Add your name, profile picture, about text, and conversation topics in Your profile." };
+  }
+  const calls = [
+    { enabled: draft.seat15Enabled, price: draft.seat15PriceAmount },
+    { enabled: draft.seat30Enabled, price: draft.seat30PriceAmount },
+  ];
+  if (!calls.some((call) => call.enabled) || calls.some((call) => call.enabled && call.price <= 0)) {
+    return { status: "error", detail: "Enable at least one call and add a price for each enabled call in Your calls." };
+  }
+  const { getDb } = await import("../../db");
+  const db = getDb();
+  const rules = await db.select().from(creatorAvailabilityRules).where(and(
+    eq(creatorAvailabilityRules.creatorId, creatorId), eq(creatorAvailabilityRules.enabled, true),
+  ));
+  if (!rules.length || !profile.calendarConnectedAt || !profile.stripeConnectedAt) {
+    return { status: "error", detail: "Save your availability, connect Google Calendar, and finish Stripe payouts before going live." };
+  }
+  const now = new Date().toISOString();
+  // Compare the draft too: a concurrent save must not be silently published or lost.
+  const updated = await db.update(creatorOnboardingProfiles).set({
+    ...draft, profileSavedAt: now, publishedAt: profile.publishedAt ?? now, updatedAt: now,
+  }).where(and(
+    eq(creatorOnboardingProfiles.id, creatorId), eq(creatorOnboardingProfiles.applicationStatus, "accepted"),
+    eq(creatorOnboardingProfiles.profileDraft, profile.profileDraft),
+  )).returning({ id: creatorOnboardingProfiles.id });
+  return updated.length
+    ? { status: "saved", detail: null, publicPath: `/with/${profile.publicSlug}` }
+    : { status: "error", detail: "Your draft changed in another window. Reload and review it before publishing." };
 }
 
 export async function listCreatorApplications() {

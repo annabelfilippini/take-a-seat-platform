@@ -1,34 +1,52 @@
 # Blank creator profiles
 
-## Profile template revision, September 13
+## Profile setup revision, September 13
 
-Implemented on `codex/creator-profile-template`; pending production approval.
+PR #22 combines the accepted-creator setup and public profile. Annabel approved
+production deployment on September 13.
 
-- Accepted creators use the shared editor at `/creators/dashboard`. Identity
-  stays prefilled from their application; About, conversation topics, photos,
-  and prices stay empty until they fill them in. Seat options start disabled.
-- The top section pairs identity and “Pull up a seat for…” topics with a photo
-  carousel. An empty carousel has an upload prompt and no inactive arrows.
-- About and “Schedule a time to meet” appear below the carousel. The profile
-  no longer asks for a separate public intro, one-to-one reason, or descriptions
-  for each seat. Existing stored values are preserved, not deleted.
-- The reusable public `/with/[slug]` layout matches this order and omits the
-  retired intro, reasons, seat descriptions, and generated gallery captions.
-  Dedicated seed profile routes keep their existing presentation.
-- “How does your seat work?” is a shared, always-visible question and answer
-  at the bottom of the public profile and editor Profile tab, with no dropdown.
-- Save behavior is unchanged: saving an accepted profile publishes it. This
-  revision does not introduce draft/publish controls or change invitation auth.
-- No migration, secrets, service, or production-data changes are required.
+- `/creators/dashboard` uses five steps: Your profile, Your calls, Availability,
+  Get paid, and Go live. Requests and notification settings remain accessible.
+- The spacious setup form keeps a numbered sidebar and a live profile preview on
+  desktop. Phones use a compact step row and a full-page Preview page dialog.
+- Accepted creators keep application identity, but start About, conversation
+  topics, pictures, and prices empty, with both calls disabled.
+- Public profiles pair identity/topics with a carousel at the top. About and
+  “Schedule a time to meet” follow. Calls show duration and price. A plain,
+  always-visible “How does your seat work?” answer is last, without a dropdown.
+- Removed intro/tagline, one-to-one explanation, call descriptions, and gallery
+  reference captions are absent from the reusable public page and setup form.
+  Older stored fields remain preserved. Dedicated seed routes retain their layout.
+- Save draft and Save and continue keep profile content and call prices private.
+  For an already live creator, public fields stay at the last published snapshot.
+- Go live / Publish changes explicitly publishes the saved draft. Server checks
+  accepted status, name, photo, About, topics, positive prices for enabled calls,
+  saved availability, and connected Google Calendar and Stripe timestamps.
+- Availability and account connections are operational settings. Saved hours
+  affect existing live booking availability immediately; the form says so.
+- Private application answers and identity contacts are never copied into the
+  public snapshot. Invitation authentication and ownership are unchanged.
 
-Verification uses a synthetic accepted creator in an isolated local D1 database:
-blank state, upload two photos, edit topics/About, enable a priced seat, save,
-reload, and inspect its public profile. Desktop (1440 px) and mobile (390 px)
-checks cover carousel arrows, content order, booking dialog, and no horizontal
-document overflow. No live invitation or production account is used.
-After integration with `main`, `npm run lint` and `npm test` (production build
-and all 68 tests) passed. The shared booking flow was checked through time
-selection and customer details on both viewports without submitting a booking.
+Migration `0016_magenta_sabretooth.sql` adds nullable `profile_draft` and
+`draft_saved_at` columns in D1. Existing live fields and publication timestamps
+are unchanged. Apply this additive migration before deploying the new Worker.
+No new secrets or services are required. The old Worker can run with the extra
+columns, but rolling back also restores the old publish-on-save behavior.
+
+Verification uses synthetic local data only. Lifecycle tests exercise blank
+profiles, private saves, live snapshots, authorization and readiness failures,
+explicit publishing, restored edits, and the booking/calendar flow after
+publication. Browser QA covers desktop and 390 px mobile editing and previews.
+No production creator, email, invitation, or external connection is used for QA.
+
+Release verification: lint, TypeScript, and the production build with all 70
+tests pass. Desktop (1440 px) and mobile (390 px) QA covers blank fields, photo
+upload, step navigation, private save/reload, draft/live separation, availability
+save, preview dialog, incomplete setup, and explicit Go live (private 404 becomes
+public 200). Preview pages have no horizontal overflow. Local connection flags
+are synthetic; real OAuth/payout readiness and paid-booking launch gates are
+unchanged. Production preflight confirms all required secret names and only
+this release migration pending.
 
 ## Original blank-profile release
 

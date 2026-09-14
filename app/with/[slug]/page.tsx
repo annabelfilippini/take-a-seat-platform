@@ -58,7 +58,7 @@ export async function generateMetadata({
 
   return {
     title: `Take a Seat with ${creator.name}`,
-    description: creator.profile.intro,
+    description: creator.profile.about[0]?.slice(0, 160) ?? creator.title,
   };
 }
 

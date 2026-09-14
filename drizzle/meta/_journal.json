@@ -106,6 +106,13 @@
       "when": 1789252404453,
       "tag": "0015_majestic_stryfe",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "6",
+      "when": 1789354870384,
+      "tag": "0016_magenta_sabretooth",
+      "breakpoints": true
     }
   ]
 }

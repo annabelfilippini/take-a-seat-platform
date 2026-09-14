@@ -322,7 +322,7 @@ test("server-renders the admin creator profile editor preview", async () => {
 
   const html = await response.text();
   assert.match(html, /Creator Profile Editor Preview \| Take a Seat/);
-  assert.match(html, /Your creator profile/);
+  assert.match(html, /Creator setup/);
   assert.match(html, /editable-profile-photo-frame/);
   assert.match(html, /aria-label="Drag profile picture to reposition it"/);
   assert.match(html, /aria-label="Profile picture zoom controls"/);
@@ -331,25 +331,27 @@ test("server-renders the admin creator profile editor preview", async () => {
   assert.doesNotMatch(html, /aria-label="Move profile picture side to side"/);
   assert.doesNotMatch(html, /aria-label="Move profile picture up and down"/);
   assert.doesNotMatch(html, />Center photo<\/button>/);
-  assert.match(html, /Editable profile preview tabs/);
-  assert.match(html, /aria-selected="true"[^>]*>Profile<\/button>/);
-  assert.match(html, />Availability<\/button>/);
-  assert.match(html, />Payments<\/button>/);
+  assert.match(html, /Creator setup steps/);
+  assert.match(html, /aria-current="step"/);
+  assert.match(html, /Your profile/);
+  assert.match(html, /Availability<\/button>/);
+  assert.match(html, /Get paid<\/button>/);
   assert.match(
     html,
-    /aria-label="Settings"[^>]*class="profile-nav-tab settings-tab-button"/,
+    /class="creator-settings-link"[^>]*aria-label="Settings"/,
   );
   assert.match(html, /class="settings-tab-icon"/);
   assert.doesNotMatch(html, /editable-creator-tabs-shell/);
   assert.match(html, /src="\/amber-headshot\.jpg"/);
   assert.match(html, /Upload profile picture/);
   assert.match(html, /Photos and videos/);
-  assert.match(html, />Save profile<\/button>/);
+  assert.match(html, />Save draft<\/button>/);
+  assert.match(html, /Save and continue/);
   assert.match(html, /aria-label="Save profile changes"/);
   assert.match(html, />Weekly availability<\/h2>/);
   assert.match(html, /These hours repeat every week in your selected timezone/);
   assert.doesNotMatch(html, /Select date|Select availability week|Visible month/);
-  assert.match(html, />Save availability<\/button>/);
+  assert.match(html, /Go live/);
   assert.match(html, /Stripe payouts/);
   assert.match(html, /Connect Stripe/);
   assert.match(
@@ -388,7 +390,7 @@ test("server-renders the admin creator profile editor preview", async () => {
   assert.match(html, /value="30"/);
   assert.match(html, /type="number" value="45"/);
   assert.match(html, /type="number" value="80"/);
-  assert.match(html, /Book this seat/);
+  assert.match(html, /Included on your page when you publish/);
 });
 
 test("server-renders candidate creator concept profiles", async () => {
