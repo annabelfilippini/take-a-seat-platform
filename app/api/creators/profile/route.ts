@@ -4,6 +4,7 @@ import {
   getCreatorProfileSettingsInput,
   getCreatorSettingsId,
   saveCreatorProfileSettings,
+  publishCreatorProfile,
 } from "../../../_lib/creator-onboarding";
 import { getRequestAdminEmail } from "../../../_lib/admin-auth";
 import { getSignedInClerkUser } from "../../../_lib/clerk-auth";
@@ -103,6 +104,17 @@ export async function POST(request: Request) {
         "creator-access",
         CREATOR_PROFILE_EDITOR_URL,
       );
+    }
+  }
+
+  if (formData.get("intent") === "publish") {
+    if (!requestedCreatorId) return profileStatusResponse(request, "error", "creator-access");
+    try {
+      const result = await publishCreatorProfile(creatorId);
+      return profileStatusResponse(request, result.status, result.detail ?? undefined, CREATOR_PROFILE_EDITOR_URL,
+        "publicPath" in result ? { publicPath: result.publicPath! } : {});
+    } catch {
+      return profileStatusResponse(request, "error", "Publishing failed. Your draft is still saved. Try again.");
     }
   }
 

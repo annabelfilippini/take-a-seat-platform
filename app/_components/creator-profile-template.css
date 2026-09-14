@@ -1,0 +1,124 @@
+.creator-profile-template .amber-profile-hero {
+  gap: clamp(32px, 5vw, 72px);
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  max-width: 1320px;
+  min-height: 0;
+  padding: 56px 28px;
+}
+
+.creator-profile-template .amber-hero-copy {
+  max-width: none;
+  min-width: 0;
+}
+
+.creator-profile-template .creator-conversation-topics {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  border-top: 1px solid var(--line);
+  margin-top: 28px;
+  padding: 24px 0 0;
+}
+
+.creator-conversation-topics h2,
+.creator-seat-how-it-works h2,
+.creator-gallery-empty h2 {
+  font-family: var(--serif);
+  font-size: 30px;
+  font-weight: 400;
+  line-height: 1.2;
+}
+
+.creator-profile-template .creator-conversation-topics ul {
+  grid-template-columns: 1fr;
+}
+
+.creator-conversation-topics p,
+.creator-seat-how-it-works p,
+.creator-gallery-empty p {
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.6;
+  margin-top: 12px;
+}
+
+.creator-profile-template .amber-hero-gallery {
+  margin: 0;
+  min-width: 0;
+  width: 100%;
+}
+
+.creator-profile-template .amber-gallery-frame {
+  aspect-ratio: 3 / 4;
+  flex-basis: 100%;
+}
+
+.creator-profile-template .amber-gallery-link::after {
+  content: none;
+}
+
+.creator-profile-template .gallery-arrow {
+  height: 44px;
+  width: 44px;
+}
+
+.creator-profile-template .gallery-arrow svg {
+  height: 22px;
+  width: 22px;
+}
+
+.creator-profile-template .gallery-arrow-prev { left: 12px; }
+.creator-profile-template .gallery-arrow-next { right: 12px; }
+
+.creator-gallery-empty {
+  align-content: center;
+  aspect-ratio: 3 / 4;
+  background: var(--cream);
+  border: 1px dashed var(--line);
+  display: grid;
+  justify-items: start;
+  padding: 32px;
+}
+
+.creator-gallery-empty a { margin-top: 20px; }
+
+.creator-profile-template .reserve-panel {
+  position: static;
+}
+
+.creator-profile-template .editable-about-copy {
+  margin-top: 16px;
+}
+
+.creator-profile-template .editable-profile-title {
+  font-size: clamp(26px, 4vw, 40px);
+}
+
+.creator-seat-how-it-works {
+  border-top: 1px solid var(--line);
+  margin: 0 auto;
+  max-width: 1320px;
+  padding: 40px 28px 64px;
+}
+
+.creator-profile-template .amber-hero-copy h1 {
+  font-size: clamp(36px, 5vw, 64px);
+}
+
+@media (max-width: 760px) {
+  .creator-profile-template .amber-profile-hero {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 32px 18px;
+  }
+
+  .creator-profile-template .amber-hero-gallery,
+  .creator-gallery-empty {
+    max-width: 460px;
+    width: 100%;
+    justify-self: center;
+  }
+
+  .creator-seat-how-it-works {
+    padding: 32px 18px 48px;
+  }
+}

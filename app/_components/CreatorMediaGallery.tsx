@@ -10,6 +10,7 @@ type CreatorMediaGalleryProps = {
   name: string;
   nextLabel?: string;
   previousLabel?: string;
+  showCaptions?: boolean;
 };
 
 export function CreatorMediaGallery({
@@ -18,6 +19,7 @@ export function CreatorMediaGallery({
   name,
   nextLabel = "Show next media",
   previousLabel = "Show previous media",
+  showCaptions = true,
 }: CreatorMediaGalleryProps) {
   const trackRef = useRef<HTMLDivElement>(null);
 
@@ -58,7 +60,7 @@ export function CreatorMediaGallery({
       <div className="amber-gallery-track" ref={trackRef}>
         {items.map((item) => (
           <span className="amber-gallery-frame" key={item.id}>
-            <GalleryFrame item={item} />
+            <GalleryFrame item={item} showCaption={showCaptions} />
           </span>
         ))}
       </div>
@@ -76,7 +78,7 @@ export function CreatorMediaGallery({
   );
 }
 
-function GalleryFrame({ item }: { item: CreatorMediaItem }) {
+function GalleryFrame({ item, showCaption }: { item: CreatorMediaItem; showCaption: boolean }) {
   const media = <GalleryMedia item={item} />;
 
   if (item.href) {
@@ -89,7 +91,7 @@ function GalleryFrame({ item }: { item: CreatorMediaItem }) {
         target="_blank"
       >
         {media}
-        <span className="amber-gallery-caption">{item.title}</span>
+        {showCaption ? <span className="amber-gallery-caption">{item.title}</span> : null}
       </a>
     );
   }
@@ -97,7 +99,7 @@ function GalleryFrame({ item }: { item: CreatorMediaItem }) {
   return (
     <span className="amber-gallery-link">
       {media}
-      <span className="amber-gallery-caption">{item.title}</span>
+      {showCaption ? <span className="amber-gallery-caption">{item.title}</span> : null}
     </span>
   );
 }

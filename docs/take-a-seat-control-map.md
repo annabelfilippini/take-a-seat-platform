@@ -1,6 +1,6 @@
 # Take a Seat Control Map
 
-Last updated: 2026-09-12
+Last updated: 2026-09-13
 
 This is the working source of truth for Take a Seat while the product is being
 organized. It should stay short, current, and operational.
@@ -47,7 +47,7 @@ Admin:
 
 - Reviews creator applications.
 - Accepts creators and sends invite links.
-- Accepts applications; creators publish their accepted profile by saving it.
+- Accepts applications; creators publish through the explicit Go live step.
 - Controls category placement, homepage featuring, refunds, exceptions, and
   launch readiness.
 - Should not be the permanent home for normal creator self-service.
@@ -136,10 +136,15 @@ Email:
 - Creator applications send Annabel the admin review email and send the
   applicant a receipt email. A valid email is required to submit or accept.
 - Acceptance reserves a public slug and prepares a private starter profile, then
-  emails the applicant a setup link. `published_at` remains null until profile save.
+  emails the applicant a setup link. `published_at` remains null until the creator explicitly goes live.
 - Blank creator setup is deployed (PR #15): retain application identity, but
   start profile content/media/prices empty and sessions disabled. Existing saved
   profiles retain their content. See `docs/blank-creator-profile.md`.
+- The revised creator setup uses five steps and a live page preview: carousel and
+  conversation topics first, scheduling below, and a plain question and answer
+  at the bottom. Profile/call edits save in `profile_draft`; Go live copies the
+  saved draft into public fields after setup checks. Saved availability updates
+  live bookable hours immediately. See `docs/blank-creator-profile.md` for release status.
 - Accepted emails provision or reuse the exact verified primary-email Clerk
   identity and send its sign-in token only to that inbox, in the URL fragment.
   Existing D1 ownership and saved profiles are preserved for repeat applicants.

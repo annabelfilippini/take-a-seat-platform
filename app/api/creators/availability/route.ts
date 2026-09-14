@@ -4,6 +4,7 @@ import {
   getCreatorAvailabilityInput,
   saveCreatorAvailability,
 } from "../../../_lib/creator-onboarding";
+import { getRequestAdminEmail } from "../../../_lib/admin-auth";
 import { getSignedInClerkUser } from "../../../_lib/clerk-auth";
 
 function redirectWithAvailabilityStatus(
@@ -61,10 +62,11 @@ export async function POST(request: Request) {
   }
 
   try {
-    const user = await getSignedInClerkUser(request);
-    const canManage = user
+    const adminEmail = await getRequestAdminEmail(request);
+    const user = adminEmail ? null : await getSignedInClerkUser(request);
+    const canManage = Boolean(adminEmail) || (user
       ? await canManageCreatorProfile(input.creatorId, user)
-      : false;
+      : false);
 
     if (!canManage) {
       return availabilityStatusResponse(

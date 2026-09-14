@@ -11,13 +11,14 @@ type CustomerBookingFlowProps = {
   creatorName: string;
   returnTo?: string;
   seats: Seat[];
+  showDescriptions?: boolean;
 };
 
 const fallbackViewerTimezone = "America/Los_Angeles";
 const weekdayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 export function CustomerBookingFlow({
-  availabilityRules = [], creatorId, creatorName, returnTo = "/with/ella", seats,
+  availabilityRules = [], creatorId, creatorName, returnTo = "/with/ella", seats, showDescriptions = true,
 }: CustomerBookingFlowProps) {
   const id = useId();
   const [activeSeatId, setActiveSeatId] = useState(seats[0]?.id ?? "");
@@ -201,7 +202,7 @@ export function CustomerBookingFlow({
       <div className="booking-seat-options" role="group" aria-label="Choose a call">
         {seats.map((seat) => <button className="booking-seat-choice" aria-pressed={seat.id === activeSeat?.id} key={seat.id} onClick={() => selectSeat(seat.id)} type="button">
           <span className="booking-seat-heading"><strong>{seat.name}</strong><strong>{seat.price}</strong></span>
-          <span>{seat.description}</span>
+          {showDescriptions && seat.description ? <span>{seat.description}</span> : null}
         </button>)}
         <button className="seat-primary-button" disabled={!activeSeat} onClick={openBooking} type="button">Find availability</button>
         <p className="booking-guest-note">No account needed.</p>
