@@ -4440,67 +4440,59 @@ img {
 .creator-apply-stage {
   align-items: center;
   background:
-    linear-gradient(90deg, rgba(31, 29, 26, 0.64), rgba(31, 29, 26, 0.38) 48%, rgba(31, 29, 26, 0.28)),
-    linear-gradient(180deg, rgba(31, 29, 26, 0.22), rgba(31, 29, 26, 0.58)),
+    linear-gradient(90deg, rgba(31, 29, 26, 0.5), rgba(31, 29, 26, 0.18) 48%, rgba(31, 29, 26, 0.44)),
+    linear-gradient(180deg, rgba(31, 29, 26, 0.18), rgba(31, 29, 26, 0.54)),
     url("/apply-to-inspire-hero.png") center center / cover no-repeat;
   display: grid;
   justify-items: center;
   min-height: 100svh;
-  padding: clamp(124px, 12vw, 156px) 28px clamp(62px, 8vw, 92px);
+  padding: clamp(104px, 9vw, 124px) 28px clamp(48px, 6vw, 72px);
 }
 
 .creator-application-layout,
 .creator-application-form,
 .creator-review-state {
   display: grid;
-  gap: 22px;
+  gap: 14px;
 }
 
 .creator-application-layout {
   align-items: start;
-  column-gap: clamp(54px, 8vw, 112px);
-  grid-template-columns: minmax(0, 1fr) minmax(360px, 460px);
+  justify-items: end;
   max-width: 1120px;
   width: min(100%, 1120px);
 }
 
-.creator-application-layout > h1 {
-  grid-column: 1;
-  transform: translateY(2in);
-}
-
 .creator-application-form {
-  grid-column: 2;
+  justify-self: end;
 }
 
 .creator-application-form,
 .creator-review-state {
   backdrop-filter: blur(7px);
-  background: rgba(255, 250, 242, 0.66);
+  background: rgba(255, 250, 242, 0.72);
   border: 1px solid rgba(255, 250, 242, 0.38);
-  border-radius: 8px;
+  border-radius: 0;
   box-shadow: 0 22px 55px rgba(31, 29, 26, 0.12);
   max-width: 560px;
-  padding: clamp(24px, 4vw, 38px);
+  padding: clamp(20px, 3vw, 28px);
   width: min(100%, 560px);
 }
 
-.creator-application-layout > h1,
+.creator-application-form h1,
 .creator-review-state h1 {
-  color: var(--cream);
+  color: var(--ink);
   font-family: var(--serif);
-  font-size: clamp(44px, calc(7vw - 14px), 70px);
+  font-size: clamp(38px, calc(5vw - 8px), 52px);
   font-weight: 400;
   letter-spacing: 0;
   line-height: 0.98;
   margin: 0 0 12px;
-  text-shadow: 0 16px 44px rgba(31, 29, 26, 0.64);
+  text-shadow: none;
 }
 
 .creator-review-state h1 {
-  color: var(--ink);
   font-size: clamp(37px, calc(7vw - 21px), 63px);
-  text-shadow: none;
 }
 
 .creator-application-form label {
@@ -4523,8 +4515,8 @@ img {
   color: var(--ink);
   font-size: 18px;
   font-weight: 500;
-  min-height: 58px;
-  padding: 15px 16px;
+  min-height: 52px;
+  padding: 12px 16px;
   width: 100%;
 }
 
@@ -4535,7 +4527,7 @@ img {
 
 .creator-application-form textarea {
   line-height: 1.45;
-  min-height: 148px;
+  min-height: 80px;
   resize: vertical;
 }
 
@@ -4545,7 +4537,7 @@ img {
   border-radius: 4px;
   color: var(--cream);
   font-size: 18px;
-  min-height: 58px;
+  min-height: 52px;
   text-transform: none;
 }
 
@@ -5358,10 +5350,6 @@ img {
     grid-template-columns: 1fr;
   }
 
-  .creator-application-layout > h1 {
-    transform: none;
-  }
-
   .about-topbar {
     align-items: stretch;
     display: grid;
@@ -5501,10 +5489,6 @@ img {
 
   .seat-directory-page .directory-results {
     scroll-margin-top: 292px;
-  }
-
-  .creator-application-form {
-    grid-column: 1;
   }
 
   .admin-topbar {
@@ -5713,7 +5697,7 @@ img {
 
   .creator-onboard-page .creator-apply-stage {
     align-items: start;
-    padding-top: 176px;
+    padding-top: 104px;
   }
 
   .creator-dashboard-card-grid {
@@ -5920,7 +5904,17 @@ img {
   }
 
   .creator-apply-stage {
+    background:
+      linear-gradient(90deg, rgba(31, 29, 26, 0.36), rgba(31, 29, 26, 0.14)),
+      linear-gradient(180deg, rgba(31, 29, 26, 0.1), rgba(31, 29, 26, 0.38)),
+      url("/apply-to-inspire-hero.png") center center / cover no-repeat;
     padding: 104px 18px 46px;
+  }
+
+  .creator-application-form,
+  .creator-review-state {
+    border-radius: 0;
+    padding: 22px;
   }
 
   .creator-proof-panel {

@@ -861,7 +861,8 @@ test("sends creator-facing application receipt emails", async () => {
   assert.match(email, /sign in and start building your profile!/);
   assert.match(email, /missing-recipient/);
   assert.match(onboardingPage, /creatorEmail: getStatus\(searchParams\?\.creatorEmail\)/);
-  assert.match(onboardingForm, /confirmation email/i);
+  assert.match(onboardingForm, /Your application is in review/);
+  assert.match(onboardingForm, /We will email you with an update/);
 });
 
 test("notifies creators when customers authorize a requested seat", async () => {
@@ -1086,13 +1087,16 @@ test("server-renders creator onboarding form", async () => {
   assert.match(html, /Last name/);
   assert.match(html, /Email address/);
   assert.match(html, /Phone number/);
-  assert.match(html, /Instagram handle/);
-  assert.match(html, /TikTok handle/);
+  assert.match(html, /Social handle/);
   assert.match(html, /Expertise/);
   assert.match(html, /<textarea(?=[^>]*name="profileDetails")/);
   assert.match(html, /Submit application/);
   assert.doesNotMatch(html, /Continue/);
-  assert.doesNotMatch(html, /Social handle/);
+  assert.doesNotMatch(html, /Instagram handle/);
+  assert.doesNotMatch(html, /TikTok handle/);
+  assert.doesNotMatch(html, /For the people we turn to/);
+  assert.doesNotMatch(html, /Your perspective\. Someone/);
+  assert.doesNotMatch(html, /Make room for the conversations/);
   assert.doesNotMatch(html, /Powered by Take a Seat/);
   assert.doesNotMatch(html, /Apply as a creator/);
   assert.doesNotMatch(html, /We will review every profile before it goes live/);
