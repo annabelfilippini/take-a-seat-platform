@@ -170,10 +170,6 @@ function getEditableCreatorMediaItems(profile: CreatorOnboardingProfile) {
     .map((item) => item.trim())
     .filter(Boolean);
 
-  if (!sources.length && profile.profileImageUrl) {
-    sources.push(profile.profileImageUrl);
-  }
-
   return sources.map((source, index) => ({
     id: `${profile.id}-media-${index + 1}`,
     kind: isVideoSource(source) ? ("video" as const) : ("photo" as const),

@@ -140,9 +140,9 @@ Email:
 - Blank creator setup is deployed (PR #15): retain application identity, but
   start profile content/media/prices empty and sessions disabled. Existing saved
   profiles retain their content. See `docs/blank-creator-profile.md`.
-- The revised creator setup uses five steps and a live page preview: carousel and
-  conversation topics first, scheduling below, and a plain question and answer
-  at the bottom. Profile/call edits save in `profile_draft`; Go live copies the
+- Creator setup and public profiles follow Ella's layout: round headshot and
+  intro beside the gallery, About/help topics/one-to-one copy below, and call
+  descriptions/prices on the right. Profile/call edits save in `profile_draft`; Go live copies the
   saved draft into public fields after setup checks. Saved availability updates
   live bookable hours immediately. See `docs/blank-creator-profile.md` for release status.
 - Accepted emails provision or reuse the exact verified primary-email Clerk
