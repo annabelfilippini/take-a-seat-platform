@@ -1198,11 +1198,14 @@ function EditableAvailabilityPanel({
   ), [availabilityBounds.end, availabilityBounds.today, weekStart]);
   const [weekDrafts, setWeekDrafts] = useState<Record<string, string[]>>({});
   const [weekSavedSlots, setWeekSavedSlots] = useState<Record<string, string[]>>({});
+  const [weekTimezones, setWeekTimezones] = useState<Record<string, string>>({});
+  const [saveError, setSaveError] = useState("");
+  const saveInFlight = useRef(false);
   const [selectedSlots, setSelectedSlots] = useState(
     () => new Set(getAvailabilitySlotKeysFromRules(weekRules)),
   );
   const [saveStatus, setSaveStatus] = useState<"empty" | "error" | "idle" | "saved" | "saving">(
-    weekRules.some((rule) => rule.enabled !== false) ? "saved" : "empty",
+    weekRules.length ? "saved" : "empty",
   );
   const paintActionRef = useRef<"clear" | "select" | null>(null);
   const paintStartRef = useRef<{ dayOfWeek: number; slotIndex: number } | null>(null);
@@ -1210,6 +1213,17 @@ function EditableAvailabilityPanel({
 
   const currentWeekIndex = Math.max(0, weekOptions.indexOf(weekStart));
   const selectedWeekLabel = formatAvailabilityWeek(weekStart);
+
+  useEffect(() => {
+    function warnOnLeave(event: BeforeUnloadEvent) {
+      if (Object.keys(weekDrafts).length || saveStatus === "saving") {
+        event.preventDefault();
+        event.returnValue = "";
+      }
+    }
+    window.addEventListener("beforeunload", warnOnLeave);
+    return () => window.removeEventListener("beforeunload", warnOnLeave);
+  }, [weekDrafts, saveStatus]);
 
   function getSlotKeysForWeek(nextWeekStart: string) {
     return weekDrafts[nextWeekStart]
@@ -1224,7 +1238,7 @@ function EditableAvailabilityPanel({
     }
 
     const nextRules = rulesForAvailabilityWeek(initialRules, nextWeekStart);
-    setSaveStatus(nextSlotKeys.length > 0 || nextRules.some((rule) => rule.enabled !== false) ? "saved" : "empty");
+    setSaveStatus(weekSavedSlots[nextWeekStart] !== undefined || nextSlotKeys.length > 0 || nextRules.length > 0 ? "saved" : "empty");
   }
 
   function showWeek(nextWeekStart: string) {
@@ -1235,9 +1249,8 @@ function EditableAvailabilityPanel({
     const nextRules = rulesForAvailabilityWeek(initialRules, nextWeekStart);
     const nextSlotKeys = getSlotKeysForWeek(nextWeekStart);
     setWeekStart(nextWeekStart);
-    if (nextRules[0]?.timezone) {
-      setTimezone(nextRules[0].timezone);
-    }
+    setTimezone(weekTimezones[nextWeekStart] ?? nextRules[0]?.timezone ?? initialTimezone);
+    setSaveError("");
     setSelectedSlots(new Set(nextSlotKeys));
     setWeekStatus(nextWeekStart, nextSlotKeys);
   }
@@ -1382,8 +1395,11 @@ function EditableAvailabilityPanel({
     }
   }
 
-  async function saveAvailability(advance = true) {
+  async function saveAvailability(advance = false) {
+    if (saveInFlight.current) return false;
+    saveInFlight.current = true;
     setSaveStatus("saving");
+    setSaveError("");
     const saveableSlots = new Set(
       sortAvailabilitySlotKeys(Array.from(selectedSlots)).filter((key) => {
         const slot = parseAvailabilitySlotKey(key);
@@ -1405,22 +1421,32 @@ function EditableAvailabilityPanel({
       });
 
       if (!response.ok) {
-        throw new Error("Availability save failed.");
+        throw new Error(response.status === 401 || response.status === 403
+          ? "Your session has expired or you no longer have access. Sign in again to save."
+          : "Availability could not be saved. Check the timezone and try again. Your changes are still here.");
       }
 
       const savedSlotKeys = sortAvailabilitySlotKeys(Array.from(saveableSlots));
       setWeekSavedSlots((current) => ({ ...current, [weekStart]: savedSlotKeys }));
+      setWeekTimezones((current) => ({ ...current, [weekStart]: timezone }));
+      setSelectedSlots(new Set(savedSlotKeys));
       setWeekDrafts((current) => {
         const nextDrafts = { ...current };
         delete nextDrafts[weekStart];
         return nextDrafts;
       });
-      setSaveStatus(savedSlotKeys.length > 0 ? "saved" : "empty");
-      onSaved(savedSlotKeys.length > 0, timezone, advance);
+      setSaveStatus("saved");
+      const savedWeeks = { ...weekSavedSlots, [weekStart]: savedSlotKeys };
+      const hasHours = weekOptions.some((week) => (savedWeeks[week]
+        ?? getAvailabilitySlotKeysFromRules(rulesForAvailabilityWeek(initialRules, week))).length > 0);
+      onSaved(hasHours, timezone, advance);
       return true;
-    } catch {
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : "Availability could not be saved. Your changes are still here. Try again.");
       setSaveStatus("error");
       return false;
+    } finally {
+      saveInFlight.current = false;
     }
   }
 
@@ -1431,7 +1457,7 @@ function EditableAvailabilityPanel({
           <h2>Weekly availability</h2>
         </div>
         <div className="editable-save-status-group">
-          <span className={saveStatus === "saved" ? "dashboard-status-complete" : "dashboard-status"}>
+          <span role="status" className={saveStatus === "saved" ? "dashboard-status-complete" : "dashboard-status"}>
             {saveStatus === "saving"
               ? "Saving"
               : saveStatus === "saved"
@@ -1484,7 +1510,7 @@ function EditableAvailabilityPanel({
             >
               {weekOptions.map((option) => (
                 <option key={option} value={option}>
-                  {formatAvailabilityWeek(option)}
+                  Week of {formatAvailabilityDate(option)}
                 </option>
               ))}
             </select>
@@ -1509,6 +1535,9 @@ function EditableAvailabilityPanel({
             value={timezone}
             onChange={(event) => {
               setTimezone(event.target.value);
+              setWeekTimezones((current) => ({ ...current, [weekStart]: event.target.value }));
+              updateWeekDraft(selectedSlots);
+              setSaveError("");
               setSaveStatus("idle");
             }}
           />
@@ -1568,6 +1597,9 @@ function EditableAvailabilityPanel({
       >
         {saveStatus === "saving" ? "Saving availability" : `Save ${selectedWeekLabel}`}
       </button>
+      {saveError ? <p role="alert">{saveError}</p> : null}
+      {Object.keys(weekDrafts).some((week) => week !== weekStart)
+        ? <p role="status">Other weeks have unsaved changes.</p> : null}
     </div>
   );
 }

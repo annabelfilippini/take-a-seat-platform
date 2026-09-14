@@ -1,6 +1,6 @@
 # Dated creator availability
 
-Prepared September 13, 2026. Not deployed.
+Initial release deployed September 13, 2026 from `03a0499` with migration 0017.
 
 Creators can navigate dated Sunday–Saturday weeks with previous/next arrows,
 choose a week from a dropdown, and save different hours through the six-month
@@ -10,11 +10,11 @@ one week at a time; drafts survive week/tab navigation and failed saves.
 
 Existing recurring schedules remain the default for untouched weeks. A dated
 week replaces the entire default week, including when the creator clears all
-hours and saves. The editor explains when it starts from recurring hours.
+hours and saves.
 
 ## Storage and booking
 
-- Migration `0016_lively_molecule_man.sql` adds nullable `week_start` to
+- Migration `0017_special_falcon.sql` adds nullable `week_start` to
   `creator_availability_rules`. Null means an existing recurring default.
 - A disabled dated row records an explicitly closed week. It must survive account
   and public-profile serialization so default hours do not reappear.
@@ -29,7 +29,7 @@ hours and saves. The editor explains when it starts from recurring hours.
 ## Verification
 
 - `npm run lint`, `npm run typecheck`, and `npm test` pass after rebasing onto
-  current GitHub main (74 tests, including the production build).
+  current GitHub main (76 tests, including the production build).
 - Automated cases cover adjacent weeks, empty-week overrides, defaults, reload,
   malformed/out-of-range input, unauthorized saves, rollback on insert failure,
   fragmented schedules, the six-month limit, notice, buffers, caps, and DST.
@@ -43,9 +43,17 @@ hours and saves. The editor explains when it starts from recurring hours.
 
 ## Release
 
-Apply migration 0016 before deploying the new Worker. It preserves existing rows.
+Migration 0017 is applied in production. It preserves existing rows.
 Old open editor tabs will need a refresh because new saves require a week.
 Roll back code only to another dated-availability-aware build: older save code
 replaces all rules and older booking code interprets dated rules as recurring.
 No new service, dependency, secret, or Stripe configuration change is needed.
 Production deployment requires Annabel's explicit approval.
+
+## Follow-up QA
+
+The [Mobbin comparison and browser checks](availability-mobbin-qa.md) record
+timezone draft retention, empty-week save feedback, pending/failure behavior,
+profile persistence, and desktop/mobile verification. Week saves keep the
+calendar open. Unsaved weeks trigger a browser leave warning. Profile edits
+still use Save draft followed by explicit publication.
