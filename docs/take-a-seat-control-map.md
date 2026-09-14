@@ -1,6 +1,6 @@
 # Take a Seat Control Map
 
-Last updated: 2026-09-13
+Last updated: 2026-09-14
 
 This is the working source of truth for Take a Seat while the product is being
 organized. It should stay short, current, and operational.
@@ -37,6 +37,9 @@ Creator backend:
 
 - Invite-only for accepted creators.
 - Lets creators edit profile content that affects buyer confidence.
+- Profile save repair is prepared, pending deployment: resize large uploaded
+  photos, enforce D1 row budgets, retain edits across failed saves, and let tabs
+  open independently of save success. See [save repair](profile-save-repair.md).
 - Lets creators set 15 minute and 30 minute seat pricing.
 - Lets creators set different availability for each dated week through six months
   ahead, with week arrows, a week dropdown, and a separate save for each week. New

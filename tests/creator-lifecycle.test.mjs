@@ -723,3 +723,40 @@ test("availability uses the same verified admin or creator access as the shared 
     assert.ok(rules.some((rule) => rule.weekStart === laterWeekStart && rule.enabled && rule.startTime === "14:00"));
   } finally { delete process.env.TAKE_A_SEAT_DEV_ADMIN_ENABLED; }
 });
+
+test("oversized profile uploads fail clearly without replacing saved draft or public data", async () => {
+  process.env.TAKE_A_SEAT_DEV_ADMIN_ENABLED = "true";
+  const id = "photo-test";
+  const values = { creatorId: id, name: "Photo Test", email: "photo-test@example.com", about: "Saved text", helpItems: "Style", profileImageUrl: "/ella-profile.jpg", seat15Enabled: "on", seat15PriceAmount: "45" };
+  const initial = await submit(formRequest("/api/creators/profile", values, true));
+  assert.equal(initial.status, 200);
+  await domain.acceptCreatorApplication(id, "photo-test");
+  assert.equal((await submit(formRequest("/api/creators/profile", values, true))).status, 200);
+  const before = await domain.getCreatorApplication(id);
+  const failed = await submit(formRequest("/api/creators/profile", { ...values, about: "Must not replace saved text", profileGallery: `data:image/jpeg;base64,${"a".repeat(6_000_000)}` }, true));
+  assert.equal(failed.status, 413);
+  assert.equal((await failed.json()).detail, "profile-too-large");
+  assert.deepEqual(await domain.getCreatorApplication(id), before);
+  // A bounded media payload can be saved, read back, and published with both copies in the row.
+  const gallery = `data:image/webp;base64,${"a".repeat(600_000)}`;
+  const retry = await submit(formRequest("/api/creators/profile", { ...values, profileGallery: gallery }, true));
+  assert.equal(retry.status, 200);
+  const saved = await domain.getCreatorApplication(id);
+  assert.equal(JSON.parse(saved.profileDraft).profileGallery, gallery);
+  assert.equal(saved.profileGallery, before.profileGallery);
+  readyConnections(id);
+  assert.equal((await domain.publishCreatorProfile(id)).status, "saved");
+  assert.equal((await domain.getCreatorApplication(id)).profileGallery, gallery);
+});
+
+test("profile byte limits count UTF-8 and reserve room for legacy published media", async () => {
+  const { MAX_PROFILE_BYTES, profileByteLength, ProfileSizeError } = await import("../app/_lib/profile-save.ts");
+  const id = "photo-test";
+  const input = await domain.getCreatorProfileSettingsInput(await formRequest("/", { email: "photo-test@example.com", name: "Photo Test" }).formData());
+  assert.ok(profileByteLength({ ...input, about: "🌸".repeat(210_000) }) > MAX_PROFILE_BYTES);
+  await assert.rejects(domain.saveCreatorProfileSettings(id, { ...input, about: "🌸".repeat(210_000) }), ProfileSizeError);
+  sqlite.prepare("UPDATE creator_onboarding_profiles SET profile_gallery = ? WHERE id = ?").run("a".repeat(1_400_000), id);
+  const before = await domain.getCreatorApplication(id);
+  await assert.rejects(domain.saveCreatorProfileSettings(id, { ...input, profileGallery: "a".repeat(600_000) }), ProfileSizeError);
+  assert.deepEqual(await domain.getCreatorApplication(id), before);
+});

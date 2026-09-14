@@ -9,6 +9,7 @@ import {
 import { getRequestAdminEmail } from "../../../_lib/admin-auth";
 import { getSignedInClerkUser } from "../../../_lib/clerk-auth";
 import { CREATOR_PROFILE_EDITOR_URL } from "../../../_lib/creator-destination";
+import { ProfileSizeError } from "../../../_lib/profile-save";
 import {
   sendCreatorApplicationEmail,
   sendCreatorApplicationReceivedEmail,
@@ -28,7 +29,7 @@ function profileStatusResponse(
         status,
         ...extraParams,
       },
-      { status: status === "saved" ? 200 : 400 },
+      { status: status === "saved" ? 200 : detail === "profile-too-large" ? 413 : 400 },
     );
   }
 
@@ -120,11 +121,11 @@ export async function POST(request: Request) {
 
   try {
     await saveCreatorProfileSettings(creatorId, input);
-  } catch {
+  } catch (error) {
     return profileStatusResponse(
       request,
-      "setup-needed",
-      "d1",
+      error instanceof ProfileSizeError ? "error" : "setup-needed",
+      error instanceof ProfileSizeError ? "profile-too-large" : "d1",
       typeof returnTo === "string" ? returnTo : null,
     );
   }

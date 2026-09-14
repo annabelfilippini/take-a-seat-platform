@@ -1,4 +1,5 @@
 import { addCalendarDays, availabilityDateBounds, availabilityWeekStart, isCalendarDate } from "./availability-weeks";
+import { MAX_PROFILE_BYTES, ProfileSizeError, profileByteLength } from "./profile-save";
 import { and, desc, eq, isNull, isNotNull, or, sql } from "drizzle-orm";
 import {
   creatorAvailabilityRules,
@@ -368,14 +369,18 @@ export async function saveCreatorProfileSettings(
   creatorId: string,
   input: CreatorProfileSettingsInput,
 ) {
+  if (profileByteLength(input) > MAX_PROFILE_BYTES) throw new ProfileSizeError();
   const { getDb } = await import("../../db");
   const db = getDb();
   const now = new Date().toISOString();
   const existing = await getCreatorApplication(creatorId);
   if (existing?.applicationStatus === "accepted") {
+    const profileDraft = JSON.stringify(getPublishableProfileFields(input));
+    // Legacy public uploads can already occupy much of D1's 2 MB row budget.
+    if (profileByteLength({ ...existing, profileDraft }) > 1_900_000) throw new ProfileSizeError();
     // Accepted creators edit a private snapshot. Public fields remain untouched.
     await db.update(creatorOnboardingProfiles).set({
-      profileDraft: JSON.stringify(getPublishableProfileFields(input)),
+      profileDraft,
       draftSavedAt: now,
       updatedAt: now,
     }).where(and(eq(creatorOnboardingProfiles.id, creatorId), eq(creatorOnboardingProfiles.applicationStatus, "accepted")));
