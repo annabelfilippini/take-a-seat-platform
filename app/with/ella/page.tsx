@@ -6,7 +6,8 @@ import {
   getProfileImageObjectPosition,
   getProfileImageTransform,
 } from "../../_lib/profile-image";
-import { CustomerBookingFlow } from "./CustomerBookingFlow";
+import { CustomerBookingFlow } from "../../_components/CustomerBookingFlow";
+import { BookingEntryLink } from "../../_components/BookingEntryLink";
 import { EllaGallery } from "./EllaGallery";
 
 export const metadata: Metadata = {
@@ -77,7 +78,6 @@ export default async function EllaProfile({ searchParams }: EllaProfileProps) {
     profile?.whyBody ??
     "Ella's strength is making your clothes feel easier to use. Use the call to put outfits together from what you already own, choose better pieces for your month, or make a shopping cart feel more intentional before you buy.";
   const bookingNotice = getBookingNotice(searchParams);
-  const startingPrice = [...creator.seats].sort((a, b) => a.unitAmount - b.unitAmount)[0]?.price;
 
   return (
     <main className="platform-shell amber-profile-page">
@@ -138,12 +138,7 @@ export default async function EllaProfile({ searchParams }: EllaProfileProps) {
             ) : null}
           </p>
           <p>{intro}</p>
-          {creator.seats.length ? (
-            <>
-              <p>From {startingPrice} · Private video call</p>
-              <a className="seat-primary-button profile-primary-button" href="#reserve">Choose a call</a>
-            </>
-          ) : null}
+          <BookingEntryLink seats={creator.seats} />
         </div>
 
         <EllaGallery items={publishedCreator ? creator.mediaItems ?? [] : creator.mediaItems?.length ? creator.mediaItems : undefined} />

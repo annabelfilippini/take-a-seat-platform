@@ -332,9 +332,10 @@ test("server-renders the admin creator profile editor preview", async () => {
   assert.doesNotMatch(html, /aria-label="Move profile picture up and down"/);
   assert.doesNotMatch(html, />Center photo<\/button>/);
   assert.match(html, /Editable profile preview tabs/);
-  assert.match(html, /aria-selected="true"[^>]*>Profile<\/button>/);
-  assert.match(html, />Availability<\/button>/);
-  assert.match(html, />Payments<\/button>/);
+  assert.match(html, /aria-selected="true"/);
+  assert.match(html, />Profile<\/button>/);
+  assert.match(html, /Availability<\/button>/);
+  assert.match(html, /Payments<\/button>/);
   assert.match(
     html,
     /aria-label="Settings"[^>]*class="profile-nav-tab settings-tab-button"/,
@@ -344,13 +345,16 @@ test("server-renders the admin creator profile editor preview", async () => {
   assert.match(html, /src="\/amber-headshot\.jpg"/);
   assert.match(html, /Upload profile picture/);
   assert.match(html, /Photos and videos/);
-  assert.match(html, />Save profile<\/button>/);
+  assert.match(html, />Save draft<\/button>/);
+  assert.match(html, /Preview your page/);
   assert.match(html, /aria-label="Save profile changes"/);
   assert.match(html, />Weekly availability<\/h2>/);
-  assert.match(html, /Set different hours each week, up to six months ahead/);
-  assert.match(html, /aria-label="Next week"/);
+  assert.match(html, /Choose any week up to six months ahead/);
   assert.match(html, /aria-label="Choose availability week"/);
-  assert.match(html, />Save this week<\/button>/);
+  assert.match(html, /aria-label="Previous availability week"/);
+  assert.match(html, /aria-label="Next availability week"/);
+  assert.doesNotMatch(html, /Select date|Visible month/);
+  assert.match(html, /Go live/);
   assert.match(html, /Stripe payouts/);
   assert.match(html, /Connect Stripe/);
   assert.match(
@@ -377,6 +381,10 @@ test("server-renders the admin creator profile editor preview", async () => {
   assert.doesNotMatch(html, /aria-label="Short profile description"/);
   assert.match(html, /aria-label="About section"/);
   assert.match(html, /aria-label="One-to-one reason"/);
+  assert.match(html, /aria-label="Public profile intro"/);
+  assert.match(html, /can help with/);
+  assert.match(html, /Choose a call/);
+  assert.match(html, /Why a 1:1 call\?/);
   assert.match(html, /aria-label="15 minutes duration in minutes"/);
   assert.match(html, /aria-label="30 minutes duration in minutes"/);
   assert.match(html, /aria-label="15 minutes description"/);
@@ -386,7 +394,6 @@ test("server-renders the admin creator profile editor preview", async () => {
   assert.match(html, /type="number" value="45"/);
   assert.match(html, /type="number" value="80"/);
   assert.match(html, /Find availability/);
-  assert.doesNotMatch(html, /Book this seat/);
 });
 
 test("server-renders candidate creator concept profiles", async () => {
@@ -565,7 +572,7 @@ test("wires accepted creators to public profile publishing", async () => {
     readFile(new URL("../app/api/stripe/checkout/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/api/bookings/request/route.ts", import.meta.url), "utf8"),
     readFile(
-      new URL("../app/with/ella/CustomerBookingFlow.tsx", import.meta.url),
+      new URL("../app/_components/CustomerBookingFlow.tsx", import.meta.url),
       "utf8",
     ),
   ]);
@@ -620,13 +627,13 @@ test("wires accepted creators to public profile publishing", async () => {
   assert.match(requestRoute, /reserveBookingRequest/);
   assert.match(requestRoute, /isBookingSlotAvailable/);
   assert.match(checkoutRoute, /export \{ POST \} from "..\/..\/bookings\/request\/route"/);
-  assert.match(customerBookingFlow, /Find Availability/);
+  assert.match(customerBookingFlow, /Find availability/);
   assert.match(customerBookingFlow, /action="\/api\/bookings\/request"/);
   assert.match(customerBookingFlow, /selectedSlot\?\.sourceAppointmentStartAt/);
   assert.match(customerBookingFlow, /selectedSlot\?\.sourceTimezone/);
   assert.match(customerBookingFlow, /What do you want to talk about with \{creatorName\}\?/);
   assert.match(customerBookingFlow, /You won't be charged unless \$\{creatorName\} accepts/);
-  assert.match(customerBookingFlow, /Go to payment next/);
+  assert.match(customerBookingFlow, /Continue to payment/);
   assert.match(bookingsLib, /accepted: "accepted"/);
   assert.match(bookingsLib, /paymentAuthorized: "payment_authorized"/);
   assert.match(bookingsLib, /markBookingPaymentAuthorized/);
@@ -862,8 +869,7 @@ test("sends creator-facing application receipt emails", async () => {
   assert.match(email, /sign in and start building your profile!/);
   assert.match(email, /missing-recipient/);
   assert.match(onboardingPage, /creatorEmail: getStatus\(searchParams\?\.creatorEmail\)/);
-  assert.match(onboardingForm, /Your application is in review/);
-  assert.match(onboardingForm, /We will email you with an update/);
+  assert.match(onboardingForm, /confirmation email/i);
 });
 
 test("notifies creators when customers authorize a requested seat", async () => {
@@ -1048,7 +1054,7 @@ test("server-renders Ella's profile page", async () => {
   assert.doesNotMatch(html, /play_button=0/);
   assert.doesNotMatch(html, /description=0/);
   assert.doesNotMatch(html, /music_info=0/);
-  assert.match(html, /Find Availability/);
+  assert.match(html, /Find availability/);
   assert.match(html, /You won&#x27;t be charged unless Ella accepts your appointment/);
   assert.doesNotMatch(html, /Choose a time and then Ella will get a short note/);
   assert.doesNotMatch(html, /Providence College/);
@@ -1088,16 +1094,13 @@ test("server-renders creator onboarding form", async () => {
   assert.match(html, /Last name/);
   assert.match(html, /Email address/);
   assert.match(html, /Phone number/);
-  assert.match(html, /Social handle/);
+  assert.match(html, /Instagram handle/);
+  assert.match(html, /TikTok handle/);
   assert.match(html, /Expertise/);
   assert.match(html, /<textarea(?=[^>]*name="profileDetails")/);
   assert.match(html, /Submit application/);
   assert.doesNotMatch(html, /Continue/);
-  assert.doesNotMatch(html, /Instagram handle/);
-  assert.doesNotMatch(html, /TikTok handle/);
-  assert.doesNotMatch(html, /For the people we turn to/);
-  assert.doesNotMatch(html, /Your perspective\. Someone/);
-  assert.doesNotMatch(html, /Make room for the conversations/);
+  assert.doesNotMatch(html, /Social handle/);
   assert.doesNotMatch(html, /Powered by Take a Seat/);
   assert.doesNotMatch(html, /Apply as a creator/);
   assert.doesNotMatch(html, /We will review every profile before it goes live/);

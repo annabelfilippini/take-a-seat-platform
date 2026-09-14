@@ -1,5 +1,74 @@
 # Blank creator profiles
 
+## Ella layout release, September 13
+
+The accepted creator editor, its draft preview, and `/with/[slug]` now follow
+Ella's layout: round headshot and intro beside a wide gallery; About, help
+topics, and the one-to-one explanation below; call descriptions and prices on
+the right. Content, media, and prices start blank, retaining application identity.
+Empty fields stay empty on save; a headshot no longer fills an empty gallery.
+
+Profile, Availability, Payments, Go live, and Settings use the top navigation.
+The newer private-draft and explicit-publish protections from PR #22 remain.
+The current booking modal and availability behavior also remain. This change
+requires no migration or new secrets. Annabel approved production deployment.
+
+Verification: all 70 current-main tests pass, including private save, publish
+readiness, draft/live separation, and blank content. The approved editor was
+checked on desktop/mobile before integration. Public browser checks were rerun
+on the release. Automatic approval blocked a fresh local admin test session;
+the integrated editor's state and persistence are covered by lifecycle tests.
+
+## Profile setup revision, September 13
+
+PR #22 combines the accepted-creator setup and public profile. Annabel approved
+production deployment on September 13.
+
+- `/creators/dashboard` uses five steps: Your profile, Your calls, Availability,
+  Get paid, and Go live. Requests and notification settings remain accessible.
+- The spacious setup form keeps a numbered sidebar and a live profile preview on
+  desktop. Phones use a compact step row and a full-page Preview page dialog.
+- Accepted creators keep application identity, but start About, conversation
+  topics, pictures, and prices empty, with both calls disabled.
+- Public profiles pair identity/topics with a carousel at the top. About and
+  “Schedule a time to meet” follow. Calls show duration and price. A plain,
+  always-visible “How does your seat work?” answer is last, without a dropdown.
+- Removed intro/tagline, one-to-one explanation, call descriptions, and gallery
+  reference captions are absent from the reusable public page and setup form.
+  Older stored fields remain preserved. Dedicated seed routes retain their layout.
+- Save draft and Save and continue keep profile content and call prices private.
+  For an already live creator, public fields stay at the last published snapshot.
+- Go live / Publish changes explicitly publishes the saved draft. Server checks
+  accepted status, name, photo, About, topics, positive prices for enabled calls,
+  saved availability, and connected Google Calendar and Stripe timestamps.
+- Availability and account connections are operational settings. Saved hours
+  affect existing live booking availability immediately; the form says so.
+- Private application answers and identity contacts are never copied into the
+  public snapshot. Invitation authentication and ownership are unchanged.
+
+Migration `0016_magenta_sabretooth.sql` adds nullable `profile_draft` and
+`draft_saved_at` columns in D1. Existing live fields and publication timestamps
+are unchanged. Apply this additive migration before deploying the new Worker.
+No new secrets or services are required. The old Worker can run with the extra
+columns, but rolling back also restores the old publish-on-save behavior.
+
+Verification uses synthetic local data only. Lifecycle tests exercise blank
+profiles, private saves, live snapshots, authorization and readiness failures,
+explicit publishing, restored edits, and the booking/calendar flow after
+publication. Browser QA covers desktop and 390 px mobile editing and previews.
+No production creator, email, invitation, or external connection is used for QA.
+
+Release verification: lint, TypeScript, and the production build with all 70
+tests pass. Desktop (1440 px) and mobile (390 px) QA covers blank fields, photo
+upload, step navigation, private save/reload, draft/live separation, availability
+save, preview dialog, incomplete setup, and explicit Go live (private 404 becomes
+public 200). Preview pages have no horizontal overflow. Local connection flags
+are synthetic; real OAuth/payout readiness and paid-booking launch gates are
+unchanged. Production preflight confirms all required secret names and only
+this release migration pending.
+
+## Original blank-profile release
+
 Deployed September 12, 2026, with Annabel's explicit approval.
 
 New accepted creators start with their application name, contact details and

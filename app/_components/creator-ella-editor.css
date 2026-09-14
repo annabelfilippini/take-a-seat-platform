@@ -1,0 +1,137 @@
+.editable-gallery-column {
+  min-width: 0;
+}
+
+.editable-profile-page .reserve-panel {
+  scroll-margin-top: 112px;
+}
+
+.editable-gallery-controls {
+  border-bottom: 1px solid var(--line);
+  margin-top: 16px;
+  padding: 16px 0;
+}
+
+.editable-gallery-controls > .editable-media-panel {
+  display: grid;
+  gap: 20px;
+  padding-top: 20px;
+}
+
+.editable-profile-photo-controls summary,
+.editable-social-url-fields summary,
+.editable-gallery-controls summary {
+  color: var(--moss);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.editable-profile-photo-controls[open] > label,
+.editable-social-url-fields[open] > label {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.editable-empty-gallery .amber-gallery-frame {
+  align-items: center;
+  background: #eeeae3;
+  border: 1px dashed var(--line);
+  color: var(--muted);
+  display: flex;
+  justify-content: center;
+}
+
+.editable-help-topics {
+  margin-bottom: 20px;
+}
+
+.editable-help-topic {
+  font-size: 14px;
+  line-height: 1.45;
+  resize: vertical;
+}
+
+.editable-public-preview .editable-profile-title {
+  font-size: 54px;
+  line-height: 1.1;
+  resize: vertical;
+}
+
+@media (max-width: 640px) {
+  .editable-public-preview .editable-profile-title {
+    font-size: 38px;
+  }
+
+  .editable-profile-page .reserve-panel {
+    scroll-margin-top: 184px;
+  }
+}
+
+.editable-seat-option-heading {
+  align-items: center;
+  gap: 14px;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.editable-seat-duration-field {
+  color: var(--ink);
+  font-size: 20px;
+  font-weight: 800;
+  grid-template-columns: minmax(0, 60px) auto;
+  justify-self: start;
+}
+
+.editable-seat-price-field {
+  color: var(--ink);
+  font-size: 20px;
+  font-weight: 800;
+  grid-template-columns: auto minmax(0, 76px);
+  justify-self: end;
+}
+
+.editable-seat-option-heading .editable-duration-field input,
+.editable-seat-option-heading .editable-price-field input {
+  background: rgba(255, 255, 255, 0.54);
+  border-color: transparent;
+  font-weight: 800;
+  min-height: 42px;
+}
+
+.editable-preview-booking-button:disabled {
+  background: var(--rosewood);
+  border-color: var(--rosewood);
+  color: var(--cream);
+  cursor: default;
+  opacity: 1;
+}
+
+.editable-reserve-note {
+  text-align: center;
+}
+
+.editable-reserve-note + .editable-reserve-note {
+  color: var(--muted);
+  text-align: left;
+}
+
+.reserve-panel .editable-preview-booking-button:disabled {
+  background: var(--rosewood);
+  border-color: var(--rosewood);
+  color: var(--cream);
+  cursor: default;
+}
+
+
+.reserve-panel { scroll-margin-top: 88px; }
+.ella-draft-preview { background: var(--paper); }
+@media (max-width: 640px) {
+  .editable-profile-page .profile-topbar .profile-nav { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .editable-profile-page .profile-topbar .profile-nav .profile-nav-tab { padding-inline: 6px; }
+}
+.editable-call-currency { display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: 14px; }
+.editable-call-currency select { min-width: 0; padding: 8px; background: var(--cream); border: 1px solid var(--line); }
+.editable-profile-page [hidden] { display: none !important; }
+.creator-draft-preview .creator-preview-name { font: 300 54px/1.1 var(--serif); margin: 0; }
+@media (max-width: 640px) { .creator-draft-preview .creator-preview-name { font-size: 38px; } }

@@ -10,8 +10,14 @@ import {
   type PointerEvent,
   type WheelEvent,
 } from "react";
-import { addCalendarDays, availabilityDateBounds, availabilityWeekStart, isCalendarDate, rulesForAvailabilityWeek } from "../../_lib/availability-weeks";
 import { CREATOR_PROFILE_EDITOR_URL } from "../../_lib/creator-destination";
+import { CreatorSetupPagePreview } from "../../_components/CreatorSetupPagePreview";
+import {
+  addCalendarDays,
+  availabilityDateBounds,
+  availabilityWeekStart,
+  rulesForAvailabilityWeek,
+} from "../../_lib/availability-weeks";
 
 type EditableGalleryItem = {
   fileName?: string;
@@ -22,7 +28,7 @@ type EditableGalleryItem = {
   title: string;
 };
 
-type EditableCreatorTab = "profile" | "availability" | "payments" | "settings";
+type EditableCreatorTab = "profile" | "availability" | "payments" | "publish" | "settings";
 type EditableDurationValue = number | string;
 type EditablePriceValue = number | string;
 type ProfileImagePointer = {
@@ -31,6 +37,8 @@ type ProfileImagePointer = {
 };
 
 type EditableProfileState = {
+  publishedAt?: string | null;
+  publicSlug?: string | null;
   about: string;
   bio: string;
   calendarConnectedAt?: string | null;
@@ -84,7 +92,6 @@ export type EditableCreatorNotification = {
 };
 
 type EditableAvailabilityRule = {
-  weekStart?: string | null;
   bufferMinutes?: number | null;
   dayOfWeek: number;
   enabled?: boolean;
@@ -94,12 +101,14 @@ type EditableAvailabilityRule = {
   minNoticeMinutes?: number | null;
   startTime: string;
   timezone: string;
+  weekStart?: string | null;
 };
 
 const creatorTabs: Array<{ id: EditableCreatorTab; label: string }> = [
   { id: "profile", label: "Profile" },
   { id: "availability", label: "Availability" },
   { id: "payments", label: "Payments" },
+  { id: "publish", label: "Go live" },
   { id: "settings", label: "Settings" },
 ];
 
@@ -183,12 +192,14 @@ const tiktokPlayerOptions = [
 
 export function EditableCreatorProfilePreview({
   calendarStatus,
+  stripeStatus,
   initialAvailabilityRules = [],
   initialProfile,
   initialNotificationPreferences = defaultNotificationPreferences,
   initialNotifications = [],
 }: {
   calendarStatus?: string;
+  stripeStatus?: string;
   initialAvailabilityRules?: EditableAvailabilityRule[];
   initialProfile: EditableProfileState;
   initialNotificationPreferences?: EditableNotificationPreferences;
@@ -196,7 +207,11 @@ export function EditableCreatorProfilePreview({
 }) {
   const [profile, setProfile] = useState(initialProfile);
   const [activeCreatorTab, setActiveCreatorTab] =
-    useState<EditableCreatorTab>(calendarStatus ? "availability" : "profile");
+    useState<EditableCreatorTab>(calendarStatus ? "availability" : stripeStatus ? "payments" : "profile");
+  const previewDialog = useRef<HTMLDialogElement>(null);
+  const [publishMessage, setPublishMessage] = useState("");
+  const [publishing, setPublishing] = useState(false);
+  const [hasAvailability, setHasAvailability] = useState(initialAvailabilityRules.some((rule) => rule.enabled !== false));
   const [draftMedia, setDraftMedia] = useState<{
     fileName: string;
     kind: EditableGalleryItem["kind"];
@@ -254,6 +269,19 @@ export function EditableCreatorProfilePreview({
           ? "Save failed"
           : "Unsaved";
 
+  useEffect(() => {
+    function warnOnLeave(event: BeforeUnloadEvent) {
+      if (mediaSaveStatus !== "saved") { event.preventDefault(); event.returnValue = ""; }
+    }
+    window.addEventListener("beforeunload", warnOnLeave);
+    return () => window.removeEventListener("beforeunload", warnOnLeave);
+  }, [mediaSaveStatus]);
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "instant" });
+    document.querySelector<HTMLElement>(".creator-setup-editor h1")?.focus({ preventScroll: true });
+  }, [activeCreatorTab]);
+
   const markProfileDirty = useCallback(() => {
     profileEditRevision.current += 1;
     setMediaSaveStatus("idle");
@@ -310,11 +338,6 @@ export function EditableCreatorProfilePreview({
     };
   }, [profile.image, profileImageZoom, updateProfileImageZoom]);
 
-  const helpItems = useMemo(
-    () =>
-      profile.helpItems ? profile.helpItems.split("\n") : ["", "", "", ""],
-    [profile.helpItems],
-  );
 
   function update<K extends keyof EditableProfileState>(
     key: K,
@@ -580,7 +603,7 @@ export function EditableCreatorProfilePreview({
 
   async function saveProfileChanges() {
     if (profileSaveInFlight.current) {
-      return;
+      return false;
     }
 
     profileSaveInFlight.current = true;
@@ -602,13 +625,57 @@ export function EditableCreatorProfilePreview({
       setMediaSaveStatus(
         profileEditRevision.current === savedRevision ? "saved" : "idle",
       );
+      return profileEditRevision.current === savedRevision;
     } catch {
       setMediaSaveStatus("error");
+      return false;
     } finally {
       profileSaveInFlight.current = false;
       setProfileSaving(false);
     }
   }
+
+  async function changeStep(step: EditableCreatorTab) {
+    if (profileSaving || publishing) return;
+    if (mediaSaveStatus !== "saved" && !(await saveProfileChanges())) return;
+    setActiveCreatorTab(step);
+    setPublishMessage("");
+    window.scrollTo({ top: 0, behavior: "instant" });
+  }
+
+  async function publishProfile() {
+    setPublishing(true);
+    setPublishMessage("");
+    try {
+      if (!(await saveProfileChanges())) throw new Error("Save your draft successfully before publishing.");
+      const body = getProfileSettingsFormData(profile);
+      body.set("intent", "publish");
+      const response = await fetch("/api/creators/profile", { method: "POST", headers: { accept: "application/json" }, body });
+      const result = await response.json() as { detail?: string; publicPath?: string };
+      if (!response.ok) throw new Error(result.detail || "Publishing failed. Please try again.");
+      setProfile((current) => ({ ...current, publishedAt: new Date().toISOString() }));
+      setPublishMessage("Your page is live. You can share it now.");
+    } catch (error) {
+      setPublishMessage(error instanceof Error ? error.message : "Publishing failed. Your draft is saved.");
+    } finally {
+      setPublishing(false);
+    }
+  }
+
+  const profileReady = Boolean(profile.name.trim() && profile.about.trim() && profile.helpItems.trim() && profile.image);
+  const enabledCalls = [
+    { enabled: profile.seat15Enabled, price: Number(profile.seat15PriceAmount) },
+    { enabled: profile.seat30Enabled, price: Number(profile.seat30PriceAmount) },
+  ].filter((call) => call.enabled);
+  const callsReady = enabledCalls.length > 0 && enabledCalls.every((call) => call.price > 0);
+  const setupChecks = [
+    { id: "profile" as const, label: "Profile picture, about text, and conversation topics", done: profileReady },
+    { id: "profile" as const, label: "Call lengths and prices", done: callsReady },
+    { id: "availability" as const, label: "Saved availability and Google Calendar", done: hasAvailability && Boolean(profile.calendarConnectedAt) },
+    { id: "payments" as const, label: "Stripe payouts connected", done: Boolean(profile.stripeConnectedAt) },
+  ];
+  const allReady = setupChecks.every((check) => check.done);
+  const helpItems = profile.helpItems ? profile.helpItems.split("\n") : ["", "", "", ""];
 
   return (
     <main className="platform-shell amber-profile-page editable-profile-page">
@@ -620,7 +687,7 @@ export function EditableCreatorProfilePreview({
         </p>
       ) : null}
 
-      <div className="profile-announcement">Your creator profile. Save when you are ready for your card to appear on the website.</div>
+      <div className="profile-announcement">{profile.publishedAt ? "Live page · private edits" : "Your creator profile · Private draft"}</div>
       <header className="topbar profile-topbar">
         <a className="brand-mark" href="/" aria-label="Take a Seat home">
           Take a Seat
@@ -634,7 +701,8 @@ export function EditableCreatorProfilePreview({
               className={`profile-nav-tab${tab.id === "settings" ? " settings-tab-button" : ""}`}
               id={`editable-creator-tab-${tab.id}`}
               key={tab.id}
-              onClick={() => setActiveCreatorTab(tab.id)}
+              disabled={profileSaving || publishing}
+              onClick={() => { void changeStep(tab.id); }}
               role="tab"
               type="button"
             >
@@ -650,6 +718,7 @@ export function EditableCreatorProfilePreview({
         id="editable-creator-profile"
         role="tabpanel"
       >
+      <fieldset className="creator-setup-fields" disabled={publishing}>
       <section className="amber-profile-hero editable-public-preview" id="public-preview">
         <div className="amber-hero-copy">
           <div className="editable-profile-photo-editor">
@@ -795,7 +864,7 @@ export function EditableCreatorProfilePreview({
                 onClick={saveProfileChanges}
                 type="button"
               >
-                {profileSaving ? "Saving profile" : "Save profile"}
+                {profileSaving ? "Saving profile" : "Save draft"}
               </button>
             </div>
           </div>
@@ -921,8 +990,10 @@ export function EditableCreatorProfilePreview({
         <aside className="reserve-panel" id="reserve" aria-label={`Book ${profile.name}`}>
           <h2 className="editable-reserve-heading">Choose a call</h2>
           <p>Private video call on Google Meet.</p>
+          <label className="editable-call-currency">Currency<select aria-label="Call currency" value={profile.currency} onChange={(event) => update("currency", event.target.value)}>{["USD", "GBP", "EUR", "CAD", "AUD"].map((currency) => <option key={currency}>{currency}</option>)}</select></label>
           <div className="seat-options">
             <EditableSeatOption
+              currency={profile.currency}
               description={profile.seat15Description}
               durationMinutes={profile.seat15DurationMinutes}
               enabled={profile.seat15Enabled}
@@ -933,6 +1004,7 @@ export function EditableCreatorProfilePreview({
               onPriceChange={(value) => update("seat15PriceAmount", value)}
             />
             <EditableSeatOption
+              currency={profile.currency}
               description={profile.seat30Description}
               durationMinutes={profile.seat30DurationMinutes}
               enabled={profile.seat30Enabled}
@@ -970,10 +1042,11 @@ export function EditableCreatorProfilePreview({
             onClick={saveProfileChanges}
             type="button"
           >
-            {profileSaving ? "Saving profile" : "Save profile"}
+            {profileSaving ? "Saving profile" : "Save draft"}
           </button>
         </div>
       </section>
+      </fieldset>
       </div>
 
       <section
@@ -988,6 +1061,7 @@ export function EditableCreatorProfilePreview({
           creatorId={profile.id}
           initialRules={initialAvailabilityRules}
           timezone={profile.timezone}
+          onSaved={(hasHours, timezone, advance) => { setHasAvailability(hasHours); setProfile((current) => ({ ...current, timezone })); if (advance) setActiveCreatorTab("payments"); }}
         />
       </section>
 
@@ -1000,7 +1074,7 @@ export function EditableCreatorProfilePreview({
       >
         <EditablePaymentsPanel
           profile={profile}
-          onEditProfile={() => setActiveCreatorTab("profile")}
+          onEditProfile={() => { void changeStep("profile"); }}
         />
       </section>
 
@@ -1017,6 +1091,15 @@ export function EditableCreatorProfilePreview({
           initialPreferences={initialNotificationPreferences}
         />
       </section>
+          <section hidden={activeCreatorTab !== "publish"} className="editable-admin-tab-panel" role="tabpanel" aria-labelledby="editable-creator-tab-publish" aria-label="Go live" id="editable-creator-publish">
+            <p>Review your page and finish these steps before publishing. Your profile and call prices stay private until you publish.</p>
+            <ul className="creator-setup-checklist">{setupChecks.map((check) => <li key={check.label}><span>{check.done ? "Ready" : "To do"}</span><button type="button" onClick={() => { void changeStep(check.id); }}>{check.label}</button></li>)}</ul>
+            <button type="button" className="seat-secondary-button" onClick={() => previewDialog.current?.showModal()}>Preview your page</button>
+            <footer className="creator-setup-footer"><button type="button" className="editable-primary-button" disabled={!allReady || publishing || profileSaving} onClick={() => { void publishProfile(); }}>{publishing ? "Publishing…" : profile.publishedAt ? "Publish changes" : "Go live"}</button></footer>
+            {publishMessage ? <p role="status">{publishMessage}</p> : null}
+            {profile.publishedAt && profile.publicSlug ? <a href={`/with/${profile.publicSlug}`} target="_blank" rel="noreferrer">View your live page ↗</a> : null}
+          </section>
+      <dialog className="creator-full-preview" ref={previewDialog} aria-label="Preview your public page"><div className="creator-preview-toolbar"><span>Draft preview</span><button type="button" onClick={() => previewDialog.current?.close()}>Back to setup</button></div><CreatorSetupPagePreview profile={profile} /></dialog>
     </main>
   );
 }
@@ -1081,64 +1164,98 @@ function EditableAvailabilityPanel({
   creatorId,
   initialRules,
   timezone: initialTimezone,
+  onSaved,
 }: {
   calendarConnectedAt?: string | null;
   creatorId: string;
   initialRules: EditableAvailabilityRule[];
   timezone: string;
+  onSaved: (hasHours: boolean, timezone: string, advance: boolean) => void;
 }) {
   const calendarConnected = Boolean(calendarConnectedAt);
-  const [weekStart, setWeekStart] = useState(() => availabilityWeekStart(availabilityDateBounds(initialTimezone).today));
+  const initialBounds = availabilityDateBounds(initialTimezone);
+  const initialWeekStart = availabilityWeekStart(initialBounds.today);
+  const [weekStart, setWeekStart] = useState(initialWeekStart);
   const weekRules = rulesForAvailabilityWeek(initialRules, weekStart);
   const [timezone, setTimezone] = useState(weekRules[0]?.timezone ?? initialTimezone);
-  let bounds;
-  try { bounds = availabilityDateBounds(timezone); } catch { bounds = availabilityDateBounds(initialTimezone); }
-  const { today, end } = bounds;
+  let availabilityBounds = initialBounds;
+  try {
+    availabilityBounds = availabilityDateBounds(timezone);
+  } catch {
+    availabilityBounds = initialBounds;
+  }
   const weekOptions = useMemo(
-    () => getAvailabilityWeekOptions(today, end),
-    [today, end],
+    () => getAvailabilityWeekOptions(availabilityBounds.today, availabilityBounds.end),
+    [availabilityBounds.today, availabilityBounds.end],
   );
-  const disabledDays = availabilityDays.filter((day) => {
-    const date = addCalendarDays(weekStart, day.value);
-    return date < today || date > end;
-  }).map((day) => day.value);
+  const disabledDays = useMemo(() => new Set(
+    availabilityDays
+      .filter((day) => {
+        const date = addCalendarDays(weekStart, day.value);
+        return date < availabilityBounds.today || date > availabilityBounds.end;
+      })
+      .map((day) => day.value),
+  ), [availabilityBounds.end, availabilityBounds.today, weekStart]);
+  const [weekDrafts, setWeekDrafts] = useState<Record<string, string[]>>({});
+  const [weekSavedSlots, setWeekSavedSlots] = useState<Record<string, string[]>>({});
   const [selectedSlots, setSelectedSlots] = useState(
     () => new Set(getAvailabilitySlotKeysFromRules(weekRules)),
   );
   const [saveStatus, setSaveStatus] = useState<"empty" | "error" | "idle" | "saved" | "saving">(
-    weekRules.length > 0 ? "saved" : "empty",
+    weekRules.some((rule) => rule.enabled !== false) ? "saved" : "empty",
   );
-  const [weekDrafts, setWeekDrafts] = useState(new Map<string, { slots: Set<string>; timezone: string; status: typeof saveStatus }>());
-
-  function showWeek(date: string) {
-    if (saveStatus === "saving" || !isCalendarDate(date)) return;
-    const nextWeek = availabilityWeekStart(date);
-    if (nextWeek < availabilityWeekStart(today) || nextWeek > availabilityWeekStart(end)) return;
-    setWeekDrafts(new Map(weekDrafts).set(weekStart, { slots: selectedSlots, timezone, status: saveStatus }));
-    const draft = weekDrafts.get(nextWeek);
-    const rules = rulesForAvailabilityWeek(initialRules, nextWeek);
-    setSelectedSlots(draft?.slots ?? new Set(getAvailabilitySlotKeysFromRules(rules)));
-    setTimezone(draft?.timezone ?? rules[0]?.timezone ?? initialTimezone);
-    setSaveStatus(draft?.status ?? (rules.length ? "saved" : "empty"));
-    setWeekStart(nextWeek);
-  }
-
-  useEffect(() => {
-    const warnIfUnsaved = (event: BeforeUnloadEvent) => {
-      if ((saveStatus !== "saved" && saveStatus !== "empty") || [...weekDrafts.entries()].some(([week, draft]) => week !== weekStart && draft.status !== "saved" && draft.status !== "empty")) {
-        event.preventDefault();
-        event.returnValue = "";
-      }
-    };
-    window.addEventListener("beforeunload", warnIfUnsaved);
-    return () => window.removeEventListener("beforeunload", warnIfUnsaved);
-  }, [saveStatus, weekDrafts, weekStart]);
   const paintActionRef = useRef<"clear" | "select" | null>(null);
   const paintStartRef = useRef<{ dayOfWeek: number; slotIndex: number } | null>(null);
   const paintedSlotsRef = useRef<Set<string>>(new Set());
 
+  const currentWeekIndex = Math.max(0, weekOptions.indexOf(weekStart));
+  const selectedWeekLabel = formatAvailabilityWeek(weekStart);
+
+  function getSlotKeysForWeek(nextWeekStart: string) {
+    return weekDrafts[nextWeekStart]
+      ?? weekSavedSlots[nextWeekStart]
+      ?? getAvailabilitySlotKeysFromRules(rulesForAvailabilityWeek(initialRules, nextWeekStart));
+  }
+
+  function setWeekStatus(nextWeekStart: string, nextSlotKeys: string[]) {
+    if (weekDrafts[nextWeekStart]) {
+      setSaveStatus("idle");
+      return;
+    }
+
+    const nextRules = rulesForAvailabilityWeek(initialRules, nextWeekStart);
+    setSaveStatus(nextSlotKeys.length > 0 || nextRules.some((rule) => rule.enabled !== false) ? "saved" : "empty");
+  }
+
+  function showWeek(nextWeekStart: string) {
+    if (!nextWeekStart || nextWeekStart === weekStart) {
+      return;
+    }
+
+    const nextRules = rulesForAvailabilityWeek(initialRules, nextWeekStart);
+    const nextSlotKeys = getSlotKeysForWeek(nextWeekStart);
+    setWeekStart(nextWeekStart);
+    if (nextRules[0]?.timezone) {
+      setTimezone(nextRules[0].timezone);
+    }
+    setSelectedSlots(new Set(nextSlotKeys));
+    setWeekStatus(nextWeekStart, nextSlotKeys);
+  }
+
+  function updateWeekDraft(nextSlots: Set<string>) {
+    setWeekDrafts((current) => ({
+      ...current,
+      [weekStart]: sortAvailabilitySlotKeys(Array.from(nextSlots)),
+    }));
+  }
+
   function paintSlot(key: string, action: "clear" | "select") {
-    if (disabledDays.includes(Number(key.split("|")[0])) || paintedSlotsRef.current.has(key)) {
+    if (paintedSlotsRef.current.has(key)) {
+      return;
+    }
+
+    const slot = parseAvailabilitySlotKey(key);
+    if (!slot || disabledDays.has(slot.dayOfWeek)) {
       return;
     }
 
@@ -1153,12 +1270,17 @@ function EditableAvailabilityPanel({
         nextSlots.add(key);
       }
 
+      updateWeekDraft(nextSlots);
       return nextSlots;
     });
     setSaveStatus("idle");
   }
 
   function toggleSlot(dayOfWeek: number, startTime: string) {
+    if (disabledDays.has(dayOfWeek)) {
+      return;
+    }
+
     const key = getAvailabilitySlotKey(dayOfWeek, startTime);
     const action = selectedSlots.has(key) ? "clear" : "select";
 
@@ -1260,15 +1382,21 @@ function EditableAvailabilityPanel({
     }
   }
 
-  async function saveAvailability() {
+  async function saveAvailability(advance = true) {
     setSaveStatus("saving");
+    const saveableSlots = new Set(
+      sortAvailabilitySlotKeys(Array.from(selectedSlots)).filter((key) => {
+        const slot = parseAvailabilitySlotKey(key);
+        return slot && !disabledDays.has(slot.dayOfWeek);
+      }),
+    );
 
     try {
       const response = await fetch("/api/creators/availability", {
         body: getAvailabilityFormData({
           creatorId,
           initialRules: weekRules,
-          selectedSlots: new Set([...selectedSlots].filter((key) => !disabledDays.includes(Number(key.split("|")[0])))),
+          selectedSlots: saveableSlots,
           timezone,
           weekStart,
         }),
@@ -1280,10 +1408,19 @@ function EditableAvailabilityPanel({
         throw new Error("Availability save failed.");
       }
 
-      setWeekDrafts(new Map(weekDrafts).set(weekStart, { slots: selectedSlots, timezone, status: "saved" }));
-      setSaveStatus("saved");
+      const savedSlotKeys = sortAvailabilitySlotKeys(Array.from(saveableSlots));
+      setWeekSavedSlots((current) => ({ ...current, [weekStart]: savedSlotKeys }));
+      setWeekDrafts((current) => {
+        const nextDrafts = { ...current };
+        delete nextDrafts[weekStart];
+        return nextDrafts;
+      });
+      setSaveStatus(savedSlotKeys.length > 0 ? "saved" : "empty");
+      onSaved(savedSlotKeys.length > 0, timezone, advance);
+      return true;
     } catch {
       setSaveStatus("error");
+      return false;
     }
   }
 
@@ -1301,10 +1438,15 @@ function EditableAvailabilityPanel({
                 ? "Saved"
                 : saveStatus === "error"
                   ? "Needs attention"
-                  : saveStatus === "empty" ? "No hours yet" : "Unsaved"}
+                  : "Unsaved"}
           </span>
           <a
             className="seat-secondary-button compact-form-button"
+            onClick={async (event) => {
+              event.preventDefault();
+              const href = event.currentTarget.href;
+              if (saveStatus !== "saving" && await saveAvailability(false)) window.location.assign(href);
+            }}
             href={`/api/google-calendar/oauth/start?creatorId=${encodeURIComponent(
               creatorId,
             )}&returnTo=${CREATOR_PROFILE_EDITOR_URL}`}
@@ -1315,37 +1457,48 @@ function EditableAvailabilityPanel({
       </div>
 
       <p className="availability-instructions" id="weekly-availability-help">
-        Set different hours each week, up to six months ahead. Tap a time or drag with
-        a mouse, then save this week. Other weeks stay unchanged.
-        {weekRules.some((rule) => !rule.weekStart) && " This week starts with your existing repeating hours."}
+        Choose any week up to six months ahead, then select the times you can take
+        calls in your timezone. Tap a time to select it, or use a mouse to drag
+        across several times.
       </p>
 
-      <div className="availability-week-navigation">
-        <button type="button" aria-label="Previous week" className="seat-secondary-button"
-          disabled={saveStatus === "saving" || weekStart <= availabilityWeekStart(today)}
-          onClick={() => showWeek(addCalendarDays(weekStart, -7))}>←</button>
-        <strong aria-live="polite">{formatAvailabilityWeek(weekStart)}</strong>
-        <button type="button" aria-label="Next week" className="seat-secondary-button"
-          disabled={saveStatus === "saving" || weekStart >= availabilityWeekStart(end)}
-          onClick={() => showWeek(addCalendarDays(weekStart, 7))}>→</button>
-      </div>
       <div className="availability-settings-row">
-        <label className="availability-timezone-picker">
-          <span>Week</span>
-          <select
-            aria-label="Choose availability week"
-            className="editable-profile-field editable-basic-input"
-            disabled={saveStatus === "saving"}
-            value={weekStart}
-            onChange={(event) => showWeek(event.target.value)}
+        <div className="availability-week-controls" aria-label="Availability week">
+          <button
+            aria-label="Previous availability week"
+            className="availability-week-step"
+            disabled={saveStatus === "saving" || currentWeekIndex <= 0}
+            onClick={() => showWeek(weekOptions[currentWeekIndex - 1])}
+            type="button"
           >
-            {weekOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
+            <span aria-hidden="true">‹</span>
+          </button>
+          <label className="availability-week-picker">
+            <span>Week</span>
+            <select
+              aria-label="Choose availability week"
+              className="editable-profile-field editable-basic-input"
+              disabled={saveStatus === "saving"}
+              value={weekStart}
+              onChange={(event) => showWeek(event.target.value)}
+            >
+              {weekOptions.map((option) => (
+                <option key={option} value={option}>
+                  {formatAvailabilityWeek(option)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            aria-label="Next availability week"
+            className="availability-week-step"
+            disabled={saveStatus === "saving" || currentWeekIndex >= weekOptions.length - 1}
+            onClick={() => showWeek(weekOptions[currentWeekIndex + 1])}
+            type="button"
+          >
+            <span aria-hidden="true">›</span>
+          </button>
+        </div>
         <label className="availability-timezone-picker">
           <span>Timezone</span>
           <input
@@ -1371,12 +1524,18 @@ function EditableAvailabilityPanel({
         <div className="availability-calendar" aria-describedby="weekly-availability-help">
           <div className="availability-days-row">
             <span className="availability-grid-corner">Time</span>
-            {availabilityDays.map((day) => (
-              <span className="availability-day-heading" key={day.value}>
+            {availabilityDays.map((day) => {
+              const date = addCalendarDays(weekStart, day.value);
+              return (
+              <span
+                className={`availability-day-heading${date === availabilityBounds.today ? " active" : ""}`}
+                key={day.value}
+              >
                 <strong>{day.label}</strong>
-                <span>{formatAvailabilityDate(addCalendarDays(weekStart, day.value))}</span>
+                <span>{formatAvailabilityDate(date)}</span>
               </span>
-            ))}
+              );
+            })}
           </div>
           <div
             className="availability-grid"
@@ -1389,11 +1548,11 @@ function EditableAvailabilityPanel({
               <EditableAvailabilityRow
                 disabled={saveStatus === "saving"}
                 disabledDays={disabledDays}
-                weekStart={weekStart}
                 key={slot.value}
                 selectedSlots={selectedSlots}
                 slot={slot}
                 slotIndex={slotIndex}
+                weekStart={weekStart}
                 toggleSlot={toggleSlot}
               />
             ))}
@@ -1401,25 +1560,13 @@ function EditableAvailabilityPanel({
         </div>
       </div>
 
-      <p className="availability-instructions" role="status">
-        {saveStatus === "error" ? "Could not save this week. Check your timezone and connection, then try again. Your selections are still here."
-          : saveStatus === "saved" ? "This week is saved."
-          : "Save each week when you finish. Unsaved selections stay here while you browse other weeks."}
-        {[...weekDrafts.entries()].some(([week, draft]) => week !== weekStart && draft.status !== "saved" && draft.status !== "empty")
-          && " You have unsaved selections in another week."}
-      </p>
-      <button type="button" className="seat-secondary-button compact-form-button"
-        disabled={saveStatus === "saving" || selectedSlots.size === 0}
-        onClick={() => { setSelectedSlots(new Set()); setSaveStatus("idle"); }}>
-        Clear this week
-      </button>
       <button
         className="editable-primary-button editable-save-button"
         disabled={saveStatus === "saving"}
-        onClick={saveAvailability}
+        onClick={() => { void saveAvailability(); }}
         type="button"
       >
-        {saveStatus === "saving" ? "Saving this week" : "Save this week"}
+        {saveStatus === "saving" ? "Saving availability" : `Save ${selectedWeekLabel}`}
       </button>
     </div>
   );
@@ -1428,19 +1575,19 @@ function EditableAvailabilityPanel({
 function EditableAvailabilityRow({
   disabled,
   disabledDays,
-  weekStart,
   selectedSlots,
   slot,
   slotIndex,
   toggleSlot,
+  weekStart,
 }: {
   disabled: boolean;
-  disabledDays: number[];
-  weekStart: string;
+  disabledDays: Set<number>;
   selectedSlots: Set<string>;
   slot: AvailabilityTimeSlot;
   slotIndex: number;
   toggleSlot: (dayOfWeek: number, startTime: string) => void;
+  weekStart: string;
 }) {
   return (
     <>
@@ -1449,8 +1596,8 @@ function EditableAvailabilityRow({
       </span>
       {availabilityDays.map((day) => {
         const key = getAvailabilitySlotKey(day.value, slot.value);
-        const dayDisabled = disabled || disabledDays.includes(day.value);
-        const selected = !disabledDays.includes(day.value) && selectedSlots.has(key);
+        const dayDisabled = disabledDays.has(day.value);
+        const selected = !dayDisabled && selectedSlots.has(key);
         const previousSelected =
           slotIndex > 0 &&
           selectedSlots.has(getAvailabilitySlotKey(day.value, availabilityTimeSlots[slotIndex - 1].value));
@@ -1463,28 +1610,29 @@ function EditableAvailabilityRow({
           selected ? "is-selected" : "",
           selected && !previousSelected ? "is-block-start" : "",
           selected && !nextSelected ? "is-block-end" : "",
+          dayDisabled ? "is-disabled" : "",
         ]
           .filter(Boolean)
           .join(" ");
 
         return (
           <button
-            aria-label={`${day.label} ${addCalendarDays(weekStart, day.value)} ${slot.label}`}
+            aria-label={`${day.label} ${formatAvailabilityDate(addCalendarDays(weekStart, day.value))} ${slot.label}`}
             aria-pressed={selected}
             className={classNames}
             data-availability-key={key}
-            disabled={dayDisabled}
+            disabled={disabled || dayDisabled}
             key={day.value}
             onPointerUp={(event) => {
               // Scrolling cancels touch pointers; only a completed tap toggles.
-              if (event.pointerType === "touch" && !dayDisabled) {
+              if (event.pointerType === "touch" && !disabled && !dayDisabled) {
                 toggleSlot(day.value, slot.value);
               }
             }}
             onClick={(event) => {
               // Pointer selection is handled above; native clicks cover
               // keyboard and assistive input without toggling a pointer twice.
-              if (event.detail === 0 && !dayDisabled) {
+              if (event.detail === 0) {
                 toggleSlot(day.value, slot.value);
               }
             }}
@@ -1551,7 +1699,7 @@ function EditablePaymentsPanel({
           {stripeConnected ? "Update Stripe" : "Connect Stripe"}
         </a>
         <button className="seat-secondary-button" onClick={onEditProfile} type="button">
-          Edit prices in Profile
+          Edit call prices
         </button>
       </div>
     </div>
@@ -1872,6 +2020,7 @@ function SocialMediaFrame({
 }
 
 function EditableSeatOption({
+  currency,
   description,
   durationMinutes,
   enabled,
@@ -1881,6 +2030,7 @@ function EditableSeatOption({
   onEnabledChange,
   onPriceChange,
 }: {
+  currency: string;
   description: string;
   durationMinutes: EditableDurationValue;
   enabled: boolean;
@@ -1916,10 +2066,11 @@ function EditableSeatOption({
           <span>minutes</span>
         </label>
         <label className="editable-price-field editable-seat-price-field">
-          <span>$</span>
+          <span>{currency === "USD" ? "$" : currency}</span>
           <input
             aria-label={`${label} price`}
-            inputMode="numeric"
+            inputMode="decimal"
+            step="0.01"
             min="0"
             type="number"
             value={price}
@@ -1977,11 +2128,11 @@ function getAvailabilityFormData({
   weekStart: string;
 }) {
   const formData = new FormData();
-  const firstRule = initialRules[0];
+  const firstRule = initialRules.find((rule) => rule.enabled !== false);
 
-  formData.set("weekStart", weekStart);
   formData.set("creatorId", creatorId);
   formData.set("timezone", timezone);
+  formData.set("weekStart", weekStart);
   formData.set("returnTo", CREATOR_PROFILE_EDITOR_URL);
   formData.set(
     "availabilitySlots",
@@ -2068,6 +2219,32 @@ function formatAvailabilityTime(value: string) {
   const hour = hours % 12 || 12;
 
   return `${hour}:${String(minutes).padStart(2, "0")} ${period}`;
+}
+
+function formatAvailabilityDate(value: string) {
+  return new Intl.DateTimeFormat("en-US", {
+    day: "numeric",
+    month: "short",
+    timeZone: "UTC",
+    year: "numeric",
+  }).format(new Date(`${value}T00:00:00Z`));
+}
+
+function formatAvailabilityWeek(weekStart: string) {
+  return `${formatAvailabilityDate(weekStart)} - ${formatAvailabilityDate(addCalendarDays(weekStart, 6))}`;
+}
+
+function getAvailabilityWeekOptions(today: string, end: string) {
+  const options: string[] = [];
+  let cursor = availabilityWeekStart(today);
+  const lastWeek = availabilityWeekStart(end);
+
+  while (cursor <= lastWeek) {
+    options.push(cursor);
+    cursor = addCalendarDays(cursor, 7);
+  }
+
+  return options;
 }
 
 function getAvailabilitySlotKey(dayOfWeek: number, startTime: string) {
@@ -2357,28 +2534,4 @@ function getTikTokVideoId(source: string) {
   } catch {
     return null;
   }
-}
-
-function formatAvailabilityDate(value: string) {
-  return new Intl.DateTimeFormat("en-US", { timeZone: "UTC", month: "short", day: "numeric" }).format(new Date(`${value}T00:00:00Z`));
-}
-
-function formatAvailabilityWeek(value: string) {
-  const format = new Intl.DateTimeFormat("en-US", { timeZone: "UTC", month: "short", day: "numeric", year: "numeric" });
-  return format.formatRange(new Date(`${value}T00:00:00Z`), new Date(`${addCalendarDays(value, 6)}T00:00:00Z`));
-}
-
-function getAvailabilityWeekOptions(today: string, end: string) {
-  const options: Array<{ label: string; value: string }> = [];
-  const firstWeek = availabilityWeekStart(today);
-  const lastWeek = availabilityWeekStart(end);
-
-  for (let week = firstWeek; week <= lastWeek; week = addCalendarDays(week, 7)) {
-    options.push({
-      label: formatAvailabilityWeek(week),
-      value: week,
-    });
-  }
-
-  return options;
 }

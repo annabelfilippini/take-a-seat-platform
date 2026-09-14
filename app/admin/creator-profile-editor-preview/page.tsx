@@ -3,7 +3,7 @@ import {
   getAdminSignInHref,
   getSignedInAdminEmail,
 } from "../../_lib/admin-auth";
-import { getCreatorApplication } from "../../_lib/creator-onboarding";
+import { getCreatorApplication, listCreatorAvailabilityRules } from "../../_lib/creator-onboarding";
 import { CreatorProfileEditorAccess } from "./CreatorProfileEditorAccess";
 import { EditableCreatorProfilePreview } from "./EditableCreatorProfilePreview";
 import {
@@ -18,7 +18,7 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
-export default async function CreatorProfileEditorPreviewPage() {
+export default async function CreatorProfileEditorPreviewPage({ searchParams }: { searchParams?: Record<string, string | string[] | undefined> }) {
   const adminEmail = await getSignedInAdminEmail();
 
   if (adminEmail) {
@@ -26,6 +26,9 @@ export default async function CreatorProfileEditorPreviewPage() {
 
     return (
       <EditableCreatorProfilePreview
+        initialAvailabilityRules={savedMockProfile ? await listCreatorAvailabilityRules(savedMockProfile.id) : []}
+        calendarStatus={typeof searchParams?.calendar === "string" ? searchParams.calendar : undefined}
+        stripeStatus={typeof searchParams?.stripe === "string" ? searchParams.stripe : undefined}
         initialProfile={
           savedMockProfile
             ? getEditableCreatorProfile(savedMockProfile)

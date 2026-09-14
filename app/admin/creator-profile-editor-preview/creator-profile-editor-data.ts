@@ -8,6 +8,8 @@ export type EditableCreatorMediaItem = {
 };
 
 export type EditableCreatorProfile = {
+  publishedAt?: string | null;
+  publicSlug?: string | null;
   about: string;
   bio: string;
   calendarConnectedAt?: string | null;
@@ -117,9 +119,14 @@ export function getEditableCreatorProfile(
 ): EditableCreatorProfile {
   // Applications from earlier releases contain generated copy and sample prices.
   // Until the first accepted-profile save, show only the applicant's identity.
-  const hasSavedProfile = Boolean(profile.profileSavedAt);
+  const hasSavedProfile = Boolean(profile.profileSavedAt || profile.profileDraft);
+  if (profile.profileDraft) {
+    profile = { ...profile, ...JSON.parse(profile.profileDraft) };
+  }
 
   return {
+    publishedAt: profile.publishedAt,
+    publicSlug: profile.publicSlug,
     about: hasSavedProfile ? profile.about ?? "" : "",
     bio: hasSavedProfile ? profile.bio ?? "" : "",
     calendarConnectedAt: profile.calendarConnectedAt,

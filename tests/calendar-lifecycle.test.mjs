@@ -155,11 +155,11 @@ test("application, invitation, saved profile, OAuth, reservation, authorization,
         const inviteUrl = new URL(emails.at(-1).text.match(/https?:\/\/\S+\?invite=\S+/)[0]);
         const owner = { userId: "user_rehearsal", email: values.email, phone: null, sessionId: "session_rehearsal" };
         assert.equal((await domain.claimCreatorInvite(inviteUrl.searchParams.get("invite"), owner)).status, "claimed");
-        const saved = await submit(form("/api/creators/profile", { ...values, creatorId: (await domain.getCreatorDashboardAccount(owner)).profile.id, reviewSubmittedAt: "false", seat15Enabled: "on", seat15PriceAmount: "50", seat15DurationMinutes: "15" }, true));
+        const saved = await submit(form("/api/creators/profile", { ...values, creatorId: (await domain.getCreatorDashboardAccount(owner)).profile.id, reviewSubmittedAt: "false", about: "Profile introduction", helpItems: "Advice", profileImageUrl: "/ella-profile.jpg", seat15Enabled: "on", seat15PriceAmount: "50", seat15DurationMinutes: "15" }, true));
         assert.equal(saved.status, 200, await saved.clone().text());
-        const creator = await domain.getPublishedCreatorBySlug("rehearsal-creator");
-        assert.ok(creator);
-        await domain.saveCreatorAvailability({ weekStart: "2026-09-27", creatorId: creator.id, timezone: "America/New_York", bufferMinutes: 15, minNoticeMinutes: 0, maxBookingsPerDay: null, maxBookingsPerWeek: null, rules: [{ dayOfWeek: 4, startTime: "09:00", endTime: "12:00" }] });
+        const creator = { id: (await domain.getCreatorDashboardAccount(owner)).profile.id };
+        assert.equal(await domain.getPublishedCreatorBySlug("rehearsal-creator"), null);
+        await domain.saveCreatorAvailability({ creatorId: creator.id, timezone: "America/New_York", bufferMinutes: 15, minNoticeMinutes: 0, maxBookingsPerDay: null, maxBookingsPerWeek: null, rules: [{ dayOfWeek: 4, startTime: "09:00", endTime: "12:00" }] });
         const started = await start(new Request("http://localhost/api/google-calendar/oauth/start?creatorId=" + creator.id + "&returnTo=/creators/dashboard", { headers: { cookie: "tas_local_admin=1" } }));
         assert.equal(started.status, 303);
         const oauth = new URL(started.headers.get("location"));
@@ -169,10 +169,21 @@ test("application, invitation, saved profile, OAuth, reservation, authorization,
         const connected = await callback(new Request(callbackUrl, { headers: { cookie: started.headers.get("set-cookie").split(";")[0] } }));
         assert.match(connected.headers.get("location"), /calendar=connected/);
         sqlite.prepare("INSERT INTO creator_stripe_connections(creator_id,stripe_account_id,account_country,connected_at) VALUES(?,'acct_test','US','2026-09-01')").run(creator.id);
-        const requested = await requestBooking(form("/api/bookings/request", { creatorId: creator.id, seatId: creator.seats[0].id, appointmentStartAt: "2026-10-01T09:00:00", timezone: "America/New_York", customerEmail: "buyer@example.com", customerName: "Test Buyer" }));
+        sqlite.prepare("UPDATE creator_onboarding_profiles SET stripe_connected_at='2026-09-13' WHERE id=?").run(creator.id);
+        assert.equal((await domain.publishCreatorProfile(creator.id)).status, "saved");
+        const liveCreator = await domain.getPublishedCreatorBySlug("rehearsal-creator");
+        assert.ok(liveCreator);
+        const requested = await requestBooking(form("/api/bookings/request", { creatorId: creator.id, seatId: liveCreator.seats[0].id, appointmentStartAt: "2026-10-01T09:00:00", timezone: "America/New_York", customerEmail: "buyer@example.com", customerName: "Test Buyer", customerNote: "Wants to talk about: Outfit advice" }));
         assert.match(requested.headers.get("location"), /^https:\/\/checkout.stripe.com/);
         const session = [...sessions.values()].at(-1);
         assert.ok(session);
+        // The compact guest form needs no phone or social handle. Keep its
+        // name, topic, and creator-local timestamp intact through reservation.
+        const reserved = await bookingDomain.getCustomerBooking(session.metadata.booking_id);
+        assert.equal(reserved.customerName, "Test Buyer");
+        assert.equal(reserved.customerNote, "Wants to talk about: Outfit advice");
+        assert.equal(reserved.appointmentStartAt, "2026-10-01T09:00:00");
+        assert.equal(reserved.timezone, "America/New_York");
         const timestamp = Math.floor(Date.now() / 1000), body = JSON.stringify({ type: "checkout.session.completed", data: { object: session } });
         const sig = createHmac("sha256", process.env.STRIPE_WEBHOOK_SECRET).update(`${timestamp}.${body}`).digest("hex");
         assert.equal((await webhook(new Request("http://localhost/api/stripe/webhook", { method: "POST", body, headers: { "stripe-signature": `t=${timestamp},v1=${sig}` } }))).status, 200);

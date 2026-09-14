@@ -49,6 +49,8 @@ registerHooks({
   },
 });
 const domain = await import("../app/_lib/creator-onboarding.ts");
+const availability = await import("../app/_lib/availability.ts");
+const availabilityWeeks = await import("../app/_lib/availability-weeks.ts");
 const { POST: submit } = await import("../app/api/creators/profile/route.ts");
 const { POST: accept } = await import("../app/api/creators/applications/accept/route.ts");
 const { sendCreatorAcceptedInviteEmail } = await import("../app/_lib/creator-accepted-invite.ts");
@@ -57,6 +59,11 @@ const { getEditableCreatorProfile } = await import("../app/admin/creator-profile
 
 function formRequest(path, values, admin = false) {
   return new Request(`http://localhost${path}`, { method: "POST", body: new URLSearchParams(values), headers: { accept: "application/json", ...(admin ? { cookie: "tas_local_admin=1" } : {}) } });
+}
+
+function readyConnections(creatorId) {
+  sqlite.prepare("UPDATE creator_onboarding_profiles SET calendar_connected_at = '2026-09-13', stripe_connected_at = '2026-09-13' WHERE id = ?").run(creatorId);
+  sqlite.prepare("INSERT INTO creator_availability_rules (creator_id, timezone, day_of_week, start_time, end_time) VALUES (?, 'America/Los_Angeles', 1, '09:00', '17:00')").run(creatorId);
 }
 
 test("application → review email → acceptance → verified owner → saved public card", async () => {
@@ -103,8 +110,11 @@ test("application → review email → acceptance → verified owner → saved p
     const forbidden = await submit(formRequest("/api/creators/profile", { ...values, creatorId: profile.id, reviewSubmittedAt: "false" }));
     assert.equal((await forbidden.json()).detail, "creator-access");
 
-    const input = await domain.getCreatorProfileSettingsInput(await formRequest("/", { ...values, reviewSubmittedAt: "false" }).formData());
+    const input = await domain.getCreatorProfileSettingsInput(await formRequest("/", { ...values, reviewSubmittedAt: "false", about: "My profile", helpItems: "Styling", profileImageUrl: "/ella-profile.jpg", seat15Enabled: "on", seat15PriceAmount: "75" }).formData());
     await domain.saveCreatorProfileSettings(profile.id, input);
+    assert.equal(await domain.getPublishedCreatorBySlug(profile.publicSlug), null);
+    readyConnections(profile.id);
+    assert.equal((await domain.publishCreatorProfile(profile.id)).status, "saved");
     const publicCreator = await domain.getPublishedCreatorBySlug(profile.publicSlug);
     assert.equal(publicCreator.name, values.name);
     assert.ok((await domain.listPublicMarketplaceCreators()).some((creator) => creator.id === profile.id));
@@ -243,18 +253,22 @@ test("profile edits, prices, and cleared social links survive save and reload", 
     assert.equal(response.status, 200, JSON.stringify(result));
     assert.equal(result.status, "saved");
     const stored = (await domain.getCreatorDashboardAccount(owner)).profile;
-    for (const key of ["name", "about", "profileIntro", "oneToOneReason", "category", "location", "instagramHandle", "tiktokHandle", "profileImageUrl", "profileGallery", "seat15Description", "seat30Description", "timezone"]) {
-      assert.equal(stored[key], edits[key], key);
+    const draft = JSON.parse(stored.profileDraft);
+    for (const key of ["name", "about", "profileIntro", "oneToOneReason", "category", "location", "instagramHandle", "tiktokHandle", "profileImageUrl", "profileGallery", "seat15Description", "seat30Description"]) {
+      assert.equal(draft[key], edits[key], key);
     }
-    assert.equal(stored.profileImagePositionX, 27);
-    assert.equal(stored.profileImagePositionY, 62);
-    assert.equal(stored.profileImageZoom, 160);
-    assert.equal(stored.seat15PriceAmount, 7500);
-    assert.equal(stored.seat30PriceAmount, 15000);
+    assert.equal(draft.profileImagePositionX, 27);
+    assert.equal(draft.profileImagePositionY, 62);
+    assert.equal(draft.profileImageZoom, 160);
+    assert.equal(draft.seat15PriceAmount, 7500);
+    assert.equal(draft.seat30PriceAmount, 15000);
     const restored = getEditableCreatorProfile(stored);
     assert.equal(restored.seat15PriceAmount, 75);
     assert.equal(restored.seat30PriceAmount, 150);
     assert.equal(restored.mediaItems.length, 2);
+    assert.equal(await domain.getPublishedCreatorBySlug(stored.publicSlug), null);
+    readyConnections(stored.id);
+    assert.equal((await domain.publishCreatorProfile(stored.id)).status, "saved");
     const publicCreator = await domain.getPublishedCreatorBySlug(stored.publicSlug);
     assert.equal(publicCreator.name, edits.name);
     assert.equal(publicCreator.profile.intro, edits.profileIntro);
@@ -275,6 +289,10 @@ test("profile edits, prices, and cleared social links survive save and reload", 
     const editor = getEditableCreatorProfile(reloaded);
     assert.equal(editor.instagramUrl, "");
     assert.equal(editor.tiktokUrl, "");
+    const stillPublished = await domain.getPublishedCreatorBySlug(reloaded.publicSlug);
+    assert.equal(stillPublished.name, edits.name);
+    assert.ok(stillPublished.instagramUrl);
+    assert.equal((await domain.publishCreatorProfile(reloaded.id)).status, "saved");
     const published = await domain.getPublishedCreatorBySlug(reloaded.publicSlug);
     assert.equal(published.name, "Updated again");
     assert.equal(published.instagramUrl, undefined);
@@ -286,7 +304,8 @@ test("profile edits, prices, and cleared social links survive save and reload", 
       }, true));
       assert.equal(priceSave.status, 200);
       const saved = (await domain.getCreatorDashboardAccount(owner)).profile;
-      assert.equal(saved.seat30PriceAmount, Math.round(amount * 100));
+      assert.equal(JSON.parse(saved.profileDraft).seat30PriceAmount, Math.round(amount * 100));
+      assert.equal(saved.seat30PriceAmount, 15000, "Live price stays unchanged while drafts are saved");
       assert.equal(getEditableCreatorProfile(saved).seat30PriceAmount, amount);
     }
   } finally {
@@ -330,6 +349,17 @@ test("first-time creators receive a blank editor and cleared fields stay blank a
   assert.equal(editor.seat30Enabled, false);
   assert.equal(await domain.getPublishedCreatorBySlug(profile.publicSlug), null);
 
+  const { EditableCreatorProfilePreview } = await import("../app/admin/creator-profile-editor-preview/EditableCreatorProfilePreview.tsx");
+  const blankEditorHtml = renderToStaticMarkup(createElement(EditableCreatorProfilePreview, { initialProfile: editor }));
+  assert.match(blankEditorHtml, /Photo or video/);
+  assert.doesNotMatch(blankEditorHtml, /Show next media|Show previous media|amber-reference|Private application answer/);
+  assert.match(blankEditorHtml, /aria-label="(?:Public profile intro|One-to-one reason|15 minutes description|30 minutes description)"/);
+  assert.match(blankEditorHtml, /aria-label="What people can ask"[^>]*><\/textarea>/);
+  assert.match(blankEditorHtml, /aria-label="About section"[^>]*><\/textarea>/);
+  assert.match(blankEditorHtml, /Why a 1:1 call\?/);
+  assert.ok(blankEditorHtml.indexOf("Photo or video") < blankEditorHtml.indexOf('id="reserve"'));
+  assert.ok(blankEditorHtml.indexOf('aria-label="One-to-one reason"') < blankEditorHtml.indexOf('id="reserve"'));
+
   process.env.TAKE_A_SEAT_DEV_ADMIN_ENABLED = "true";
   try {
     const values = { ...application, creatorId: profile.id, reviewSubmittedAt: "false", about: "My own profile copy", profileIntro: "My own introduction", seat15Enabled: "on", seat15PriceAmount: "75", seat15DurationMinutes: "15", seat15Description: "My own session description" };
@@ -353,14 +383,12 @@ test("first-time creators receive a blank editor and cleared fields stay blank a
     assert.equal(restored.image, "");
     assert.equal(stored.profileDetails, application.profileDetails);
     const published = await domain.getPublishedCreatorBySlug(stored.publicSlug);
-    assert.deepEqual(published.profile.about, []);
-    assert.equal(published.profile.intro, "");
-    assert.equal(published.profile.whyBody, "");
-    assert.deepEqual(published.profile.helpItems, []);
-    assert.equal(published.image, null);
+    assert.equal(published, null);
     assert.deepEqual(getEditableCreatorProfile({ ...stored, profileImageUrl: "/ella-profile.jpg" }).mediaItems, []);
-    assert.deepEqual(domain.createPublishedCreator({ ...stored, profileIntro: "My introduction", bio: "My introduction", about: "" }).profile.about, []);
-    assert.equal(domain.createPublishedCreator({ ...stored, profileIntro: "", bio: "My about text", about: "My about text" }).profile.intro, "");
+    assert.deepEqual(domain.createPublishedCreator({ ...stored, profileIntro: "Intro", bio: "Intro", about: "" }).profile.about, []);
+    assert.equal(domain.createPublishedCreator({ ...stored, profileIntro: "", bio: "About", about: "About" }).profile.intro, "");
+    assert.equal(domain.createPublishedCreator(stored).profile.whyBody, "");
+    assert.equal((await domain.publishCreatorProfile(stored.id)).status, "error");
   } finally {
     delete process.env.TAKE_A_SEAT_DEV_ADMIN_ENABLED;
   }
@@ -437,119 +465,261 @@ test("acceptance email keeps the one-use credential in the fragment and preserve
 test("unaccepted applications cannot generate a setup email or provision an identity", async () => {
   assert.deepEqual(await sendCreatorAcceptedInviteEmail({ profile: { applicationStatus: "in_review", email: "test@example.com" }, request: new Request("http://localhost") }), { status: "skipped", reason: "setup-link-failed" });
 });
-const weeks = await import('../app/_lib/availability-weeks.ts');
-const availability = await import('../app/_lib/availability.ts');
-const { POST: saveAvailabilityRoute } = await import('../app/api/creators/availability/route.ts');
-const availabilitySeat = { id: 'qa-seat', name: '15 minutes', unitAmount: 1000 };
+
+const { POST: saveAvailabilityRoute } = await import("../app/api/creators/availability/route.ts");
+const availabilitySeat = { id: "qa-seat", name: "15 minutes", unitAmount: 1000 };
+
 function availabilityForm(weekStart, slots = [], extra = {}) {
-  return new URLSearchParams({ creatorId: 'onboard_week_test', timezone: 'America/Los_Angeles', weekStart,
-    availabilitySlots: JSON.stringify(slots), minNoticeMinutes: '0', bufferMinutes: '0', ...extra });
-}
-async function availabilityInput(weekStart, slots, extra) {
-  return domain.getCreatorAvailabilityInput(await new Request('http://localhost', { method: 'POST', body: availabilityForm(weekStart, slots, extra) }).formData());
-}
-function viewerDays(rules) {
-  return availability.getViewerAvailability({ availabilityRules: rules, creatorId: 'onboard_week_test', seat: availabilitySeat,
-    viewerTimezone: 'America/Los_Angeles', windowStart: availability.getAvailabilityWindowStart() });
+  return new URLSearchParams({
+    creatorId: "onboard_week_test",
+    timezone: "America/Los_Angeles",
+    weekStart,
+    availabilitySlots: JSON.stringify(slots),
+    minNoticeMinutes: "0",
+    bufferMinutes: "0",
+    ...extra,
+  });
 }
 
-test('dated availability saves and reloads independent weeks, preserves defaults, and closes an empty week', async () => {
-  const firstWeek = weeks.addCalendarDays(weeks.availabilityWeekStart(weeks.availabilityDateBounds('America/Los_Angeles').today), 7);
-  const secondWeek = weeks.addCalendarDays(firstWeek, 7);
-  const first = await availabilityInput(firstWeek, [2,3,4].map(dayOfWeek => ({ dayOfWeek, startTime: '10:00' })));
-  const second = await availabilityInput(secondWeek, [0,5,6].map(dayOfWeek => ({ dayOfWeek, startTime: '11:00' })));
-  // Existing creators retain their repeating baseline until that week is customized.
-  await domain.saveCreatorAvailability({ ...first, weekStart: null, rules: [{ dayOfWeek: 1, startTime:'09:00', endTime:'10:00' }] });
+async function availabilityInput(weekStart, slots, extra) {
+  return domain.getCreatorAvailabilityInput(
+    await new Request("http://localhost", {
+      body: availabilityForm(weekStart, slots, extra),
+      method: "POST",
+    }).formData(),
+  );
+}
+
+function viewerDays(rules) {
+  return availability.getViewerAvailability({
+    availabilityRules: rules,
+    creatorId: "onboard_week_test",
+    seat: availabilitySeat,
+    viewerTimezone: "America/Los_Angeles",
+    windowStart: availability.getAvailabilityWindowStart(),
+  });
+}
+
+test("dated availability saves and reloads independent weeks, preserves defaults, and closes an empty week", async () => {
+  const currentWeek = availabilityWeeks.availabilityWeekStart(
+    availabilityWeeks.availabilityDateBounds("America/Los_Angeles").today,
+  );
+  const firstWeek = availabilityWeeks.addCalendarDays(currentWeek, 7);
+  const secondWeek = availabilityWeeks.addCalendarDays(firstWeek, 7);
+  const first = await availabilityInput(firstWeek, [2, 3, 4].map((dayOfWeek) => ({ dayOfWeek, startTime: "10:00" })));
+  const second = await availabilityInput(secondWeek, [0, 5, 6].map((dayOfWeek) => ({ dayOfWeek, startTime: "11:00" })));
+
+  await domain.saveCreatorAvailability({ ...first, weekStart: null, rules: [{ dayOfWeek: 1, startTime: "09:00", endTime: "10:00" }] });
   await domain.saveCreatorAvailability(first);
   await domain.saveCreatorAvailability(second);
   let saved = await domain.listCreatorAvailabilityRules(first.creatorId);
-  assert.equal(saved.filter(rule => rule.weekStart === firstWeek).length, 3);
-  assert.equal(saved.filter(rule => rule.weekStart === secondWeek).length, 3);
-  assert.equal(saved.filter(rule => rule.weekStart === null).length, 1);
-  let dates = viewerDays(saved).map(day => day.date);
-  for (const day of [2,3,4]) assert.ok(dates.includes(weeks.addCalendarDays(firstWeek, day)));
-  assert.ok(!dates.includes(weeks.addCalendarDays(firstWeek, 1)), 'weekly override replaces the default Monday');
-  for (const day of [0,5,6]) assert.ok(dates.includes(weeks.addCalendarDays(secondWeek, day)));
+  assert.equal(saved.filter((rule) => rule.weekStart === firstWeek).length, 3);
+  assert.equal(saved.filter((rule) => rule.weekStart === secondWeek).length, 3);
+  assert.equal(saved.filter((rule) => rule.weekStart === null).length, 1);
+
+  let dates = viewerDays(saved).map((day) => day.date);
+  for (const day of [2, 3, 4]) assert.ok(dates.includes(availabilityWeeks.addCalendarDays(firstWeek, day)));
+  assert.ok(!dates.includes(availabilityWeeks.addCalendarDays(firstWeek, 1)), "weekly override replaces the default Monday");
+  for (const day of [0, 5, 6]) assert.ok(dates.includes(availabilityWeeks.addCalendarDays(secondWeek, day)));
+
   await domain.saveCreatorAvailability(await availabilityInput(firstWeek, []));
   saved = await domain.listCreatorAvailabilityRules(first.creatorId);
-  assert.equal(saved.find(rule => rule.weekStart === firstWeek).enabled, false);
-  dates = viewerDays(saved).map(day => day.date);
-  assert.ok(!dates.some(date => weeks.availabilityWeekStart(date) === firstWeek));
-  assert.ok(dates.includes(weeks.addCalendarDays(secondWeek, 5)));
-  assert.ok(dates.includes(weeks.addCalendarDays(secondWeek, 8)), 'untouched week still uses legacy baseline');
+  assert.equal(saved.find((rule) => rule.weekStart === firstWeek).enabled, false);
+  dates = viewerDays(saved).map((day) => day.date);
+  assert.ok(!dates.some((date) => availabilityWeeks.availabilityWeekStart(date) === firstWeek));
+  assert.ok(dates.includes(availabilityWeeks.addCalendarDays(secondWeek, 5)));
+  assert.ok(dates.includes(availabilityWeeks.addCalendarDays(secondWeek, 8)), "untouched week still uses legacy baseline");
 });
 
-test('availability rejects malformed payloads, missing week, invalid timezone, past weeks and dates beyond six months', async () => {
-  const { today, end } = weeks.availabilityDateBounds('America/Los_Angeles');
-  const current = weeks.availabilityWeekStart(today);
-  for (const bad of ['', '2027-02-30', weeks.addCalendarDays(current, 1), weeks.addCalendarDays(current, -7), weeks.addCalendarDays(weeks.availabilityWeekStart(end), 7)]) {
+test("availability rejects malformed payloads, missing week, invalid timezone, past weeks and dates beyond six months", async () => {
+  const { today, end } = availabilityWeeks.availabilityDateBounds("America/Los_Angeles");
+  const current = availabilityWeeks.availabilityWeekStart(today);
+  for (const bad of ["", "2027-02-30", availabilityWeeks.addCalendarDays(current, 1), availabilityWeeks.addCalendarDays(current, -7), availabilityWeeks.addCalendarDays(availabilityWeeks.availabilityWeekStart(end), 7)]) {
     assert.equal(await availabilityInput(bad, []), null, bad);
   }
-  for (const raw of ['', '{', '{}', '[null]', '[{"dayOfWeek":2,"startTime":"25:00"}]', '[{"dayOfWeek":2,"startTime":"10:01"}]']) {
+  for (const raw of ["", "{", "{}", "[null]", "[{\"dayOfWeek\":2,\"startTime\":\"25:00\"}]", "[{\"dayOfWeek\":2,\"startTime\":\"10:01\"}]"]) {
     assert.equal(await availabilityInput(current, [], { availabilitySlots: raw }), null);
   }
-  assert.equal(await availabilityInput(current, [], {timezone:'Not/A_Zone'}), null);
-  const afterEnd = weeks.addCalendarDays(end, 1);
-  assert.equal(await availabilityInput(weeks.availabilityWeekStart(afterEnd), [{dayOfWeek:new Date(afterEnd+'T00:00:00Z').getUTCDay(),startTime:'10:00'}]), null);
-  const unauthorized = await saveAvailabilityRoute(new Request('http://localhost/api/creators/availability', {
-    method:'POST', body:availabilityForm(current), headers:{accept:'application/json'},
+  assert.equal(await availabilityInput(current, [], { timezone: "Not/A_Zone" }), null);
+  const afterEnd = availabilityWeeks.addCalendarDays(end, 1);
+  assert.equal(
+    await availabilityInput(availabilityWeeks.availabilityWeekStart(afterEnd), [{ dayOfWeek: new Date(`${afterEnd}T00:00:00Z`).getUTCDay(), startTime: "10:00" }]),
+    null,
+  );
+  const unauthorized = await saveAvailabilityRoute(new Request("http://localhost/api/creators/availability", {
+    body: availabilityForm(current),
+    headers: { accept: "application/json" },
+    method: "POST",
   }));
   assert.equal(unauthorized.status, 400);
-  assert.equal((await unauthorized.json()).detail, 'creator-access');
+  assert.equal((await unauthorized.json()).detail, "creator-access");
 });
 
-test('a failed availability insertion rolls back the deletion', async () => {
-  const week = weeks.addCalendarDays(weeks.availabilityWeekStart(weeks.availabilityDateBounds('UTC').today), 14);
-  const input = await availabilityInput(week, [{dayOfWeek:2,startTime:'12:00'}]);
+test("a failed availability insertion rolls back the deletion", async () => {
+  const currentWeek = availabilityWeeks.availabilityWeekStart(
+    availabilityWeeks.availabilityDateBounds("UTC").today,
+  );
+  const week = availabilityWeeks.addCalendarDays(currentWeek, 14);
+  const input = await availabilityInput(week, [{ dayOfWeek: 2, startTime: "12:00" }]);
   await domain.saveCreatorAvailability(input);
   const before = await domain.listCreatorAvailabilityRules(input.creatorId);
   sqlite.exec("CREATE TRIGGER fail_availability_insert BEFORE INSERT ON creator_availability_rules BEGIN SELECT RAISE(ABORT, 'simulated write failure'); END");
-  try { await assert.rejects(domain.saveCreatorAvailability({...input,rules:[]})); }
-  finally { sqlite.exec('DROP TRIGGER fail_availability_insert'); }
+  try {
+    await assert.rejects(domain.saveCreatorAvailability({ ...input, rules: [] }));
+  } finally {
+    sqlite.exec("DROP TRIGGER fail_availability_insert");
+  }
   assert.deepEqual(await domain.listCreatorAvailabilityRules(input.creatorId), before);
 });
 
-test('customer selection and server validation reach the six-month limit with notice, buffer and timezone intact', async () => {
-  const { end } = weeks.availabilityDateBounds('America/Los_Angeles');
-  const input = await availabilityInput(weeks.availabilityWeekStart(end), [{dayOfWeek:new Date(end+'T00:00:00Z').getUTCDay(),startTime:'12:00'}]);
+test("customer selection and server validation reach the six-month limit with notice, buffer and timezone intact", async () => {
+  const { end } = availabilityWeeks.availabilityDateBounds("America/Los_Angeles");
+  const endDayOfWeek = new Date(`${end}T00:00:00Z`).getUTCDay();
+  const input = await availabilityInput(availabilityWeeks.availabilityWeekStart(end), [{ dayOfWeek: endDayOfWeek, startTime: "12:00" }]);
   await domain.saveCreatorAvailability(input);
   const saved = await domain.listCreatorAvailabilityRules(input.creatorId);
-  const found = viewerDays(saved).find(day => day.date === end);
+  const found = viewerDays(saved).find((day) => day.date === end);
   assert.ok(found);
-  const matched = availability.getMatchedAvailabilitySlot({ appointmentStartAt:`${end}T12:00:00`, timezone:'America/Los_Angeles',
-    creatorId:input.creatorId, seat:availabilitySeat, availabilityRules:saved });
+  const matched = availability.getMatchedAvailabilitySlot({
+    appointmentStartAt: `${end}T12:00:00`,
+    availabilityRules: saved,
+    creatorId: input.creatorId,
+    seat: availabilitySeat,
+    timezone: "America/Los_Angeles",
+  });
   assert.equal(matched.creatorDate, end);
   assert.equal(matched.appointmentEndUtc - matched.appointmentStartUtc, 15 * 60_000);
-  const future = weeks.addCalendarDays(end, 1);
-  assert.equal(availability.getMatchedAvailabilitySlot({appointmentStartAt:`${future}T12:00:00`,timezone:'America/Los_Angeles',creatorId:input.creatorId,seat:availabilitySeat,availabilityRules:saved}),null);
-  const repeating = [{dayOfWeek:2,startTime:'10:00',endTime:'11:00',timezone:'America/Los_Angeles',bufferMinutes:15,minNoticeMinutes:0,maxBookingsPerDay:2,maxBookingsPerWeek:4}];
+  const future = availabilityWeeks.addCalendarDays(end, 1);
+  assert.equal(availability.getMatchedAvailabilitySlot({
+    appointmentStartAt: `${future}T12:00:00`,
+    availabilityRules: saved,
+    creatorId: input.creatorId,
+    seat: availabilitySeat,
+    timezone: "America/Los_Angeles",
+  }), null);
+  const repeating = [{ dayOfWeek: 2, startTime: "10:00", endTime: "11:00", timezone: "America/Los_Angeles", bufferMinutes: 15, minNoticeMinutes: 0, maxBookingsPerDay: 2, maxBookingsPerWeek: 4 }];
   const firstDay = viewerDays(repeating)[0];
-  assert.deepEqual(firstDay.slots.map(slot=>slot.sourceAppointmentStartAt.slice(11,16)), ['10:00','10:30']);
-  const match = availability.getMatchedAvailabilitySlot({appointmentStartAt:firstDay.slots[0].sourceAppointmentStartAt,timezone:'America/Los_Angeles',creatorId:input.creatorId,seat:availabilitySeat,availabilityRules:repeating});
-  assert.equal(match.maxBookingsPerDay,2); assert.equal(match.maxBookingsPerWeek,4);
-  assert.deepEqual(viewerDays([{...repeating[0],minNoticeMinutes:600000}]), []);
+  assert.deepEqual(firstDay.slots.map((slot) => slot.sourceAppointmentStartAt.slice(11, 16)), ["10:00", "10:30"]);
+  const match = availability.getMatchedAvailabilitySlot({
+    appointmentStartAt: firstDay.slots[0].sourceAppointmentStartAt,
+    availabilityRules: repeating,
+    creatorId: input.creatorId,
+    seat: availabilitySeat,
+    timezone: "America/Los_Angeles",
+  });
+  assert.equal(match.maxBookingsPerDay, 2);
+  assert.equal(match.maxBookingsPerWeek, 4);
+  assert.deepEqual(viewerDays([{ ...repeating[0], minNoticeMinutes: 600000 }]), []);
 });
 
-test('six-month and daylight-saving boundaries never shift selected wall times', () => {
-  assert.deepEqual(weeks.availabilityDateBounds('UTC', new Date('2028-08-31T12:00:00Z')), {today:'2028-08-31',end:'2029-02-28'});
-  assert.equal(weeks.availabilityDateBounds('America/Los_Angeles',new Date('2026-09-13T01:00:00Z')).today,'2026-09-12');
-  assert.equal(availability.localDateTimeToUtc('2027-03-14T10:00:00','America/Los_Angeles').toISOString(),'2027-03-14T17:00:00.000Z');
-  assert.equal(availability.localDateTimeToUtc('2026-11-01T10:00:00','America/Los_Angeles').toISOString(),'2026-11-01T18:00:00.000Z');
-  assert.equal(availability.localDateTimeToUtc('2027-03-14T02:30:00','America/Los_Angeles'), null);
+test("six-month and daylight-saving boundaries never shift selected wall times", () => {
+  assert.deepEqual(availabilityWeeks.availabilityDateBounds("UTC", new Date("2028-08-31T12:00:00Z")), { today: "2028-08-31", end: "2029-02-28" });
+  assert.equal(availabilityWeeks.availabilityDateBounds("America/Los_Angeles", new Date("2026-09-13T01:00:00Z")).today, "2026-09-12");
+  assert.equal(availability.localDateTimeToUtc("2027-03-14T10:00:00", "America/Los_Angeles").toISOString(), "2027-03-14T17:00:00.000Z");
+  assert.equal(availability.localDateTimeToUtc("2026-11-01T10:00:00", "America/Los_Angeles").toISOString(), "2026-11-01T18:00:00.000Z");
+  assert.equal(availability.localDateTimeToUtc("2027-03-14T02:30:00", "America/Los_Angeles"), null);
 });
 
-test('fragmented hours save without exceeding D1 parameter limits', async () => {
-  const week = weeks.addCalendarDays(weeks.availabilityWeekStart(weeks.availabilityDateBounds('UTC').today), 21);
-  const slots = Array.from({length:7},(_,dayOfWeek) => Array.from({length:13},(_,hour) => ({dayOfWeek,startTime:`${String(hour+8).padStart(2,'0')}:00`}))).flat();
-  const input = await availabilityInput(week,slots);
+test("fragmented hours save without exceeding D1 parameter limits", async () => {
+  const currentWeek = availabilityWeeks.availabilityWeekStart(
+    availabilityWeeks.availabilityDateBounds("UTC").today,
+  );
+  const week = availabilityWeeks.addCalendarDays(currentWeek, 21);
+  const slots = Array.from({ length: 7 }, (_, dayOfWeek) =>
+    Array.from({ length: 13 }, (_, hour) => ({ dayOfWeek, startTime: `${String(hour + 8).padStart(2, "0")}:00` })),
+  ).flat();
+  const input = await availabilityInput(week, slots);
   const originalPrepare = globalThis.__lifecycleEnv.DB.prepare;
   globalThis.__lifecycleEnv.DB.prepare = (sql) => {
     const statement = originalPrepare(sql);
     const originalBind = statement.bind;
-    statement.bind = (...values) => { assert.ok(values.length <= 100, `${values.length} bound parameters`); return originalBind(...values); };
+    statement.bind = (...values) => {
+      assert.ok(values.length <= 100, `${values.length} bound parameters`);
+      return originalBind(...values);
+    };
     return statement;
   };
-  try { await domain.saveCreatorAvailability(input); }
-  finally { globalThis.__lifecycleEnv.DB.prepare = originalPrepare; }
-  assert.equal((await domain.listCreatorAvailabilityRules(input.creatorId)).filter(rule=>rule.weekStart===week).length,91);
+  try {
+    await domain.saveCreatorAvailability(input);
+  } finally {
+    globalThis.__lifecycleEnv.DB.prepare = originalPrepare;
+  }
+  assert.equal((await domain.listCreatorAvailabilityRules(input.creatorId)).filter((rule) => rule.weekStart === week).length, 91);
+});
+
+test("publish requires accepted ownership and complete setup; drafts never leak into live cards or prices", async () => {
+  process.env.TAKE_A_SEAT_DEV_ADMIN_ENABLED = "true";
+  try {
+    const values = { creatorId: "onboard_private_draft", name: "Public Name", email: "private-draft@example.com", about: "Public about", helpItems: "Public topic", profileImageUrl: "/ella-profile.jpg", seat15Enabled: "on", seat15PriceAmount: "50" };
+    const input = await domain.getCreatorProfileSettingsInput(await formRequest("/", values).formData());
+    await domain.saveCreatorProfileSettings(values.creatorId, input);
+    assert.equal((await submit(formRequest("/api/creators/profile", { ...values, intent: "publish" }, true))).status, 400);
+    const accepted = await domain.acceptCreatorApplication(values.creatorId, "private-draft-test");
+    values.creatorId = accepted.id;
+    assert.equal((await submit(formRequest("/api/creators/profile", values, true))).status, 200);
+    assert.equal((await submit(formRequest("/api/creators/profile", { ...values, intent: "publish" }))).status, 400);
+    assert.equal((await submit(formRequest("/api/creators/profile", { ...values, intent: "publish" }, true))).status, 400);
+    assert.equal(await domain.getPublishedCreatorBySlug(accepted.publicSlug), null);
+    readyConnections(accepted.id);
+    const firstPublish = await submit(formRequest("/api/creators/profile", { ...values, intent: "publish" }, true));
+    assert.equal(firstPublish.status, 200);
+    assert.equal((await firstPublish.json()).publicPath, "/with/private-draft-test");
+    assert.equal((await domain.getPublishedCreatorBySlug(accepted.publicSlug)).name, "Public Name");
+    await submit(formRequest("/api/creators/profile", { ...values, name: "Private Name", about: "Private about", seat15PriceAmount: "99", profileImageUrl: "/amber-headshot.jpg" }, true));
+    let live = await domain.getPublishedCreatorBySlug(accepted.publicSlug);
+    assert.equal(live.name, "Public Name");
+    assert.equal(live.seats[0].unitAmount, 5000);
+    assert.equal(live.image, "/ella-profile.jpg");
+    assert.doesNotMatch(JSON.stringify(await domain.listPublicMarketplaceCreators()), /Private Name|Private about|profileDraft/);
+    const restored = getEditableCreatorProfile(await domain.getCreatorApplication(accepted.id));
+    assert.equal(restored.name, "Private Name");
+    assert.equal(restored.seat15PriceAmount, 99);
+    // Publish reads the saved snapshot, never unreviewed fields from the publish request.
+    assert.equal((await submit(formRequest("/api/creators/profile", { ...values, intent: "publish", name: "Unsaved payload" }, true))).status, 200);
+    live = await domain.getPublishedCreatorBySlug(accepted.publicSlug);
+    assert.equal(live.name, "Private Name");
+    assert.equal(live.seats[0].unitAmount, 9900);
+    await submit(formRequest("/api/creators/profile", { ...values, seat15PriceAmount: "0" }, true));
+    assert.equal((await domain.publishCreatorProfile(accepted.id)).status, "error");
+    assert.equal((await domain.getPublishedCreatorBySlug(accepted.publicSlug)).seats[0].unitAmount, 9900);
+  } finally { delete process.env.TAKE_A_SEAT_DEV_ADMIN_ENABLED; }
+});
+
+
+test("availability uses the same verified admin or creator access as the shared profile editor", async () => {
+  const { POST: saveAvailability } = await import("../app/api/creators/availability/route.ts");
+  const currentWeek = availabilityWeeks.availabilityWeekStart(
+    availabilityWeeks.availabilityDateBounds("Europe/London").today,
+  );
+  const weekStart = availabilityWeeks.addCalendarDays(currentWeek, 7);
+  const laterWeekStart = availabilityWeeks.addCalendarDays(weekStart, 7);
+  const values = { creatorId: "onboard_private_draft", timezone: "Europe/London", weekStart, availabilitySlots: JSON.stringify([{ dayOfWeek: 2, startTime: "10:00" }]) };
+  const denied = await saveAvailability(formRequest("/api/creators/availability", values));
+  assert.equal(denied.status, 400);
+  assert.equal((await denied.json()).detail, "creator-access");
+  process.env.TAKE_A_SEAT_DEV_ADMIN_ENABLED = "true";
+  try {
+    const response = await saveAvailability(formRequest("/api/creators/availability", values, true));
+    assert.equal(response.status, 200);
+    const secondWeek = await saveAvailability(formRequest("/api/creators/availability", {
+      ...values,
+      weekStart: laterWeekStart,
+      availabilitySlots: JSON.stringify([{ dayOfWeek: 4, startTime: "14:00" }]),
+    }, true));
+    assert.equal(secondWeek.status, 200);
+    let rules = await domain.listCreatorAvailabilityRules(values.creatorId);
+    assert.ok(rules.some((rule) => rule.weekStart === weekStart && rule.dayOfWeek === 2 && rule.startTime === "10:00"));
+    assert.ok(rules.some((rule) => rule.weekStart === laterWeekStart && rule.dayOfWeek === 4 && rule.startTime === "14:00"));
+
+    const cleared = await saveAvailability(formRequest("/api/creators/availability", {
+      ...values,
+      availabilitySlots: "[]",
+    }, true));
+    assert.equal(cleared.status, 200);
+    rules = await domain.listCreatorAvailabilityRules(values.creatorId);
+    const clearedWeekRules = rules.filter((rule) => rule.weekStart === weekStart);
+    assert.equal(clearedWeekRules.length, 1);
+    assert.equal(clearedWeekRules[0].enabled, false);
+    assert.ok(rules.some((rule) => rule.weekStart === laterWeekStart && rule.enabled && rule.startTime === "14:00"));
+  } finally { delete process.env.TAKE_A_SEAT_DEV_ADMIN_ENABLED; }
 });

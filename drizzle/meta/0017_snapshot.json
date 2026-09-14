@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "c5d3a649-f61d-40b2-a6e7-473a694bef5a",
-  "prevId": "8caadfe2-cc5e-4f90-a442-45ed9fbf2039",
+  "id": "3a93fb89-ea13-4842-9952-79465cf50268",
+  "prevId": "c5d3a649-f61d-40b2-a6e7-473a694bef5a",
   "tables": {
     "creator_accounts": {
       "name": "creator_accounts",
@@ -83,6 +83,13 @@
     "creator_availability_rules": {
       "name": "creator_availability_rules",
       "columns": {
+        "week_start": {
+          "name": "week_start",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "id": {
           "name": "id",
           "type": "integer",

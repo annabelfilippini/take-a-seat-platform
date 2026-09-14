@@ -31,6 +31,7 @@ export default async function CreatorDashboardPage({
   if (creatorAccount && "profile" in creatorAccount) {
     return (
       <EditableCreatorProfilePreview
+        stripeStatus={typeof searchParams?.stripe === "string" ? searchParams.stripe : undefined}
         calendarStatus={typeof searchParams?.calendar === "string" ? searchParams.calendar : undefined}
         initialAvailabilityRules={creatorAccount.availabilityRules}
         initialNotificationPreferences={creatorAccount.notificationPreferences}

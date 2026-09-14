@@ -8,7 +8,8 @@ import {
   getProfileImageObjectPosition,
   getProfileImageTransform,
 } from "../../_lib/profile-image";
-import { CustomerBookingFlow } from "../ella/CustomerBookingFlow";
+import { CustomerBookingFlow } from "../../_components/CustomerBookingFlow";
+import { BookingEntryLink } from "../../_components/BookingEntryLink";
 
 type CreatorProfilePageProps = {
   params: {
@@ -77,7 +78,6 @@ export default async function CreatorProfilePage({
     profile.waitlistSubject,
   )}`;
   const isBookable = creator.status === "booking" && creator.seats.length > 0;
-  const startingPrice = [...creator.seats].sort((a, b) => a.unitAmount - b.unitAmount)[0]?.price;
   const bookingNotice = getBookingNotice(searchParams, creator.name);
 
   return (
@@ -133,12 +133,7 @@ export default async function CreatorProfilePage({
             ) : null}
           </p>
           <p>{profile.intro}</p>
-          {isBookable ? (
-            <>
-              <p>From {startingPrice} · Private video call</p>
-              <a className="seat-primary-button profile-primary-button" href="#reserve">Choose a call</a>
-            </>
-          ) : null}
+          <BookingEntryLink seats={creator.seats} />
         </div>
 
         {creator.mediaItems?.length ? (
