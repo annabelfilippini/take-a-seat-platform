@@ -25,6 +25,10 @@ Public website:
 - Shows public creator profiles.
 - Lets customers pick a creator, seat length, and available time.
 - Does not require customer accounts for v1 paid bookings.
+- Public profiles use the shared `app/_components/CustomerBookingFlow.tsx`
+  for compact call choices, time selection, and a separate details step.
+  Phone and Instagram are optional; the summary explains authorization before
+  creator acceptance. See [booking flow](mobile-booking-flow.md) for QA and release status.
 
 Creator backend:
 

@@ -8,7 +8,8 @@ import {
   getProfileImageObjectPosition,
   getProfileImageTransform,
 } from "../../_lib/profile-image";
-import { CustomerBookingFlow } from "../ella/CustomerBookingFlow";
+import { BookingEntryLink } from "../../_components/BookingEntryLink";
+import { CustomerBookingFlow } from "../../_components/CustomerBookingFlow";
 
 type CreatorProfilePageProps = {
   params: {
@@ -125,6 +126,7 @@ export default async function CreatorProfilePage({
             {creator.location ? <span>{creator.location}</span> : null}
           </p>
           <p>{profile.intro}</p>
+          {isBookable ? <BookingEntryLink seats={creator.seats} /> : null}
         </div>
 
         {creator.mediaItems?.length ? (
