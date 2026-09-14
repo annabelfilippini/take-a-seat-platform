@@ -17,7 +17,7 @@ const localBindingConfig = {
       database_id: TAKE_A_SEAT_DATABASE_ID,
     },
   ],
-  r2_buckets: [],
+  r2_buckets: [{ binding: "CREATOR_MEDIA", bucket_name: "take-a-seat-creator-media" }],
 };
 
 export default defineConfig(async () => {

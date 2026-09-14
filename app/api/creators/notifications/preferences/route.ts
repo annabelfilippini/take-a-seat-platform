@@ -1,3 +1,4 @@
+import { getRequestAdminEmail } from "../../../../_lib/admin-auth";
 import { getSignedInClerkUser } from "../../../../_lib/clerk-auth";
 import { canManageCreatorProfile } from "../../../../_lib/creator-onboarding";
 import {
@@ -36,8 +37,9 @@ export async function POST(request: Request) {
   }
 
   try {
-    const user = await getSignedInClerkUser(request);
-    const canManage = user ? await canManageCreatorProfile(creatorId, user) : false;
+    const admin = await getRequestAdminEmail(request);
+    const user = admin ? null : await getSignedInClerkUser(request);
+    const canManage = Boolean(admin) || (user ? await canManageCreatorProfile(creatorId, user) : false);
 
     if (!canManage) {
       return Response.json(

@@ -1,3 +1,4 @@
+import { normalizeStoredMedia } from "../../../_lib/creator-media";
 import { getSafeReturnTo } from "../../../_lib/safe-redirect";
 import {
   canManageCreatorProfile,
@@ -67,7 +68,9 @@ export async function POST(request: Request) {
   const formData = await request.formData();
   const requestedCreatorId = getCreatorSettingsId(formData);
   const creatorId = requestedCreatorId ?? `onboard_${crypto.randomUUID()}`;
-  const input = await getCreatorProfileSettingsInput(formData);
+  let input;
+  try { input = await getCreatorProfileSettingsInput(formData); }
+  catch (error) { return profileStatusResponse(request, "error", error instanceof Error ? error.message : "Invalid profile media."); }
   const returnTo = formData.get("returnTo");
 
   if (!input || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.email)) {
@@ -119,12 +122,13 @@ export async function POST(request: Request) {
   }
 
   try {
+    if (requestedCreatorId) input = await normalizeStoredMedia(creatorId, input);
     await saveCreatorProfileSettings(creatorId, input);
-  } catch {
+  } catch (error) {
     return profileStatusResponse(
       request,
       "setup-needed",
-      "d1",
+      error instanceof Error && !/D1|SQL|query/i.test(error.message) ? error.message : "Your draft could not be saved. Please try again.",
       typeof returnTo === "string" ? returnTo : null,
     );
   }
@@ -159,5 +163,6 @@ export async function POST(request: Request) {
     "saved",
     undefined,
     typeof returnTo === "string" ? returnTo : null,
+    { profileImageUrl: input.profileImageUrl, profileGallery: input.profileGallery },
   );
 }

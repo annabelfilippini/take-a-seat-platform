@@ -1,6 +1,7 @@
 /* eslint-disable @next/next/no-html-link-for-pages, @next/next/no-img-element */
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { CreatorProfileIdentity } from "../../_components/CreatorProfileIdentity";
 import { CreatorMediaGallery } from "../../_components/CreatorMediaGallery";
 import { CreatorSeatHowItWorks } from "../../_components/CreatorSeatHowItWorks";
 import { creators } from "../../_lib/creators";
@@ -19,16 +20,6 @@ type CreatorProfilePageProps = {
 };
 
 export const dynamic = "force-dynamic";
-
-function InstagramIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24">
-      <rect x="3.2" y="3.2" width="17.6" height="17.6" rx="5" />
-      <circle cx="12" cy="12" r="4.1" />
-      <path d="M17.35 6.7h.01" />
-    </svg>
-  );
-}
 
 function TikTokIcon() {
   return (
@@ -73,7 +64,6 @@ export default async function CreatorProfilePage({
     notFound();
   }
 
-  const socialLabel = creator.tiktokHandle ?? creator.instagramHandle ?? creator.name;
   const waitlistHref = `mailto:annabel@takeaseatwith.com?subject=${encodeURIComponent(
     profile.waitlistSubject,
   )}`;
@@ -102,17 +92,8 @@ export default async function CreatorProfilePage({
           <span className="test-profile-badge">
             {isBookable ? "Now booking" : "Opening soon"}
           </span>
-          <h1>{creator.name}</h1>
-          <p className="amber-meta">
-            {creator.instagramUrl ? (
-              <a
-                aria-label={`Open ${creator.name} on Instagram`}
-                className="profile-social-link"
-                href={creator.instagramUrl}
-              >
-                <InstagramIcon />
-              </a>
-            ) : null}
+          <CreatorProfileIdentity profile={creator} heading="h1" />
+          {creator.tiktokUrl || creator.location ? <p className="amber-meta">
             {creator.tiktokUrl ? (
               <a
                 aria-label={`Open ${creator.name} on TikTok`}
@@ -122,9 +103,9 @@ export default async function CreatorProfilePage({
                 <TikTokIcon />
               </a>
             ) : null}
-            <span>{socialLabel}</span>
+
             {creator.location ? <span>{creator.location}</span> : null}
-          </p>
+          </p> : null}
           {profile.helpItems.length ? (
             <div className="help-card creator-conversation-topics">
               <h2>Pull up a seat for…</h2>

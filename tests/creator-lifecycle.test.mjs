@@ -219,7 +219,7 @@ test("profile edits, prices, and cleared social links survive save and reload", 
     oneToOneReason: "Personal advice for your next event",
     category: "Style & Beauty",
     location: "New York",
-    instagramHandle: "updatedcreator",
+    instagramHandle: "updated.creator_name",
     tiktokHandle: "updatedcreator2",
     profileImageUrl: "/ella-profile.jpg",
     profileImagePositionX: "27",
@@ -252,9 +252,10 @@ test("profile edits, prices, and cleared social links survive save and reload", 
     assert.equal(result.status, "saved");
     const stored = (await domain.getCreatorDashboardAccount(owner)).profile;
     const draft = JSON.parse(stored.profileDraft);
-    for (const key of ["name", "about", "profileIntro", "oneToOneReason", "category", "location", "instagramHandle", "tiktokHandle", "profileImageUrl", "profileGallery", "seat15Description", "seat30Description"]) {
+    for (const key of ["name", "about", "profileIntro", "oneToOneReason", "category", "location", "instagramHandle", "tiktokHandle", "profileImageUrl", "seat15Description", "seat30Description"]) {
       assert.equal(draft[key], edits[key], key);
     }
+    assert.deepEqual(JSON.parse(draft.profileGallery).map((item) => item.source), edits.profileGallery.split("\n"));
     assert.equal(draft.profileImagePositionX, 27);
     assert.equal(draft.profileImagePositionY, 62);
     assert.equal(draft.profileImageZoom, 160);
@@ -269,6 +270,7 @@ test("profile edits, prices, and cleared social links survive save and reload", 
     assert.equal((await domain.publishCreatorProfile(stored.id)).status, "saved");
     const publicCreator = await domain.getPublishedCreatorBySlug(stored.publicSlug);
     assert.equal(publicCreator.name, edits.name);
+    assert.equal(publicCreator.instagramUrl, "https://www.instagram.com/updated.creator_name/");
     assert.equal(publicCreator.profile.intro, edits.profileIntro);
     assert.deepEqual(publicCreator.seats.map(seat => seat.unitAmount), [7500, 15000]);
 
@@ -512,5 +514,83 @@ test("availability uses the same verified admin or creator access as the shared 
     const rules = await domain.listCreatorAvailabilityRules(values.creatorId);
     assert.equal(rules[0].timezone, "Europe/London");
     assert.equal(rules[0].startTime, "10:00");
+  } finally { delete process.env.TAKE_A_SEAT_DEV_ADMIN_ENABLED; }
+});
+
+test("media upload → private draft → reload with crops/order → publish; rejected uploads preserve the draft", async () => {
+  process.env.TAKE_A_SEAT_DEV_ADMIN_ENABLED = "true";
+  const { POST: upload } = await import("../app/api/creators/media/route.ts");
+  const { GET: readMedia } = await import("../app/api/creators/media/[id]/route.ts");
+  const objects = new Map();
+  globalThis.__lifecycleEnv.CREATOR_MEDIA = {
+    async put(key, bytes, metadata) { objects.set(key, { bytes, ...metadata }); return {}; },
+    async head(key) { const value = objects.get(key); return value ? { customMetadata: value.customMetadata, size: value.bytes.byteLength } : null; },
+    async get(key) { const value = objects.get(key); return value ? { body: value.bytes, size: value.bytes.byteLength, writeHttpMetadata(headers) { headers.set("content-type", value.httpMetadata.contentType); } } : null; },
+  };
+  const id = "media-owner";
+  const edits = { creatorId: id, name: "Media Tester", email: "media@example.com", about: "An introduction", helpItems: "Style advice", profileImageUrl: "/amber-headshot.jpg", seat15Enabled: "on", seat15PriceAmount: "45" };
+  await domain.saveCreatorProfileSettings(id, await domain.getCreatorProfileSettingsInput(await formRequest("/", edits).formData()));
+  sqlite.prepare("UPDATE creator_onboarding_profiles SET application_status = 'accepted', public_slug = 'media-owner' WHERE id = ?").run(id);
+  async function uploadFile(mime = "image/png", bytes = new Uint8Array(3_000_000), admin = true) {
+    const body = new FormData(); body.set("creatorId", id); body.set("file", new Blob([bytes], { type: mime }), "test.png");
+    return upload(new Request("http://localhost/api/creators/media", { method: "POST", body, headers: admin ? { cookie: "tas_local_admin=1" } : {} }));
+  }
+  function read(source, admin = false) { return readMedia(new Request(`http://localhost${source}`, { headers: admin ? { cookie: "tas_local_admin=1" } : {} }), { params: { id: source.split("/").at(-1) } }); }
+  try {
+    assert.equal((await uploadFile("image/png", new Uint8Array(10), false)).status, 403);
+    assert.equal((await uploadFile("image/svg+xml", new Uint8Array(10))).status, 400);
+    assert.equal((await uploadFile("image/png", new Uint8Array(21 * 1024 * 1024))).status, 400);
+    const first = await uploadFile(); assert.equal(first.status, 200);
+    const { source: firstSource } = await first.json();
+    const { source: secondSource } = await (await uploadFile()).json();
+    assert.equal((await read(firstSource)).status, 404, "unpublished uploads stay private");
+    assert.equal((await read(firstSource, true)).status, 200);
+    const items = [{ id: "second", source: secondSource, kind: "photo", title: "Second", positionX: 17, positionY: 82, zoom: 180 }, { id: "first", source: firstSource, kind: "photo", title: "First", zoom: 120 }];
+    let response = await submit(formRequest("/api/creators/profile", { ...edits, profileImageUrl: firstSource, profileGallery: JSON.stringify(items) }, true));
+    assert.equal(response.status, 200, JSON.stringify(await response.json()));
+    let saved = await domain.getCreatorApplication(id);
+    assert.ok(saved.profileDraft.length < 5000, "large photos are not embedded in the D1 profile row");
+    const restored = getEditableCreatorProfile(saved);
+    assert.equal(restored.image, firstSource);
+    assert.deepEqual(restored.mediaItems.map((item) => item.id), ["second", "first"]);
+    assert.equal(restored.mediaItems[0].positionY, 82); assert.equal(restored.mediaItems[0].zoom, 180);
+    readyConnections(id);
+    assert.equal((await domain.publishCreatorProfile(id)).status, "saved");
+    const publicProfile = await domain.getPublishedCreatorBySlug("media-owner");
+    assert.deepEqual(publicProfile.mediaItems, restored.mediaItems);
+    assert.equal((await read(firstSource)).status, 200);
+    const liveSnapshot = (await domain.getCreatorApplication(id)).profileGallery;
+    response = await submit(formRequest("/api/creators/profile", { ...edits, profileGallery: "[]" }, true));
+    assert.equal(response.status, 200);
+    saved = await domain.getCreatorApplication(id);
+    assert.equal(getEditableCreatorProfile(saved).mediaItems.length, 0, "removing the last photo does not recreate the portrait in the gallery");
+    assert.equal(saved.profileGallery, liveSnapshot, "removal remains private until publishing");
+    const snapshot = saved.profileDraft;
+    response = await submit(formRequest("/api/creators/profile", { ...edits, profileGallery: '[{"source":"javascript:alert(1)"}]' }, true));
+    assert.equal(response.status, 400);
+    assert.equal((await domain.getCreatorApplication(id)).profileDraft, snapshot);
+    // A creator cannot reference a different creator's unpublished upload.
+    objects.get(firstSource.split("/").at(-1)).customMetadata = { creatorId: "another-owner" };
+    response = await submit(formRequest("/api/creators/profile", { ...edits, profileGallery: JSON.stringify(items) }, true));
+    assert.equal(response.status, 400);
+    assert.equal((await domain.getCreatorApplication(id)).profileDraft, snapshot);
+    // Storage outages preserve the last successful draft.
+    globalThis.__lifecycleEnv.CREATOR_MEDIA.put = async () => { throw new Error("Storage unavailable"); };
+    assert.equal((await uploadFile()).status, 400);
+    assert.equal((await domain.getCreatorApplication(id)).profileDraft, snapshot);
+  } finally { delete globalThis.__lifecycleEnv.CREATOR_MEDIA; delete process.env.TAKE_A_SEAT_DEV_ADMIN_ENABLED; }
+});
+
+test("notification settings save for verified admins, reject anonymous access, and reload correctly", async () => {
+  const { POST: savePreferences } = await import("../app/api/creators/notifications/preferences/route.ts");
+  const { getCreatorNotificationPreferences } = await import("../app/_lib/notifications.ts");
+  process.env.TAKE_A_SEAT_DEV_ADMIN_ENABLED = "true";
+  const body = JSON.stringify({ creatorId: "media-owner", bookingEmailEnabled: true, bookingSmsEnabled: false, bookingProfileEnabled: true });
+  try {
+    const denied = await savePreferences(new Request("http://localhost/api/creators/notifications/preferences", { method: "POST", body, headers: { "content-type": "application/json" } }));
+    assert.equal(denied.status, 403);
+    const saved = await savePreferences(new Request("http://localhost/api/creators/notifications/preferences", { method: "POST", body, headers: { "content-type": "application/json", cookie: "tas_local_admin=1" } }));
+    assert.equal(saved.status, 200);
+    assert.equal((await getCreatorNotificationPreferences("media-owner")).bookingSmsEnabled, false);
   } finally { delete process.env.TAKE_A_SEAT_DEV_ADMIN_ENABLED; }
 });

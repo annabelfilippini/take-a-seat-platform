@@ -53,6 +53,7 @@
       "globs": ["**/*.js", "**/*.mjs"]
     }
   ],
+  "r2_buckets": [{ "binding": "CREATOR_MEDIA", "bucket_name": "take-a-seat-creator-media" }],
   "d1_databases": [
     {
       "binding": "DB",

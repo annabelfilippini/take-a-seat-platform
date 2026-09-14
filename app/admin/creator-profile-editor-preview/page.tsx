@@ -1,3 +1,4 @@
+import { getCreatorNotificationPreferences, listCreatorNotifications } from "../../_lib/notifications";
 import type { Metadata } from "next";
 import {
   getAdminSignInHref,
@@ -26,6 +27,8 @@ export default async function CreatorProfileEditorPreviewPage({ searchParams }: 
 
     return (
       <EditableCreatorProfilePreview
+        initialNotificationPreferences={savedMockProfile ? await getCreatorNotificationPreferences(savedMockProfile.id) : undefined}
+        initialNotifications={savedMockProfile ? await listCreatorNotifications(savedMockProfile.id) : []}
         initialAvailabilityRules={savedMockProfile ? await listCreatorAvailabilityRules(savedMockProfile.id) : []}
         calendarStatus={typeof searchParams?.calendar === "string" ? searchParams.calendar : undefined}
         stripeStatus={typeof searchParams?.stripe === "string" ? searchParams.stripe : undefined}
