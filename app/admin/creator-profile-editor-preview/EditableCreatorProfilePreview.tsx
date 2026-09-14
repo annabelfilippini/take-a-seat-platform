@@ -12,6 +12,8 @@ import {
 } from "react";
 import { CREATOR_PROFILE_EDITOR_URL } from "../../_lib/creator-destination";
 import { CreatorSetupPagePreview } from "../../_components/CreatorSetupPagePreview";
+import { prepareProfileMedia } from "../../_lib/profile-media";
+import { profileSaveError } from "../../_lib/profile-save";
 import {
   addCalendarDays,
   availabilityDateBounds,
@@ -260,6 +262,7 @@ export function EditableCreatorProfilePreview({
   const profileEditRevision = useRef(0);
   const profileSaveInFlight = useRef(false);
   const [profileSaving, setProfileSaving] = useState(false);
+  const [profileSaveMessage, setProfileSaveMessage] = useState("");
   const profileSaveLabel =
     profileSaving
       ? "Saving"
@@ -610,24 +613,32 @@ export function EditableCreatorProfilePreview({
     const savedRevision = profileEditRevision.current;
     setProfileSaving(true);
     setMediaSaveStatus("saving");
+    setProfileSaveMessage("");
 
     try {
+      const [image, ...sources] = await prepareProfileMedia([profile.image, ...profile.mediaItems.map((item) => item.source)]);
+      const preparedProfile = { ...profile, image, mediaItems: profile.mediaItems.map((item, index) => ({ ...item, source: sources[index] })) };
       const response = await fetch("/api/creators/profile", {
-        body: getProfileSettingsFormData(profile),
+        body: getProfileSettingsFormData(preparedProfile),
         headers: { accept: "application/json" },
         method: "POST",
+        signal: AbortSignal.timeout(30_000),
       });
-
-      if (!response.ok) {
-        throw new Error("Profile save failed.");
+      const result = await response.json().catch(() => null) as { status?: string; detail?: string } | null;
+      if (!response.ok || result?.status !== "saved") {
+        throw new Error(profileSaveError(result?.detail, response.status));
       }
 
+      if (profileEditRevision.current === savedRevision) {
+        setProfile((current) => ({ ...current, image, mediaItems: preparedProfile.mediaItems }));
+      }
       setMediaSaveStatus(
         profileEditRevision.current === savedRevision ? "saved" : "idle",
       );
       return profileEditRevision.current === savedRevision;
-    } catch {
+    } catch (error) {
       setMediaSaveStatus("error");
+      setProfileSaveMessage(error instanceof Error && error.name === "Error" ? error.message : profileSaveError());
       return false;
     } finally {
       profileSaveInFlight.current = false;
@@ -635,12 +646,13 @@ export function EditableCreatorProfilePreview({
     }
   }
 
-  async function changeStep(step: EditableCreatorTab) {
-    if (profileSaving || publishing) return;
-    if (mediaSaveStatus !== "saved" && !(await saveProfileChanges())) return;
+  function changeStep(step: EditableCreatorTab) {
+    if (publishing) return;
     setActiveCreatorTab(step);
     setPublishMessage("");
     window.scrollTo({ top: 0, behavior: "instant" });
+    // Every panel stays mounted. Saving must never gate in-page navigation.
+    if (mediaSaveStatus === "idle" && !profileSaveInFlight.current) void saveProfileChanges();
   }
 
   async function publishProfile() {
@@ -648,7 +660,9 @@ export function EditableCreatorProfilePreview({
     setPublishMessage("");
     try {
       if (!(await saveProfileChanges())) throw new Error("Save your draft successfully before publishing.");
-      const body = getProfileSettingsFormData(profile);
+      const body = new FormData();
+      body.set("creatorId", profile.id);
+      body.set("email", profile.email ?? "");
       body.set("intent", "publish");
       const response = await fetch("/api/creators/profile", { method: "POST", headers: { accept: "application/json" }, body });
       const result = await response.json() as { detail?: string; publicPath?: string };
@@ -701,7 +715,7 @@ export function EditableCreatorProfilePreview({
               className={`profile-nav-tab${tab.id === "settings" ? " settings-tab-button" : ""}`}
               id={`editable-creator-tab-${tab.id}`}
               key={tab.id}
-              disabled={profileSaving || publishing}
+              disabled={publishing}
               onClick={() => { void changeStep(tab.id); }}
               role="tab"
               type="button"
@@ -711,6 +725,13 @@ export function EditableCreatorProfilePreview({
           ))}
         </nav>
       </header>
+
+      {profileSaveMessage ? (
+        <div className="creator-profile-save-notice" role="alert">
+          <p>{profileSaveMessage}</p>
+          <button className="editable-primary-button" disabled={profileSaving || publishing} onClick={() => { void saveProfileChanges(); }} type="button">Retry Save draft</button>
+        </div>
+      ) : null}
 
       <div
         aria-labelledby="editable-creator-tab-profile"

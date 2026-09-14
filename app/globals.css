@@ -4761,6 +4761,27 @@ img {
   gap: 16px;
 }
 
+.creator-profile-save-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin: 16px clamp(16px, 4vw, 64px);
+  padding: 16px;
+  border: 1px solid #9d573f;
+  background: #fff6ef;
+  color: #6f3021;
+}
+
+.creator-profile-save-notice p {
+  flex: 1 1 240px;
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
 .creator-setup-steps {
   background: #ffffff;
   border: 1px solid rgba(31, 29, 26, 0.12);
