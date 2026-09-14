@@ -1,6 +1,7 @@
 "use client";
 
 /* eslint-disable @next/next/no-img-element */
+import { mediaImageStyle } from "../_lib/creator-gallery";
 import { useRef } from "react";
 import type { CreatorMediaItem } from "../_lib/creators";
 
@@ -118,5 +119,5 @@ function GalleryMedia({ item }: { item: CreatorMediaItem }) {
     );
   }
 
-  return <img alt={item.alt ?? item.title} src={item.source} />;
+  return <img alt={item.alt ?? item.title} src={item.source} style={mediaImageStyle(item)} draggable={false} />;
 }

@@ -368,7 +368,8 @@ test("server-renders the admin creator profile editor preview", async () => {
   assert.match(html, /aria-label="Instagram URL"/);
   assert.match(html, /aria-label="TikTok URL"/);
   assert.match(html, /aria-label="Upload new media file"/);
-  assert.match(html, />Add media<\/button>/);
+  assert.match(html, /Add photos or videos/);
+  assert.doesNotMatch(html, /Write a short introduction in your own voice/);
   assert.match(html, /accept="image\/\*,video\/\*"/);
   assert.doesNotMatch(html, /aria-label="New media URL"/);
   assert.doesNotMatch(html, /aria-label="TikTok video URL"/);

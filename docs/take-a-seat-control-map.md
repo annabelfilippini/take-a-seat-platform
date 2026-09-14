@@ -58,6 +58,13 @@ Customer account area:
 - Add later only if saved bookings, reschedules, purchase history, messaging, or
   repeat booking workflows need it.
 
+## Creator editor media repair
+
+The pending editor repair uses private R2 file storage through `CREATOR_MEDIA`,
+with profile, crop, order, and publication references remaining in D1. Sidebar
+navigation retains edits without depending on save success. See
+[repair and release requirements](creator-editor-media-repair.md) before deployment.
+
 ## Current Technical Shape
 
 App/runtime:

@@ -12,7 +12,13 @@ import {
 import { CREATOR_PROFILE_EDITOR_URL } from "../../_lib/creator-destination";
 import { CreatorSetupPagePreview } from "../../_components/CreatorSetupPagePreview";
 
+import { CreatorMediaEditor } from "../../_components/CreatorMediaEditor";
+import { uploadCreatorMedia } from "../../_lib/upload-creator-media";
+import { MAX_GALLERY_ITEMS, parseCreatorGallery } from "../../_lib/creator-gallery";
 type EditableGalleryItem = {
+  positionX?: number;
+  positionY?: number;
+  zoom?: number;
   fileName?: string;
   id: string;
   kind: "photo" | "video";
@@ -165,22 +171,6 @@ const timezoneOptions = [
   "Pacific/Auckland",
 ];
 
-const tiktokPlayerOptions = [
-  "autoplay=1",
-  "muted=1",
-  "loop=1",
-  "controls=0",
-  "play_button=0",
-  "volume_control=0",
-  "fullscreen_button=0",
-  "progress_bar=0",
-  "timestamp=0",
-  "music_info=0",
-  "description=0",
-  "rel=0",
-  "native_context_menu=0",
-  "closed_caption=0",
-].join("&");
 
 export function EditableCreatorProfilePreview({
   calendarStatus,
@@ -204,18 +194,10 @@ export function EditableCreatorProfilePreview({
   const [publishMessage, setPublishMessage] = useState("");
   const [publishing, setPublishing] = useState(false);
   const [hasAvailability, setHasAvailability] = useState(initialAvailabilityRules.some((rule) => rule.enabled !== false));
-  const [draftMedia, setDraftMedia] = useState<{
-    fileName: string;
-    kind: EditableGalleryItem["kind"];
-    title: string;
-    uploadedSource: string;
-  }>({
-    fileName: "",
-    kind: "photo",
-    title: "",
-    uploadedSource: "",
-  });
-  const draftMediaFileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const uploadInFlight = useRef(false);
+  const [uploadMessage, setUploadMessage] = useState("");
+  const [saveError, setSaveError] = useState("");
   const profileImageDragRef = useRef<{
     originX: number;
     originY: number;
@@ -263,11 +245,11 @@ export function EditableCreatorProfilePreview({
 
   useEffect(() => {
     function warnOnLeave(event: BeforeUnloadEvent) {
-      if (mediaSaveStatus !== "saved") { event.preventDefault(); event.returnValue = ""; }
+      if (mediaSaveStatus !== "saved" || uploading) { event.preventDefault(); event.returnValue = ""; }
     }
     window.addEventListener("beforeunload", warnOnLeave);
     return () => window.removeEventListener("beforeunload", warnOnLeave);
-  }, [mediaSaveStatus]);
+  }, [mediaSaveStatus, uploading]);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "instant" });
@@ -353,92 +335,52 @@ export function EditableCreatorProfilePreview({
     }));
   }
 
-  function chooseMediaItemFile(id: string, file: File | undefined) {
-    if (!file || !isSupportedMediaFile(file)) {
-      return;
+  async function uploadFiles(files: File[], replacementId?: string, portrait = false) {
+    if (!files.length || uploadInFlight.current) return;
+    if (!portrait && !replacementId && profile.mediaItems.length + files.length > MAX_GALLERY_ITEMS) {
+      setUploadMessage("Add up to 12 photos or videos. Remove a photo before adding more."); return;
     }
-
-    readFileAsDataUrl(file, (source) => {
-      markProfileDirty();
-      setProfile((current) => ({
-        ...current,
-        mediaItems: current.mediaItems.map((item) =>
-          item.id === id
-            ? {
-                ...item,
-                fileName: file.name,
-                kind: getMediaKindForFile(file),
-                source,
-                sourceKind: "upload",
-                title: item.title || getMediaTitleFromFileName(file.name),
-              }
-            : item,
-        ),
-      }));
+    uploadInFlight.current = true;
+    setUploading(true);
+    setUploadMessage("Uploading… Keep this page open until your photos are ready.");
+    try {
+      for (const file of files) {
+        const uploaded = await uploadCreatorMedia(file, profile.id);
+        markProfileDirty();
+        if (portrait) {
+          setProfile((current) => ({ ...current, image: uploaded.source, profileImagePositionX: 50, profileImagePositionY: 50, profileImageZoom: 100 }));
+          setProfileImageFileName(file.name);
+        } else {
+          const item = { ...uploaded, id: replacementId ?? crypto.randomUUID(), title: getMediaTitleFromFileName(file.name), fileName: file.name, sourceKind: "upload" as const, positionX: 50, positionY: 50, zoom: 100 };
+          setProfile((current) => ({ ...current, mediaItems: replacementId ? current.mediaItems.map((existing) => existing.id === replacementId ? item : existing) : [...current.mediaItems, item] }));
+        }
+      }
+      setUploadMessage("Added. Save your draft to keep these photos and their positions.");
+    } catch (error) {
+      setUploadMessage(error instanceof Error ? error.message : "Upload failed. Please try again.");
+    } finally {
+      uploadInFlight.current = false; setUploading(false);
+    }
+  }
+  function updateMedia(id: string, crop: { positionX?: number; positionY?: number; zoom?: number }) {
+    markProfileDirty();
+    setProfile((current) => ({ ...current, mediaItems: current.mediaItems.map((item) => item.id === id ? { ...item, ...crop } : item) }));
+  }
+  function reorderMedia(id: string, direction: -1 | 1) {
+    markProfileDirty();
+    setProfile((current) => {
+      const items = [...current.mediaItems]; const index = items.findIndex((item) => item.id === id); const next = index + direction;
+      if (index < 0 || next < 0 || next >= items.length) return current;
+      [items[index], items[next]] = [items[next], items[index]];
+      return { ...current, mediaItems: items };
     });
   }
-
   function removeMediaItem(id: string) {
     markProfileDirty();
     setProfile((current) => ({
       ...current,
       mediaItems: current.mediaItems.filter((item) => item.id !== id),
     }));
-  }
-
-  function addMediaItem() {
-    const source = draftMedia.uploadedSource;
-
-    if (!source) {
-      return;
-    }
-
-    setProfile((current) => ({
-      ...current,
-      mediaItems: [
-        ...current.mediaItems,
-        {
-          fileName: draftMedia.fileName || undefined,
-          id: globalThis.crypto?.randomUUID?.() ?? `media-${Date.now()}`,
-          kind: draftMedia.kind,
-          source,
-          sourceKind: "upload",
-          title:
-            draftMedia.title.trim() ||
-            `${draftMedia.kind === "photo" ? "Photo" : "Video"} ${
-              current.mediaItems.length + 1
-            }`,
-        },
-      ],
-    }));
-    markProfileDirty();
-    setDraftMedia((current) => ({
-      ...current,
-      fileName: "",
-      title: "",
-      uploadedSource: "",
-    }));
-    if (draftMediaFileInputRef.current) {
-      draftMediaFileInputRef.current.value = "";
-    }
-  }
-
-  function chooseProfileImage(file: File | undefined) {
-    if (!file) {
-      return;
-    }
-
-    readFileAsDataUrl(file, (source) => {
-      setProfile((current) => ({
-        ...current,
-        image: source,
-        profileImagePositionX: 50,
-        profileImagePositionY: 50,
-        profileImageZoom: 135,
-      }));
-      markProfileDirty();
-      setProfileImageFileName(file.name);
-    });
   }
 
   function updateProfileImagePosition(next: {
@@ -577,29 +519,14 @@ export function EditableCreatorProfilePreview({
     panProfileImage(event.deltaX, event.deltaY);
   }
 
-  function chooseDraftMediaFile(file: File | undefined) {
-    if (!file || !isSupportedMediaFile(file)) {
-      return;
-    }
-
-    readFileAsDataUrl(file, (source) => {
-      setDraftMedia((current) => ({
-        ...current,
-        fileName: file.name,
-        kind: getMediaKindForFile(file),
-        title: current.title || getMediaTitleFromFileName(file.name),
-        uploadedSource: source,
-      }));
-    });
-  }
-
   async function saveProfileChanges() {
-    if (profileSaveInFlight.current) {
+    if (profileSaveInFlight.current || uploadInFlight.current) {
       return false;
     }
 
     profileSaveInFlight.current = true;
     const savedRevision = profileEditRevision.current;
+    setSaveError("");
     setProfileSaving(true);
     setMediaSaveStatus("saving");
 
@@ -608,17 +535,25 @@ export function EditableCreatorProfilePreview({
         body: getProfileSettingsFormData(profile),
         headers: { accept: "application/json" },
         method: "POST",
+        signal: AbortSignal.timeout(30000),
       });
 
-      if (!response.ok) {
-        throw new Error("Profile save failed.");
+      const result = await response.json() as { status?: string; detail?: string; profileImageUrl?: string; profileGallery?: string };
+      if (!response.ok || result.status !== "saved") {
+        const messages: Record<string, string> = { "creator-access": "Your session expired. Sign in again before saving.", "creator-auth": "We could not verify your session. Please try again.", "profile-required": "Your profile needs a valid email before it can be saved." };
+        throw new Error(messages[result.detail ?? ""] || result.detail || "Profile save failed. Please try again.");
       }
 
+      if (profileEditRevision.current === savedRevision) {
+        setUploadMessage("");
+        setProfile((current) => ({ ...current, image: result.profileImageUrl ?? current.image, mediaItems: result.profileGallery ? parseCreatorGallery(result.profileGallery) : current.mediaItems }));
+      }
       setMediaSaveStatus(
         profileEditRevision.current === savedRevision ? "saved" : "idle",
       );
       return profileEditRevision.current === savedRevision;
-    } catch {
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : "Your draft could not be saved. Please try again.");
       setMediaSaveStatus("error");
       return false;
     } finally {
@@ -628,8 +563,7 @@ export function EditableCreatorProfilePreview({
   }
 
   async function changeStep(step: EditableCreatorTab) {
-    if (profileSaving || publishing) return;
-    if (mediaSaveStatus !== "saved" && !(await saveProfileChanges())) return;
+    if (publishing) return;
     setActiveCreatorTab(step);
     setPublishMessage("");
     window.scrollTo({ top: 0, behavior: "instant" });
@@ -680,17 +614,18 @@ export function EditableCreatorProfilePreview({
         <div className="creator-setup-header-actions">
           <span>{profile.publishedAt ? "Live page · private edits" : "Private draft"}</span>
           <button type="button" onClick={() => previewDialog.current?.showModal()}>Preview page</button>
-          <button className="seat-secondary-button" disabled={profileSaving || publishing} onClick={() => { void saveProfileChanges(); }} type="button">{profileSaving ? "Saving…" : "Save draft"}</button>
+          <button className="seat-secondary-button" disabled={profileSaving || publishing || uploading} onClick={() => { void saveProfileChanges(); }} type="button">{profileSaving ? "Saving…" : "Save draft"}</button>
         </div>
       </header>
       {calendarStatus ? <p role="status" className="calendar-connection-notice">{calendarStatus === "connected" && profile.calendarConnectedAt ? "Google Calendar connected." : "Calendar connection is incomplete. You can try again in Availability."}</p> : null}
       {stripeStatus ? <p role="status" className="calendar-connection-notice">{profile.stripeConnectedAt ? "Stripe payouts connected." : "Stripe setup is incomplete. Continue in Get paid."}</p> : null}
-      {mediaSaveStatus === "error" ? <p role="alert" className="calendar-connection-notice">Your draft could not be saved. Please try Save draft again before leaving this page.</p> : null}
+      {mediaSaveStatus === "error" ? <p role="alert" className="calendar-connection-notice">{saveError} Your edits are still here; you can switch sections and retry saving.</p> : null}
+      {uploadMessage ? <p role="status" className="calendar-connection-notice">{uploadMessage}</p> : null}
       <div className="creator-setup-layout">
         <nav className="creator-setup-sidebar" aria-label="Creator setup steps">
           <p className="creator-setup-eyebrow">Setup</p>
           <ol>{creatorTabs.map((tab, index) => <li key={tab.id}>
-            <button type="button" aria-current={activeCreatorTab === tab.id ? "step" : undefined} disabled={profileSaving || publishing} onClick={() => { void changeStep(tab.id); }}>
+            <button type="button" aria-current={activeCreatorTab === tab.id ? "step" : undefined} disabled={publishing} onClick={() => { void changeStep(tab.id); }}>
               <span className="creator-step-number">{index + 1}</span>{tab.label}
             </button>
           </li>)}</ol>
@@ -717,7 +652,7 @@ export function EditableCreatorProfilePreview({
                   alt={`${profile.name} profile`}
                   draggable={false}
                   src={profile.image}
-                  style={{ transform: profileImageTransform }}
+                  style={{ objectPosition: `${profileImagePositionX}% ${profileImagePositionY}%`, transform: profileImageTransform }}
                 />
               ) : (
                 <b>{profile.name.slice(0, 2) || "TS"}</b>
@@ -731,7 +666,8 @@ export function EditableCreatorProfilePreview({
                   aria-label="Upload profile picture"
                   className="editable-profile-field editable-file-input"
                   type="file"
-                  onChange={(event) => chooseProfileImage(event.target.files?.[0])}
+                  disabled={uploading}
+                  onChange={(event) => { void uploadFiles(Array.from(event.target.files ?? []), undefined, true); event.target.value = ""; }}
                 />
               </label>
               {profileImageFileName ? (
@@ -763,30 +699,6 @@ export function EditableCreatorProfilePreview({
           </div>
 
           <label className="creator-name-field" htmlFor="creator-hero-name"><span>Your name</span><EditableInput ariaLabel="Creator hero name" className="editable-basic-input" value={profile.name} onChange={(value) => update("name", value)} /></label>
-          <div className="help-card creator-conversation-topics">
-            <h2>Pull up a seat for…</h2>
-            <p>Share three things someone could ask you about, one per line.</p>
-            <EditableTextarea
-              ariaLabel="What people can ask"
-              className="editable-help-input"
-              rows={4}
-              value={profile.helpItems}
-              onChange={(value) => update("helpItems", value)}
-            />
-          </div>
-        <div className="about-main">
-          <h2>A little about me</h2>
-          <p>Write a short introduction in your own voice.</p>
-          <EditableTextarea
-            ariaLabel="About section"
-            className="editable-about-copy"
-            rows={6}
-            value={profile.about}
-            onChange={(value) => update("about", value)}
-          />
-
-        </div>
-
           <div className="editable-social-url-fields">
             <label>
               <span>Instagram URL</span>
@@ -835,6 +747,29 @@ export function EditableCreatorProfilePreview({
             </label>
           </p>
 
+          <div className="help-card creator-conversation-topics">
+            <h2>Pull up a seat for…</h2>
+            <p>Share three things someone could ask you about, one per line.</p>
+            <EditableTextarea
+              ariaLabel="What people can ask"
+              className="editable-help-input"
+              rows={4}
+              value={profile.helpItems}
+              onChange={(value) => update("helpItems", value)}
+            />
+          </div>
+        <div className="about-main">
+          <h2>A little about me</h2>
+          <EditableTextarea
+            ariaLabel="About section"
+            className="editable-about-copy"
+            rows={6}
+            value={profile.about}
+            onChange={(value) => update("about", value)}
+          />
+
+        </div>
+
           <section className="creator-setup-media" id="media"><h2>Photos and videos</h2><p>Add photos to the carousel at the top of your page.</p>
           <div className="editable-social-accounts">
             <label>
@@ -854,18 +789,17 @@ export function EditableCreatorProfilePreview({
             </label>
           </div>
           <div className="editable-media-list">
-            {profile.mediaItems.map((item) => (
+            {profile.mediaItems.map((item, index) => (
               <article className="editable-media-row" key={item.id}>
-                <MediaPreview item={item} />
+                <CreatorMediaEditor item={item} onChange={(crop) => updateMedia(item.id, crop)} />
                 <div className="editable-media-source-control">
                   <input
                     accept="image/*,video/*"
                     aria-label={`Upload replacement for ${item.title}`}
                     className="editable-profile-field editable-file-input"
                     type="file"
-                    onChange={(event) =>
-                      chooseMediaItemFile(item.id, event.target.files?.[0])
-                    }
+                    disabled={uploading}
+                    onChange={(event) => { void uploadFiles(Array.from(event.target.files ?? []), item.id); event.target.value = ""; }}
                   />
                   {item.sourceKind === "upload" && item.fileName ? (
                     <p className="editable-upload-note">Uploaded {item.fileName}</p>
@@ -878,36 +812,21 @@ export function EditableCreatorProfilePreview({
                 >
                   Remove
                 </button>
+                <div className="creator-media-order"><button type="button" aria-label={`Move ${item.title} earlier`} disabled={index === 0} onClick={() => reorderMedia(item.id, -1)}>← Move earlier</button><span>{index + 1} of {profile.mediaItems.length}</span><button type="button" aria-label={`Move ${item.title} later`} disabled={index === profile.mediaItems.length - 1} onClick={() => reorderMedia(item.id, 1)}>Move later →</button></div>
               </article>
             ))}
           </div>
 
           <div className="editable-add-media">
-            <div className="editable-add-source">
-              <input
-                accept="image/*,video/*"
-                aria-label="Upload new media file"
-                className="editable-profile-field editable-file-input"
-                ref={draftMediaFileInputRef}
-                type="file"
-                onChange={(event) => chooseDraftMediaFile(event.target.files?.[0])}
-              />
-              {draftMedia.fileName ? (
-                <p className="editable-upload-note">Uploaded {draftMedia.fileName}</p>
-              ) : null}
-            </div>
-            <button
-              className="editable-primary-button"
-              disabled={!draftMedia.uploadedSource}
-              onClick={addMediaItem}
-              type="button"
-            >
-              Add media
-            </button>
+            <label className="creator-media-upload"><span>Add photos or videos</span>
+              <input accept="image/*,video/mp4,video/webm,video/quicktime" aria-label="Upload new media file" type="file" multiple disabled={uploading || profile.mediaItems.length >= MAX_GALLERY_ITEMS}
+                onChange={(event) => { void uploadFiles(Array.from(event.target.files ?? [])); event.target.value = ""; }} />
+            </label>
+            <p>Up to 12 items, 20 MB each. Photos appear here as soon as they upload.</p>
           </div>
 
           </section>
-          <footer className="creator-setup-footer" aria-label="Save profile changes"><span role="status">{profileSaveLabel}</span><button className="editable-primary-button" disabled={profileSaving} onClick={() => { void saveAndContinue("calls"); }} type="button">{profileSaving ? "Saving…" : "Save and continue"}</button></footer>
+          <footer className="creator-setup-footer" aria-label="Save profile changes"><span role="status">{profileSaveLabel}</span><button className="editable-primary-button" disabled={profileSaving || uploading} onClick={() => { void saveAndContinue("calls"); }} type="button">{profileSaving ? "Saving…" : "Save and continue"}</button></footer>
           </section>
           <section hidden={activeCreatorTab !== "calls"} aria-label="Your calls" id="editable-creator-calls">
             <p>Choose which calls to offer and set your prices. Customers will see the length and price of each call.</p>
@@ -933,7 +852,7 @@ export function EditableCreatorProfilePreview({
             />
           </div>
 
-            <footer className="creator-setup-footer"><span role="status">{profileSaveLabel}</span><button className="editable-primary-button" disabled={profileSaving} onClick={() => { void saveAndContinue("availability"); }} type="button">{profileSaving ? "Saving…" : "Save and continue"}</button></footer>
+            <footer className="creator-setup-footer"><span role="status">{profileSaveLabel}</span><button className="editable-primary-button" disabled={profileSaving || uploading} onClick={() => { void saveAndContinue("availability"); }} type="button">{profileSaving ? "Saving…" : "Save and continue"}</button></footer>
           </section>
           <section hidden={activeCreatorTab !== "availability"} aria-label="Availability" id="editable-creator-availability">
             {profile.publishedAt ? <p>Your saved availability updates the times customers can book immediately.</p> : null}
@@ -948,7 +867,7 @@ export function EditableCreatorProfilePreview({
             <p>Review your page and finish these steps before publishing. Your profile and call prices stay private until you publish.</p>
             <ul className="creator-setup-checklist">{setupChecks.map((check) => <li key={check.id}><span>{check.done ? "Ready" : "To do"}</span><button type="button" onClick={() => { void changeStep(check.id); }}>{check.label}</button></li>)}</ul>
             <button type="button" className="seat-secondary-button" onClick={() => previewDialog.current?.showModal()}>Preview your page</button>
-            <footer className="creator-setup-footer"><button type="button" className="editable-primary-button" disabled={!allReady || publishing || profileSaving} onClick={() => { void publishProfile(); }}>{publishing ? "Publishing…" : profile.publishedAt ? "Publish changes" : "Go live"}</button></footer>
+            <footer className="creator-setup-footer"><button type="button" className="editable-primary-button" disabled={!allReady || publishing || profileSaving || uploading} onClick={() => { void publishProfile(); }}>{publishing ? "Publishing…" : profile.publishedAt ? "Publish changes" : "Go live"}</button></footer>
             {publishMessage ? <p role="status">{publishMessage}</p> : null}
             {profile.publishedAt && profile.publicSlug ? <a href={`/with/${profile.publicSlug}`} target="_blank" rel="noreferrer">View your live page ↗</a> : null}
           </section>
@@ -1435,7 +1354,7 @@ function EditableSettingsPanel({
 }) {
   const [preferences, setPreferences] = useState(initialPreferences);
   const [saveStatus, setSaveStatus] = useState<"error" | "idle" | "saved" | "saving">(
-    "idle",
+    "saved",
   );
 
   function updatePreference(
@@ -1495,7 +1414,7 @@ function EditableSettingsPanel({
                 ? "Saved"
                 : saveStatus === "error"
                   ? "Needs retry"
-                  : "Default on"}
+                  : "Unsaved"}
           </span>
         </div>
 
@@ -1606,49 +1525,6 @@ function formatNotificationDate(value: string) {
   });
 }
 
-function MediaPreview({ item }: { item: EditableGalleryItem }) {
-  return (
-    <span className="editable-media-thumb">
-      {item.kind === "video" && isTikTokVideoSource(item.source) ? (
-        <iframe
-          allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
-          loading="lazy"
-          src={getVideoEmbedSource(item.source)}
-          title={item.title}
-        />
-      ) : item.kind === "video" ? (
-        <video controls muted playsInline preload="metadata" src={item.source} />
-      ) : isSocialMediaUrl(item.source) ? (
-        <SocialMediaFrame source={item.source} title={item.title} />
-      ) : item.source ? (
-        <img alt="" src={item.source} />
-      ) : (
-        <span className="editable-media-empty">No media</span>
-      )}
-    </span>
-  );
-}
-
-function SocialMediaFrame({
-  source,
-  title,
-}: {
-  source: string;
-  title: string;
-}) {
-  const href = normalizeSocialUrlForHref(source);
-  const network = isTikTokUrl(source) ? "TikTok" : "Instagram";
-
-  return href ? (
-    <a className="editable-social-media-frame" href={href}>
-      {network === "Instagram" ? <InstagramIcon /> : <TikTokIcon />}
-      <span>{network}</span>
-      <strong>{title}</strong>
-    </a>
-  ) : (
-    <span className="editable-media-empty">{title}</span>
-  );
-}
 
 function EditableSeatOption({
   currency,
@@ -1913,24 +1789,6 @@ function getAvailabilitySlotKeyFromPointer(event: PointerEvent<HTMLElement>) {
   return cell instanceof HTMLElement ? cell.dataset.availabilityKey ?? null : null;
 }
 
-function readFileAsDataUrl(file: File, onLoad: (source: string) => void) {
-  const reader = new FileReader();
-  reader.addEventListener("load", () => {
-    if (typeof reader.result === "string") {
-      onLoad(reader.result);
-    }
-  });
-  reader.readAsDataURL(file);
-}
-
-function isSupportedMediaFile(file: File) {
-  return file.type.startsWith("image/") || file.type.startsWith("video/");
-}
-
-function getMediaKindForFile(file: File): EditableGalleryItem["kind"] {
-  return file.type.startsWith("video/") ? "video" : "photo";
-}
-
 function getMediaTitleFromFileName(fileName: string) {
   return fileName
     .replace(/\.[^.]+$/, "")
@@ -1940,11 +1798,7 @@ function getMediaTitleFromFileName(fileName: string) {
 
 function getProfileSettingsFormData(profile: EditableProfileState) {
   const formData = new FormData();
-  const gallerySources = profile.mediaItems
-    .map((item) => item.source.trim())
-    .filter(isUploadedGallerySource)
-    .filter(Boolean)
-    .join("\n");
+  const gallerySources = JSON.stringify(profile.mediaItems);
 
   formData.set("creatorId", profile.id);
   formData.set("about", profile.about);
@@ -1994,17 +1848,6 @@ function getProfileSettingsFormData(profile: EditableProfileState) {
   }
 
   return formData;
-}
-
-function isUploadedGallerySource(source: string) {
-  return (
-    /^data:image\//i.test(source) ||
-    /^data:video\//i.test(source) ||
-    /^\/[^?#]+\.(?:avif|gif|jpe?g|png|webp)(?:[?#].*)?$/i.test(source) ||
-    /^\/[^?#]+\.(?:m4v|mov|mp4|webm)(?:[?#].*)?$/i.test(source) ||
-    /^https?:\/\/[^?#]+\.(?:avif|gif|jpe?g|png|webp)(?:[?#].*)?$/i.test(source) ||
-    /^https?:\/\/[^?#]+\.(?:m4v|mov|mp4|webm)(?:[?#].*)?$/i.test(source)
-  );
 }
 
 function getPercentValue(value: number | string | undefined) {
@@ -2061,7 +1904,7 @@ function normalizeSocialUrlForHref(value: string) {
       /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`,
     );
 
-    if (!isInstagramHost(url.hostname) && !isTikTokHost(url.hostname)) {
+    if (!/(^|\.)instagram\.com$/i.test(url.hostname) && !/(^|\.)tiktok\.com$/i.test(url.hostname)) {
       return "";
     }
 
@@ -2092,73 +1935,5 @@ function getSocialHandleFromUrl(value: string) {
     return firstPathPart.startsWith("@") ? firstPathPart : `@${firstPathPart}`;
   } catch {
     return "";
-  }
-}
-
-function isSocialMediaUrl(source: string) {
-  return isInstagramUrl(source) || isTikTokUrl(source);
-}
-
-function isInstagramUrl(source: string) {
-  const href = normalizeSocialUrlForHref(source);
-
-  if (!href) {
-    return false;
-  }
-
-  return isInstagramHost(new URL(href).hostname);
-}
-
-function isTikTokUrl(source: string) {
-  const href = normalizeSocialUrlForHref(source);
-
-  if (!href) {
-    return false;
-  }
-
-  return isTikTokHost(new URL(href).hostname);
-}
-
-function isInstagramHost(hostname: string) {
-  return /(^|\.)instagram\.com$/i.test(hostname);
-}
-
-function isTikTokHost(hostname: string) {
-  return /(^|\.)tiktok\.com$/i.test(hostname);
-}
-
-function isTikTokVideoSource(source: string) {
-  return Boolean(getTikTokVideoId(source));
-}
-
-function getVideoEmbedSource(source: string) {
-  const trimmed = source.trim();
-  const id = getTikTokVideoId(trimmed);
-
-  if (id) {
-    return `https://www.tiktok.com/player/v1/${id}?${tiktokPlayerOptions}`;
-  }
-
-  return trimmed;
-}
-
-function getTikTokVideoId(source: string) {
-  const trimmed = source.trim();
-  const bareId = trimmed.match(/^(\d{10,})$/)?.[1];
-
-  if (bareId) {
-    return bareId;
-  }
-
-  try {
-    const url = new URL(trimmed);
-
-    if (!/(^|\.)tiktok\.com$/i.test(url.hostname)) {
-      return null;
-    }
-
-    return url.pathname.match(/\/video\/(\d{10,})/)?.[1] ?? null;
-  } catch {
-    return null;
   }
 }

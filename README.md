@@ -61,6 +61,9 @@ stay in ignored local env files or Cloudflare Worker secrets.
 
 - App/runtime: vinext on Cloudflare Workers.
 - Database: Cloudflare D1 via Drizzle schema in `db/schema.ts`.
+- Creator uploads: private Cloudflare R2 through `CREATOR_MEDIA`; profile and
+  publication references remain in D1. See `docs/creator-editor-media-repair.md`
+  for the required bucket setup before deployment.
 - Auth: Acceptance emails open `/creators/email-sign-in` with a one-use Clerk
   sign-in link. Returning creators use email-code sign-in at `/sign-in`. Phone sign-in is
   hidden unless explicitly enabled in both Clerk and the Worker configuration.

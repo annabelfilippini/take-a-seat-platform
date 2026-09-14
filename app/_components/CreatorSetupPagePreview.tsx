@@ -1,11 +1,12 @@
 "use client";
 
+import { CreatorProfileIdentity } from "./CreatorProfileIdentity";
 import { CreatorMediaGallery } from "./CreatorMediaGallery";
 import { CreatorSeatHowItWorks } from "./CreatorSeatHowItWorks";
 import type { EditableCreatorProfile } from "../admin/creator-profile-editor-preview/creator-profile-editor-data";
 
 export function CreatorSetupPagePreview({ profile, compact = false }: { profile: EditableCreatorProfile; compact?: boolean }) {
-  const media = profile.mediaItems.length ? profile.mediaItems : profile.image ? [{ id: "profile-photo", source: profile.image, title: `${profile.name} profile`, kind: "photo" as const }] : [];
+  const media = profile.mediaItems;
   const calls = [
     { enabled: profile.seat15Enabled, duration: profile.seat15DurationMinutes, price: profile.seat15PriceAmount },
     { enabled: profile.seat30Enabled, duration: profile.seat30DurationMinutes, price: profile.seat30PriceAmount },
@@ -15,8 +16,8 @@ export function CreatorSetupPagePreview({ profile, compact = false }: { profile:
       <section className="amber-profile-hero">
         <div className="amber-hero-copy">
           <span className="test-profile-badge">Take a seat with</span>
-          <h2 className="creator-preview-name">{profile.name || "Your name"}</h2>
-          <p className="amber-meta">{profile.instagramHandle || profile.tiktokHandle}{profile.location ? ` · ${profile.location}` : ""}</p>
+          <CreatorProfileIdentity profile={profile} />
+          <p className="amber-meta">{profile.location}</p>
           <div className="help-card creator-conversation-topics"><h2>Pull up a seat for…</h2>
             {profile.helpItems.trim() ? <ul>{profile.helpItems.split("\n").filter((line) => line.trim()).map((line, index) => <li key={index}>{line}</li>)}</ul> : <p>Your conversation topics will appear here.</p>}
           </div>

@@ -1,3 +1,4 @@
+import { parseCreatorGallery } from "./creator-gallery";
 import { and, desc, eq, isNotNull, or, sql } from "drizzle-orm";
 import {
   creatorAvailabilityRules,
@@ -1282,19 +1283,7 @@ function splitProfileLines(value: string | null) {
 function getPublishedCreatorMediaItems(
   profile: CreatorOnboardingProfile,
 ): CreatorMediaItem[] {
-  return splitProfileLines(profile.profileGallery).map((source, index) => ({
-    id: `${profile.id}-media-${index + 1}`,
-    kind: isVideoMediaSource(source) ? "video" : "photo",
-    source,
-    title: `${profile.name} media ${index + 1}`,
-  }));
-}
-
-function isVideoMediaSource(source: string) {
-  return (
-    /^data:video\//i.test(source) ||
-    /(?:\.m4v|\.mov|\.mp4|\.webm)(?:[?#].*)?$/i.test(source)
-  );
+  return parseCreatorGallery(profile.profileGallery);
 }
 
 function getCreatorAccent(category: string | null) {
@@ -1320,9 +1309,12 @@ function getCreatorAccent(category: string | null) {
 }
 
 function getSocialUrl(platform: "instagram" | "tiktok", handle: string | null) {
-  const normalized = normalizeSocialHandle(handle);
+  // URL handles retain dots and underscores; creator slugs use different rules.
+  const normalized = (handle ?? "").trim()
+    .replace(/^https?:\/\/(?:www\.)?(?:instagram\.com|tiktok\.com)\//i, "")
+    .split(/[/?#]/)[0].replace(/^@/, "");
 
-  if (!normalized) {
+  if (!/^[a-z0-9._]+$/i.test(normalized)) {
     return undefined;
   }
 
@@ -1495,12 +1487,7 @@ function cleanHelpItems(value: string | null) {
 }
 
 function cleanProfileGallery(value: string | null) {
-  return (value ?? "")
-    .split("\n")
-    .map((item) => item.trim())
-    .filter(Boolean)
-    .slice(0, 12)
-    .join("\n");
+  return JSON.stringify(parseCreatorGallery(value));
 }
 
 function cleanProfileImageUrl(value: string | null) {

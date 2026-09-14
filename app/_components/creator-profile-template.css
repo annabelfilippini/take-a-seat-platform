@@ -1,6 +1,6 @@
 .creator-profile-template .amber-profile-hero {
   gap: clamp(32px, 5vw, 72px);
-  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, .85fr);
   max-width: 1320px;
   min-height: 0;
   padding: 56px 28px;
@@ -121,4 +121,19 @@
   .creator-seat-how-it-works {
     padding: 32px 18px 48px;
   }
+}
+
+.creator-profile-template .amber-hero-gallery,
+.creator-profile-template .creator-gallery-empty,
+.creator-profile-template .profile-concept-preview { max-width: 420px; justify-self: end; align-self: center; }
+.creator-profile-identity { display: flex; flex-direction: column; align-items: flex-start; gap: 14px; margin-top: 20px; }
+.creator-profile-avatar { display: grid; place-items: center; width: 148px; height: 148px; flex-shrink: 0; overflow: hidden; border-radius: 50%; background: var(--cream); }
+.creator-profile-avatar img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.creator-profile-identity .creator-preview-name { margin: 0; }
+.creator-instagram-handle { font-size: 15px; color: var(--rust); overflow-wrap: anywhere; }
+.creator-profile-template .amber-gallery-link { overflow: hidden; }
+@media (max-width: 760px) {
+  .creator-profile-template .amber-hero-gallery,
+  .creator-profile-template .creator-gallery-empty,
+  .creator-profile-template .profile-concept-preview { justify-self: center; }
 }

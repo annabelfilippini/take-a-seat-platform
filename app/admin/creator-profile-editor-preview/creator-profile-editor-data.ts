@@ -1,6 +1,10 @@
+import { parseCreatorGallery } from "../../_lib/creator-gallery";
 import type { CreatorOnboardingProfile } from "../../_lib/creator-onboarding";
 
 export type EditableCreatorMediaItem = {
+  positionX?: number;
+  positionY?: number;
+  zoom?: number;
   id: string;
   kind: "photo" | "video";
   source: string;
@@ -165,21 +169,7 @@ export function getEditableCreatorProfile(
 }
 
 function getEditableCreatorMediaItems(profile: CreatorOnboardingProfile) {
-  const sources = (profile.profileGallery ?? "")
-    .split("\n")
-    .map((item) => item.trim())
-    .filter(Boolean);
-
-  if (!sources.length && profile.profileImageUrl) {
-    sources.push(profile.profileImageUrl);
-  }
-
-  return sources.map((source, index) => ({
-    id: `${profile.id}-media-${index + 1}`,
-    kind: isVideoSource(source) ? ("video" as const) : ("photo" as const),
-    source,
-    title: `${profile.name} media ${index + 1}`,
-  }));
+  return parseCreatorGallery(profile.profileGallery);
 }
 
 function getEditablePriceAmount(value: number | null) {
@@ -192,11 +182,6 @@ function getEditablePriceAmount(value: number | null) {
   return Number((amount / 100).toFixed(2));
 }
 
-function isVideoSource(source: string) {
-  return /(?:tiktok\.com|youtube\.com|youtu\.be|vimeo\.com|\.mp4(?:\?|$)|^data:video\/)/i.test(
-    source,
-  );
-}
 
 function getSocialUrl(value: string | null, network: "instagram" | "tiktok") {
   const trimmed = value?.trim() ?? "";

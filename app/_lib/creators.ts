@@ -25,6 +25,9 @@ export type CreatorAvailabilityRule = {
 };
 
 export type CreatorMediaItem = {
+  positionX?: number;
+  positionY?: number;
+  zoom?: number;
   alt?: string;
   href?: string;
   id: string;
