@@ -1,5 +1,37 @@
 # Blank creator profiles
 
+## Profile template revision, September 13
+
+Implemented on `codex/creator-profile-template`; pending production approval.
+
+- Accepted creators use the shared editor at `/creators/dashboard`. Identity
+  stays prefilled from their application; About, conversation topics, photos,
+  and prices stay empty until they fill them in. Seat options start disabled.
+- The top section pairs identity and “Pull up a seat for…” topics with a photo
+  carousel. An empty carousel has an upload prompt and no inactive arrows.
+- About and “Schedule a time to meet” appear below the carousel. The profile
+  no longer asks for a separate public intro, one-to-one reason, or descriptions
+  for each seat. Existing stored values are preserved, not deleted.
+- The reusable public `/with/[slug]` layout matches this order and omits the
+  retired intro, reasons, seat descriptions, and generated gallery captions.
+  Dedicated seed profile routes keep their existing presentation.
+- “How does your seat work?” is a shared, always-visible question and answer
+  at the bottom of the public profile and editor Profile tab, with no dropdown.
+- Save behavior is unchanged: saving an accepted profile publishes it. This
+  revision does not introduce draft/publish controls or change invitation auth.
+- No migration, secrets, service, or production-data changes are required.
+
+Verification uses a synthetic accepted creator in an isolated local D1 database:
+blank state, upload two photos, edit topics/About, enable a priced seat, save,
+reload, and inspect its public profile. Desktop (1440 px) and mobile (390 px)
+checks cover carousel arrows, content order, booking dialog, and no horizontal
+document overflow. No live invitation or production account is used.
+After integration with `main`, `npm run lint` and `npm test` (production build
+and all 68 tests) passed. The shared booking flow was checked through time
+selection and customer details on both viewports without submitting a booking.
+
+## Original blank-profile release
+
 Deployed September 12, 2026, with Annabel's explicit approval.
 
 New accepted creators start with their application name, contact details and

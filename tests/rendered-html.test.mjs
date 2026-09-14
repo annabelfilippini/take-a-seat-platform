@@ -375,11 +375,15 @@ test("server-renders the admin creator profile editor preview", async () => {
   assert.match(html, /aria-label="Creator hero name"/);
   assert.doesNotMatch(html, /aria-label="Short profile description"/);
   assert.match(html, /aria-label="About section"/);
-  assert.match(html, /aria-label="One-to-one reason"/);
+  assert.doesNotMatch(html, /aria-label="One-to-one reason"/);
+  assert.doesNotMatch(html, /aria-label="Public profile intro"/);
+  assert.match(html, /Pull up a seat for/);
+  assert.match(html, /Schedule a time to meet/);
+  assert.match(html, /How does your seat work\?/);
   assert.match(html, /aria-label="15 minutes duration in minutes"/);
   assert.match(html, /aria-label="30 minutes duration in minutes"/);
-  assert.match(html, /aria-label="15 minutes description"/);
-  assert.match(html, /aria-label="30 minutes description"/);
+  assert.doesNotMatch(html, /aria-label="15 minutes description"/);
+  assert.doesNotMatch(html, /aria-label="30 minutes description"/);
   assert.match(html, /value="15"/);
   assert.match(html, /value="30"/);
   assert.match(html, /type="number" value="45"/);
@@ -508,7 +512,7 @@ test("preserves creator uploaded media for dashboard and public profiles", async
   assert.doesNotMatch(editor, />Save media</);
   assert.match(profileImageHelper, /export function getProfileImageTransform/);
   assert.match(dynamicProfilePage, /export const dynamic = "force-dynamic"/);
-  assert.match(dynamicProfilePage, /<CreatorMediaGallery items=\{creator\.mediaItems\} name=\{creator\.name\} \/>/);
+  assert.match(dynamicProfilePage, /<CreatorMediaGallery items=\{creator\.mediaItems\} name=\{creator\.name\} showCaptions=\{false\} \/>/);
   assert.match(ellaPage, /src=\{creator\.image \?\? "\/ella-profile\.jpg"\}/);
   assert.match(ellaPage, /export const dynamic = "force-dynamic"/);
   assert.match(ellaPage, /getProfileImageObjectPosition\(creator\)/);

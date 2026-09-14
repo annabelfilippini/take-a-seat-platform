@@ -2,13 +2,13 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { CreatorMediaGallery } from "../../_components/CreatorMediaGallery";
+import { CreatorSeatHowItWorks } from "../../_components/CreatorSeatHowItWorks";
 import { creators } from "../../_lib/creators";
 import { getPublicCreatorBySlug } from "../../_lib/creator-onboarding";
 import {
   getProfileImageObjectPosition,
   getProfileImageTransform,
 } from "../../_lib/profile-image";
-import { BookingEntryLink } from "../../_components/BookingEntryLink";
 import { CustomerBookingFlow } from "../../_components/CustomerBookingFlow";
 
 type CreatorProfilePageProps = {
@@ -81,7 +81,7 @@ export default async function CreatorProfilePage({
   const bookingNotice = getBookingNotice(searchParams, creator.name);
 
   return (
-    <main className="platform-shell amber-profile-page">
+    <main className="platform-shell amber-profile-page creator-profile-template">
       <div className="profile-announcement">{profile.announcement}</div>
       <header className="topbar profile-topbar">
         <a className="brand-mark" href="/" aria-label="Take a Seat home">
@@ -125,12 +125,20 @@ export default async function CreatorProfilePage({
             <span>{socialLabel}</span>
             {creator.location ? <span>{creator.location}</span> : null}
           </p>
-          <p>{profile.intro}</p>
-          {isBookable ? <BookingEntryLink seats={creator.seats} /> : null}
+          {profile.helpItems.length ? (
+            <div className="help-card creator-conversation-topics">
+              <h2>Pull up a seat for…</h2>
+              <ul>
+                {profile.helpItems.map((item, index) => (
+                  <li key={`${index}-${item}`}>{item}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
         </div>
 
         {creator.mediaItems?.length ? (
-          <CreatorMediaGallery items={creator.mediaItems} name={creator.name} />
+          <CreatorMediaGallery items={creator.mediaItems} name={creator.name} showCaptions={false} />
         ) : (
           <div
             className={`test-profile-preview profile-concept-preview profile-${creator.accent}${
@@ -157,30 +165,17 @@ export default async function CreatorProfilePage({
 
       <section className="amber-about-section" id="about">
         <div className="about-main">
-          <h2>About</h2>
+          <h2>A little about me</h2>
           {profile.about.map((paragraph) => (
             <p key={paragraph}>{paragraph}</p>
           ))}
 
-          <div className="help-card">
-            <h3>{profile.helpHeading}</h3>
-            <ul>
-              {profile.helpItems.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="why-card">
-            <h3>{profile.whyTitle}</h3>
-            <p>{profile.whyBody}</p>
-          </div>
         </div>
 
         <aside className="reserve-panel" id="reserve" aria-label={`Reserve with ${creator.name}`}>
           {isBookable ? (
             <>
-              <h2>Choose a call</h2>
+              <h2>Schedule a time to meet</h2>
               <p>Private video call on Google Meet.</p>
               {bookingNotice ? (
                 <p className="booking-notice booking-status-notice">
@@ -193,6 +188,7 @@ export default async function CreatorProfilePage({
                 creatorName={creator.name}
                 returnTo={`/with/${creator.slug}`}
                 seats={creator.seats}
+                showDescriptions={false}
               />
               <p className="reserve-note">
                 You won&apos;t be charged unless the creator accepts your
@@ -220,6 +216,7 @@ export default async function CreatorProfilePage({
           )}
         </aside>
       </section>
+      <CreatorSeatHowItWorks />
     </main>
   );
 }

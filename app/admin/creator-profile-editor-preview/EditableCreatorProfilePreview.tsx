@@ -11,6 +11,7 @@ import {
   type WheelEvent,
 } from "react";
 import { CREATOR_PROFILE_EDITOR_URL } from "../../_lib/creator-destination";
+import { CreatorSeatHowItWorks } from "../../_components/CreatorSeatHowItWorks";
 
 type EditableGalleryItem = {
   fileName?: string;
@@ -612,7 +613,7 @@ export function EditableCreatorProfilePreview({
   }
 
   return (
-    <main className="platform-shell amber-profile-page editable-profile-page">
+    <main className="platform-shell amber-profile-page editable-profile-page creator-profile-template">
       {calendarStatus ? (
         <p role={calendarStatus === "connected" && profile.calendarConnectedAt ? "status" : "alert"} className="calendar-connection-notice">
           {calendarStatus === "connected" && profile.calendarConnectedAt ? "Google Calendar connected. Your saved hours will be checked for calendar conflicts."
@@ -756,23 +757,43 @@ export function EditableCreatorProfilePreview({
               icon="tiktok"
               label={`Open ${profile.name} on TikTok`}
             />
-            <EditableInput
-              ariaLabel="Location"
-              className="editable-inline-text"
-              value={profile.location}
-              onChange={(value) => update("location", value)}
-            />
+            <label>
+              <span>Location (optional)</span>
+              <EditableInput
+                ariaLabel="Location"
+                className="editable-inline-text"
+                value={profile.location}
+                onChange={(value) => update("location", value)}
+              />
+            </label>
           </p>
-          <EditableTextarea
-            ariaLabel="Public profile intro"
-            className="editable-profile-paragraph"
-            rows={4}
-            value={profile.profileIntro}
-            onChange={(value) => update("profileIntro", value)}
-          />
+          <div className="help-card creator-conversation-topics">
+            <h2>Pull up a seat for…</h2>
+            <p>Share three things someone could ask you about, one per line.</p>
+            <EditableTextarea
+              ariaLabel="What people can ask"
+              className="editable-help-input"
+              rows={4}
+              value={profile.helpItems}
+              onChange={(value) => update("helpItems", value)}
+            />
+            <ul>
+              {helpItems.map((item, index) => (
+                <li key={`${index}-${item}`}>{item}</li>
+              ))}
+            </ul>
+          </div>
         </div>
 
-        <EditableMediaGallery items={profile.mediaItems} name={profile.name} />
+        {profile.mediaItems.length ? (
+          <EditableMediaGallery items={profile.mediaItems} name={profile.name} />
+        ) : (
+          <div className="creator-gallery-empty">
+            <h2>Your photos go here</h2>
+            <p>Add photos below to show your personality, style, or work.</p>
+            <a href="#media">Add carousel photos</a>
+          </div>
+        )}
       </section>
 
       <section className="editable-profile-workspace editable-image-workspace" id="media">
@@ -876,7 +897,8 @@ export function EditableCreatorProfilePreview({
 
       <section className="amber-about-section" id="about">
         <div className="about-main">
-          <h2>About</h2>
+          <h2>A little about me</h2>
+          <p>Write a short introduction in your own voice.</p>
           <EditableTextarea
             ariaLabel="About section"
             className="editable-about-copy"
@@ -885,54 +907,24 @@ export function EditableCreatorProfilePreview({
             onChange={(value) => update("about", value)}
           />
 
-          <div className="help-card">
-            <h3>{profile.name.split(" ")[0] || "Creator"} can help with</h3>
-            <EditableTextarea
-              ariaLabel="What people can ask"
-              className="editable-help-input"
-              rows={6}
-              value={profile.helpItems}
-              onChange={(value) => update("helpItems", value)}
-            />
-            <ul>
-              {helpItems.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="why-card">
-            <h3>Why a 1:1 call?</h3>
-            <EditableTextarea
-              ariaLabel="One-to-one reason"
-              className="editable-profile-paragraph"
-              rows={4}
-              value={profile.oneToOneReason}
-              onChange={(value) => update("oneToOneReason", value)}
-            />
-          </div>
         </div>
 
         <aside className="reserve-panel" id="reserve" aria-label={`Book ${profile.name}`}>
-          <h2 className="editable-reserve-heading">Choose a Time</h2>
+          <h2 className="editable-reserve-heading">Schedule a time to meet</h2>
           <p>Private video call on Google Meet.</p>
           <div className="seat-options">
             <EditableSeatOption
-              description={profile.seat15Description}
               durationMinutes={profile.seat15DurationMinutes}
               enabled={profile.seat15Enabled}
               price={profile.seat15PriceAmount}
-              onDescriptionChange={(value) => update("seat15Description", value)}
               onDurationChange={(value) => update("seat15DurationMinutes", value)}
               onEnabledChange={(value) => update("seat15Enabled", value)}
               onPriceChange={(value) => update("seat15PriceAmount", value)}
             />
             <EditableSeatOption
-              description={profile.seat30Description}
               durationMinutes={profile.seat30DurationMinutes}
               enabled={profile.seat30Enabled}
               price={profile.seat30PriceAmount}
-              onDescriptionChange={(value) => update("seat30Description", value)}
               onDurationChange={(value) => update("seat30DurationMinutes", value)}
               onEnabledChange={(value) => update("seat30Enabled", value)}
               onPriceChange={(value) => update("seat30PriceAmount", value)}
@@ -961,6 +953,7 @@ export function EditableCreatorProfilePreview({
           </button>
         </div>
       </section>
+      <CreatorSeatHowItWorks />
       </div>
 
       <section
@@ -1767,20 +1760,16 @@ function SocialMediaFrame({
 }
 
 function EditableSeatOption({
-  description,
   durationMinutes,
   enabled,
   price,
-  onDescriptionChange,
   onDurationChange,
   onEnabledChange,
   onPriceChange,
 }: {
-  description: string;
   durationMinutes: EditableDurationValue;
   enabled: boolean;
   price: EditablePriceValue;
-  onDescriptionChange: (value: string) => void;
   onDurationChange: (value: EditableDurationValue) => void;
   onEnabledChange: (value: boolean) => void;
   onPriceChange: (value: EditablePriceValue) => void;
@@ -1835,13 +1824,6 @@ function EditableSeatOption({
           </dd>
         </div>
       </dl>
-      <EditableTextarea
-        ariaLabel={`${label} description`}
-        className="editable-seat-description"
-        rows={3}
-        value={description}
-        onChange={onDescriptionChange}
-      />
       <button className="seat-primary-button" disabled={!enabled} type="button">
         {enabled ? "Book this seat" : "Hidden from profile"}
       </button>

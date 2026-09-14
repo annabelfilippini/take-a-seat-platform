@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./_components/creator-profile-template.css";
 
 :root {
   --paper: #f7f1e8;

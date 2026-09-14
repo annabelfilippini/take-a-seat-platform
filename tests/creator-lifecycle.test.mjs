@@ -330,6 +330,17 @@ test("first-time creators receive a blank editor and cleared fields stay blank a
   assert.equal(editor.seat30Enabled, false);
   assert.equal(await domain.getPublishedCreatorBySlug(profile.publicSlug), null);
 
+  const { EditableCreatorProfilePreview } = await import("../app/admin/creator-profile-editor-preview/EditableCreatorProfilePreview.tsx");
+  const blankEditorHtml = renderToStaticMarkup(createElement(EditableCreatorProfilePreview, { initialProfile: editor }));
+  assert.match(blankEditorHtml, /Your photos go here/);
+  assert.doesNotMatch(blankEditorHtml, /Show next media|Show previous media|amber-reference|Private application answer/);
+  assert.doesNotMatch(blankEditorHtml, /aria-label="(?:Public profile intro|One-to-one reason|15 minutes description|30 minutes description)"/);
+  assert.match(blankEditorHtml, /aria-label="What people can ask"[^>]*><\/textarea>/);
+  assert.match(blankEditorHtml, /aria-label="About section"[^>]*><\/textarea>/);
+  assert.match(blankEditorHtml, /How does your seat work\?/);
+  assert.ok(blankEditorHtml.indexOf("Your photos go here") < blankEditorHtml.indexOf("Schedule a time to meet"));
+  assert.ok(blankEditorHtml.indexOf("Save profile changes") < blankEditorHtml.indexOf("How does your seat work?"));
+
   process.env.TAKE_A_SEAT_DEV_ADMIN_ENABLED = "true";
   try {
     const values = { ...application, creatorId: profile.id, reviewSubmittedAt: "false", about: "My own profile copy", profileIntro: "My own introduction", seat15Enabled: "on", seat15PriceAmount: "75", seat15DurationMinutes: "15", seat15Description: "My own session description" };
