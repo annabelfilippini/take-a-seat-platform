@@ -5706,11 +5706,33 @@ img {
   .availability-settings-row {
     align-items: stretch;
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .availability-week-controls {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
     max-width: none;
     width: 100%;
+  }
+
+  .availability-week-picker {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+
+  .availability-week-step {
+    height: 44px;
+    width: 100%;
+  }
+
+  #editable-creator-availability .editable-save-button {
+    max-width: 100%;
+    white-space: normal;
+  }
+
+  #editable-creator-availability h2 {
+    font-size: 28px;
   }
 
   .availability-timezone-picker {
