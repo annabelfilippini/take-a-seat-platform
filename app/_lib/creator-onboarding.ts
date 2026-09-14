@@ -1098,8 +1098,8 @@ export function createPublishedCreator(
   const seats = createPublishedSeats(profile);
   const firstSeat = seats[0] ?? null;
   const publicSlug = normalizeCreatorPublicId(profile.publicSlug) ?? profile.id;
-  const intro = profile.profileIntro || profile.bio;
-  const about = splitProfileLines(profile.about || profile.bio);
+  const intro = profile.profileIntro || "";
+  const about = splitProfileLines(profile.about);
   const helpItems = splitProfileLines(profile.helpItems);
   const firstName = profile.name.split(/\s+/u)[0] || profile.name;
 
@@ -1151,9 +1151,7 @@ export function createPublishedCreator(
       helpItems,
       intro,
       waitlistSubject: `Book ${profile.name} on Take a Seat`,
-      whyBody:
-        profile.oneToOneReason ||
-        "A private call makes the advice specific to the person, question, timing, and context.",
+      whyBody: profile.oneToOneReason || "",
       whyTitle: "Why a 1:1 call?",
     },
     seats,

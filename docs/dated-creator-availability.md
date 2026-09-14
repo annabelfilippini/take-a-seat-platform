@@ -3,9 +3,9 @@
 Prepared September 13, 2026. Not deployed.
 
 Creators can navigate dated Sunday–Saturday weeks with previous/next arrows,
-select a date to jump ahead, and save different hours through the calendar-year
-anniversary in their selected timezone. The final partial week disables dates
-beyond that anniversary. New creators start with no hours. Changes are saved
+choose a week from a dropdown, and save different hours through the six-month
+horizon in their selected timezone. The final partial week disables dates
+beyond that horizon. New creators start with no hours. Changes are saved
 one week at a time; drafts survive week/tab navigation and failed saves.
 
 Existing recurring schedules remain the default for untouched weeks. A dated
@@ -19,10 +19,10 @@ hours and saves. The editor explains when it starts from recurring hours.
 - A disabled dated row records an explicitly closed week. It must survive account
   and public-profile serialization so default hours do not reappear.
 - New API saves require a valid Sunday and valid quarter-hour slots within the
-  current calendar-year horizon. Saves replace only that creator/week.
+  current six-month horizon. Saves replace only that creator/week.
 - Delete and insert run in one atomic D1 batch, with small insert groups to stay
   within the [D1 parameter limit](https://developers.cloudflare.com/d1/platform/limits/).
-- Public slot generation and server booking validation cover the same full year,
+- Public slot generation and server booking validation cover the same six months,
   retaining notice, buffer, and booking caps. Timezone conversion resolves the
   offset at the appointment instant and rejects nonexistent spring-forward times.
 
@@ -32,7 +32,7 @@ hours and saves. The editor explains when it starts from recurring hours.
   current GitHub main (74 tests, including the production build).
 - Automated cases cover adjacent weeks, empty-week overrides, defaults, reload,
   malformed/out-of-range input, unauthorized saves, rollback on insert failure,
-  fragmented schedules, the anniversary, notice, buffers, caps, and DST.
+  fragmented schedules, the six-month limit, notice, buffers, caps, and DST.
 - Local browser QA uses the real React editor and CSS with synthetic profile data
   and a local save fixture. Desktop: separate weekly selections, keyboard toggles,
   drafts across navigation, failure/retry, save controls disabled while pending,

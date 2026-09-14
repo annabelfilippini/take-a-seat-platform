@@ -1757,6 +1757,77 @@ img {
   scroll-margin-top: 104px;
 }
 
+.editable-gallery-column {
+  min-width: 0;
+}
+
+.editable-profile-page .reserve-panel {
+  scroll-margin-top: 112px;
+}
+
+.editable-gallery-controls {
+  border-bottom: 1px solid var(--line);
+  margin-top: 16px;
+  padding: 16px 0;
+}
+
+.editable-gallery-controls > .editable-media-panel {
+  display: grid;
+  gap: 20px;
+  padding-top: 20px;
+}
+
+.editable-profile-photo-controls summary,
+.editable-social-url-fields summary,
+.editable-gallery-controls summary {
+  color: var(--moss);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.editable-profile-photo-controls[open] > label,
+.editable-social-url-fields[open] > label {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.editable-empty-gallery .amber-gallery-frame {
+  align-items: center;
+  background: #eeeae3;
+  border: 1px dashed var(--line);
+  color: var(--muted);
+  display: flex;
+  justify-content: center;
+}
+
+.editable-help-topics {
+  margin-bottom: 20px;
+}
+
+.editable-help-topic {
+  font-size: 14px;
+  line-height: 1.45;
+  resize: vertical;
+}
+
+.editable-public-preview .editable-profile-title {
+  font-size: 54px;
+  line-height: 1.1;
+  resize: vertical;
+}
+
+@media (max-width: 640px) {
+  .editable-public-preview .editable-profile-title {
+    font-size: 38px;
+  }
+
+  .editable-profile-page .reserve-panel {
+    scroll-margin-top: 184px;
+  }
+}
+
 .editable-card-kicker {
   color: var(--cream);
   font-size: 12px;
@@ -1824,6 +1895,53 @@ img {
 .editable-price-field input {
   min-height: 40px;
   padding: 6px 8px;
+}
+
+.editable-seat-option-heading {
+  align-items: center;
+  gap: 14px;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.editable-seat-duration-field {
+  color: var(--ink);
+  font-size: 20px;
+  font-weight: 800;
+  grid-template-columns: minmax(0, 60px) auto;
+  justify-self: start;
+}
+
+.editable-seat-price-field {
+  color: var(--ink);
+  font-size: 20px;
+  font-weight: 800;
+  grid-template-columns: auto minmax(0, 76px);
+  justify-self: end;
+}
+
+.editable-seat-option-heading .editable-duration-field input,
+.editable-seat-option-heading .editable-price-field input {
+  background: rgba(255, 255, 255, 0.54);
+  border-color: transparent;
+  font-weight: 800;
+  min-height: 42px;
+}
+
+.editable-preview-booking-button:disabled {
+  background: var(--rosewood);
+  border-color: var(--rosewood);
+  color: var(--cream);
+  cursor: default;
+  opacity: 1;
+}
+
+.editable-reserve-note {
+  text-align: center;
+}
+
+.editable-reserve-note + .editable-reserve-note {
+  color: var(--muted);
+  text-align: left;
 }
 
 .editable-seat-disabled {
@@ -2050,6 +2168,7 @@ img {
   gap: 18px;
   padding: 28px 26px;
   position: sticky;
+  scroll-margin-top: 88px;
   top: 88px;
 }
 
@@ -2219,6 +2338,13 @@ img {
   border-color: #c5b9aa;
   color: rgba(255, 250, 242, 0.88);
   cursor: not-allowed;
+}
+
+.reserve-panel .editable-preview-booking-button:disabled {
+  background: var(--rosewood);
+  border-color: var(--rosewood);
+  color: var(--cream);
+  cursor: default;
 }
 
 .customer-booking-overlay {
@@ -4515,8 +4641,8 @@ img {
   color: var(--ink);
   font-size: 18px;
   font-weight: 500;
-  min-height: 52px;
-  padding: 12px 16px;
+  min-height: 58px;
+  padding: 15px 16px;
   width: 100%;
 }
 
@@ -4537,7 +4663,7 @@ img {
   border-radius: 4px;
   color: var(--cream);
   font-size: 18px;
-  min-height: 52px;
+  min-height: 58px;
   text-transform: none;
 }
 

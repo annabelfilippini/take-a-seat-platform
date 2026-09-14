@@ -69,14 +69,15 @@ export default async function EllaProfile({ searchParams }: EllaProfileProps) {
 
   const profile = creator.profile;
   const intro = profile?.intro ?? fallbackIntro;
-  const about = profile?.about.length ? profile.about : fallbackAbout;
-  const profileHelpItems = profile?.helpItems.length ? profile.helpItems : helpItems;
+  const about = profile ? profile.about : fallbackAbout;
+  const profileHelpItems = profile ? profile.helpItems : helpItems;
   const firstName = creator.name.split(/\s+/u)[0] || "Ella";
   const whyTitle = profile?.whyTitle ?? "Why a 1:1 call?";
   const whyBody =
     profile?.whyBody ??
     "Ella's strength is making your clothes feel easier to use. Use the call to put outfits together from what you already own, choose better pieces for your month, or make a shopping cart feel more intentional before you buy.";
   const bookingNotice = getBookingNotice(searchParams);
+  const startingPrice = [...creator.seats].sort((a, b) => a.unitAmount - b.unitAmount)[0]?.price;
 
   return (
     <main className="platform-shell amber-profile-page">
@@ -104,20 +105,22 @@ export default async function EllaProfile({ searchParams }: EllaProfileProps) {
       <section className="amber-profile-hero">
         <div className="amber-hero-copy">
           <span className="creator-headshot-frame">
+            {creator.image ? (
             <img
               alt={creator.name}
-              src={creator.image ?? "/ella-profile.jpg"}
+              src={creator.image}
               style={{
                 objectPosition: getProfileImageObjectPosition(creator),
                 transform: getProfileImageTransform(creator),
               }}
             />
+            ) : null}
           </span>
           <h1>{creator.name}</h1>
           <p className="amber-meta">
             {creator.instagramUrl ? (
               <a
-                aria-label="Open Ella McLane on Instagram"
+                aria-label={`Open ${creator.name} on Instagram`}
                 className="profile-social-link"
                 href={creator.instagramUrl}
               >
@@ -126,7 +129,7 @@ export default async function EllaProfile({ searchParams }: EllaProfileProps) {
             ) : null}
             {creator.tiktokUrl ? (
               <a
-                aria-label="Open Ella McLane on TikTok"
+                aria-label={`Open ${creator.name} on TikTok`}
                 className="profile-social-link"
                 href={creator.tiktokUrl}
               >
@@ -135,9 +138,15 @@ export default async function EllaProfile({ searchParams }: EllaProfileProps) {
             ) : null}
           </p>
           <p>{intro}</p>
+          {creator.seats.length ? (
+            <>
+              <p>From {startingPrice} · Private video call</p>
+              <a className="seat-primary-button profile-primary-button" href="#reserve">Choose a call</a>
+            </>
+          ) : null}
         </div>
 
-        <EllaGallery items={creator.mediaItems?.length ? creator.mediaItems : undefined} />
+        <EllaGallery items={publishedCreator ? creator.mediaItems ?? [] : creator.mediaItems?.length ? creator.mediaItems : undefined} />
       </section>
 
       <section className="amber-about-section" id="about">

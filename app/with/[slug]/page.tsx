@@ -72,11 +72,12 @@ export default async function CreatorProfilePage({
     notFound();
   }
 
-  const socialLabel = creator.tiktokHandle ?? creator.instagramHandle ?? creator.name;
+  const firstName = creator.name.split(/\s+/u)[0] || creator.name;
   const waitlistHref = `mailto:annabel@takeaseatwith.com?subject=${encodeURIComponent(
     profile.waitlistSubject,
   )}`;
   const isBookable = creator.status === "booking" && creator.seats.length > 0;
+  const startingPrice = [...creator.seats].sort((a, b) => a.unitAmount - b.unitAmount)[0]?.price;
   const bookingNotice = getBookingNotice(searchParams, creator.name);
 
   return (
@@ -98,8 +99,17 @@ export default async function CreatorProfilePage({
 
       <section className="amber-profile-hero">
         <div className="amber-hero-copy">
-          <span className="test-profile-badge">
-            {isBookable ? "Now booking" : "Opening soon"}
+          <span className="creator-headshot-frame">
+            {creator.image ? (
+              <img
+                alt={creator.name}
+                src={creator.image}
+                style={{
+                  objectPosition: getProfileImageObjectPosition(creator),
+                  transform: getProfileImageTransform(creator),
+                }}
+              />
+            ) : null}
           </span>
           <h1>{creator.name}</h1>
           <p className="amber-meta">
@@ -121,36 +131,19 @@ export default async function CreatorProfilePage({
                 <TikTokIcon />
               </a>
             ) : null}
-            <span>{socialLabel}</span>
-            {creator.location ? <span>{creator.location}</span> : null}
           </p>
           <p>{profile.intro}</p>
+          {isBookable ? (
+            <>
+              <p>From {startingPrice} · Private video call</p>
+              <a className="seat-primary-button profile-primary-button" href="#reserve">Choose a call</a>
+            </>
+          ) : null}
         </div>
 
         {creator.mediaItems?.length ? (
           <CreatorMediaGallery items={creator.mediaItems} name={creator.name} />
-        ) : (
-          <div
-            className={`test-profile-preview profile-concept-preview profile-${creator.accent}${
-              creator.image ? " profile-concept-preview-image" : ""
-            }`}
-            aria-label={`${creator.name} profile preview`}
-          >
-            {creator.image ? (
-              <img
-                alt={`${creator.name} profile`}
-                src={creator.image}
-                style={{
-                  objectPosition: getProfileImageObjectPosition(creator),
-                  transform: getProfileImageTransform(creator),
-                }}
-              />
-            ) : null}
-            <span>{creator.category}</span>
-            <strong>{creator.offer}</strong>
-            <p>{creator.title}</p>
-          </div>
-        )}
+        ) : null}
       </section>
 
       <section className="amber-about-section" id="about">
@@ -161,7 +154,7 @@ export default async function CreatorProfilePage({
           ))}
 
           <div className="help-card">
-            <h3>{profile.helpHeading}</h3>
+            <h3>{firstName} <span>can help with</span></h3>
             <ul>
               {profile.helpItems.map((item) => (
                 <li key={item}>{item}</li>
@@ -193,7 +186,7 @@ export default async function CreatorProfilePage({
                 seats={creator.seats}
               />
               <p className="reserve-note">
-                You won&apos;t be charged unless the creator accepts your
+                You won&apos;t be charged unless {firstName} accepts your
                 appointment.
               </p>
             </>

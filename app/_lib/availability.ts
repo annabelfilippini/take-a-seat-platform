@@ -36,8 +36,8 @@ type SourceAvailabilitySlot = {
   timezone: string;
 };
 
-// Include both sides of the date line and leap-year anniversaries.
-const defaultAvailabilityWindowDays = 371;
+// Include both sides of the date line and the longest six-month creator window.
+const defaultAvailabilityWindowDays = 190;
 const ellaAvailability = [
   { date: "2026-09-17", times: ["09:30", "11:00"] },
   { date: "2026-09-22", times: ["10:00", "12:30", "15:00"] },

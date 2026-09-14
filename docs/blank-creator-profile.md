@@ -32,6 +32,27 @@ Verification:
   through the real route/domain code with SQLite using the D1 statement API.
 - No production application, email, identity or profile was changed during QA.
 
+## Pending layout update
+
+The accepted creator editor and `/with/[slug]` follow Ella's profile layout:
+round headshot, name, social links and intro beside a wide gallery; About,
+help topics and the one-to-one reason below; call options and pricing on the
+right. Gallery upload controls sit with the gallery, and empty media retains
+two blank frames in the editor. The public booking form is unchanged.
+
+Profile copy maps to its matching section without filling cleared fields from
+the bio. A published Ella profile also respects empty saved media and text,
+instead of restoring launch-fixture content. No migration is required.
+These layout changes are local and have not been deployed.
+
+Verification: lint and all 74 tests pass. Local browser checks cover the blank
+editor on desktop and at 390px, text edits, adding a help topic, photo upload,
+and the call-section anchor below the mobile header. Public profile layout and
+Ella's image loading were checked too. Test edits were discarded without saving
+to an account; persistence and cleared-field behavior are covered by the local
+SQLite lifecycle tests. The application-form changes from the earlier
+misunderstanding have been removed.
+
 ## Production release
 
 - PR #15 merged to main as `bd93506` (source identical to tested `54e508d`).

@@ -20,10 +20,13 @@ export function availabilityDateBounds(timezone: string, now = new Date()) {
     timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit",
   }).formatToParts(now).map((part) => [part.type, part.value]));
   const today = `${parts.year}-${parts.month}-${parts.day}`;
-  // Clamp February 29 to February 28 in a non-leap following year.
-  const year = Number(parts.year) + 1;
-  const lastDay = new Date(Date.UTC(year, Number(parts.month), 0)).getUTCDate();
-  const end = `${year}-${parts.month}-${String(Math.min(Number(parts.day), lastDay)).padStart(2, "0")}`;
+  const monthIndex = Number(parts.month) - 1;
+  const target = new Date(Date.UTC(Number(parts.year), monthIndex + 6, 1));
+  const year = target.getUTCFullYear();
+  const month = target.getUTCMonth() + 1;
+  // Clamp month-end starts, such as August 31, to the last day six months later.
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const end = `${year}-${String(month).padStart(2, "0")}-${String(Math.min(Number(parts.day), lastDay)).padStart(2, "0")}`;
   return { today, end };
 }
 

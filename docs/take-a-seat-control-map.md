@@ -5,6 +5,9 @@ Last updated: 2026-09-12
 This is the working source of truth for Take a Seat while the product is being
 organized. It should stay short, current, and operational.
 
+For email delivery, invitation, and admin/creator login troubleshooting, read
+[the onboarding lessons](creator-onboarding-lessons.md) before live testing.
+
 ## Product North Star
 
 Take a Seat is a curated marketplace where people can book private 1:1 calls
@@ -31,8 +34,8 @@ Creator backend:
 - Invite-only for accepted creators.
 - Lets creators edit profile content that affects buyer confidence.
 - Lets creators set 15 minute and 30 minute seat pricing.
-- Lets creators set different availability for each dated week through one year
-  ahead, with week arrows, a date jump, and a separate save for each week. New
+- Lets creators set different availability for each dated week through six months
+  ahead, with week arrows, a week dropdown, and a separate save for each week. New
   creators start empty; existing recurring hours remain on untouched weeks.
   Saving an empty week closes it. Customer slots and server validation follow
   these dated weeks and retain notice, buffers, and booking caps. See

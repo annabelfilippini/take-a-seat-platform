@@ -347,9 +347,9 @@ test("server-renders the admin creator profile editor preview", async () => {
   assert.match(html, />Save profile<\/button>/);
   assert.match(html, /aria-label="Save profile changes"/);
   assert.match(html, />Weekly availability<\/h2>/);
-  assert.match(html, /Set different hours each week, up to a year ahead/);
+  assert.match(html, /Set different hours each week, up to six months ahead/);
   assert.match(html, /aria-label="Next week"/);
-  assert.match(html, /aria-label="Jump to availability date"/);
+  assert.match(html, /aria-label="Choose availability week"/);
   assert.match(html, />Save this week<\/button>/);
   assert.match(html, /Stripe payouts/);
   assert.match(html, /Connect Stripe/);
@@ -385,7 +385,8 @@ test("server-renders the admin creator profile editor preview", async () => {
   assert.match(html, /value="30"/);
   assert.match(html, /type="number" value="45"/);
   assert.match(html, /type="number" value="80"/);
-  assert.match(html, /Book this seat/);
+  assert.match(html, /Find availability/);
+  assert.doesNotMatch(html, /Book this seat/);
 });
 
 test("server-renders candidate creator concept profiles", async () => {
@@ -510,11 +511,11 @@ test("preserves creator uploaded media for dashboard and public profiles", async
   assert.match(profileImageHelper, /export function getProfileImageTransform/);
   assert.match(dynamicProfilePage, /export const dynamic = "force-dynamic"/);
   assert.match(dynamicProfilePage, /<CreatorMediaGallery items=\{creator\.mediaItems\} name=\{creator\.name\} \/>/);
-  assert.match(ellaPage, /src=\{creator\.image \?\? "\/ella-profile\.jpg"\}/);
+  assert.match(ellaPage, /src=\{creator\.image\}/);
   assert.match(ellaPage, /export const dynamic = "force-dynamic"/);
   assert.match(ellaPage, /getProfileImageObjectPosition\(creator\)/);
   assert.match(ellaPage, /getProfileImageTransform\(creator\)/);
-  assert.match(ellaPage, /items=\{creator\.mediaItems\?\.length \? creator\.mediaItems : undefined\}/);
+  assert.match(ellaPage, /publishedCreator \? creator\.mediaItems \?\? \[\]/);
   assert.match(ellaGallery, /CreatorMediaGallery/);
   assert.match(creatorGallery, /className="amber-hero-gallery"/);
   assert.match(creatorsLib, /mediaItems: \[/);
@@ -614,7 +615,7 @@ test("wires accepted creators to public profile publishing", async () => {
   assert.match(dynamicProfilePage, /getPublicCreatorBySlug/);
   assert.match(dynamicProfilePage, /<CustomerBookingFlow/);
   assert.match(dynamicProfilePage, /availabilityRules=\{creator\.availabilityRules\}/);
-  assert.match(dynamicProfilePage, /won&apos;t be charged unless the creator accepts/);
+  assert.match(dynamicProfilePage, /won&apos;t be charged unless \{firstName\} accepts/);
   assert.match(requestRoute, /getBookableCreatorById/);
   assert.match(requestRoute, /reserveBookingRequest/);
   assert.match(requestRoute, /isBookingSlotAvailable/);

@@ -355,7 +355,12 @@ test("first-time creators receive a blank editor and cleared fields stay blank a
     const published = await domain.getPublishedCreatorBySlug(stored.publicSlug);
     assert.deepEqual(published.profile.about, []);
     assert.equal(published.profile.intro, "");
+    assert.equal(published.profile.whyBody, "");
+    assert.deepEqual(published.profile.helpItems, []);
     assert.equal(published.image, null);
+    assert.deepEqual(getEditableCreatorProfile({ ...stored, profileImageUrl: "/ella-profile.jpg" }).mediaItems, []);
+    assert.deepEqual(domain.createPublishedCreator({ ...stored, profileIntro: "My introduction", bio: "My introduction", about: "" }).profile.about, []);
+    assert.equal(domain.createPublishedCreator({ ...stored, profileIntro: "", bio: "My about text", about: "My about text" }).profile.intro, "");
   } finally {
     delete process.env.TAKE_A_SEAT_DEV_ADMIN_ENABLED;
   }
@@ -474,7 +479,7 @@ test('dated availability saves and reloads independent weeks, preserves defaults
   assert.ok(dates.includes(weeks.addCalendarDays(secondWeek, 8)), 'untouched week still uses legacy baseline');
 });
 
-test('availability rejects malformed payloads, missing week, invalid timezone, past weeks and dates beyond a year', async () => {
+test('availability rejects malformed payloads, missing week, invalid timezone, past weeks and dates beyond six months', async () => {
   const { today, end } = weeks.availabilityDateBounds('America/Los_Angeles');
   const current = weeks.availabilityWeekStart(today);
   for (const bad of ['', '2027-02-30', weeks.addCalendarDays(current, 1), weeks.addCalendarDays(current, -7), weeks.addCalendarDays(weeks.availabilityWeekStart(end), 7)]) {
@@ -504,7 +509,7 @@ test('a failed availability insertion rolls back the deletion', async () => {
   assert.deepEqual(await domain.listCreatorAvailabilityRules(input.creatorId), before);
 });
 
-test('customer selection and server validation reach the anniversary with notice, buffer and timezone intact', async () => {
+test('customer selection and server validation reach the six-month limit with notice, buffer and timezone intact', async () => {
   const { end } = weeks.availabilityDateBounds('America/Los_Angeles');
   const input = await availabilityInput(weeks.availabilityWeekStart(end), [{dayOfWeek:new Date(end+'T00:00:00Z').getUTCDay(),startTime:'12:00'}]);
   await domain.saveCreatorAvailability(input);
@@ -525,8 +530,8 @@ test('customer selection and server validation reach the anniversary with notice
   assert.deepEqual(viewerDays([{...repeating[0],minNoticeMinutes:600000}]), []);
 });
 
-test('calendar-year and daylight-saving boundaries never shift selected wall times', () => {
-  assert.deepEqual(weeks.availabilityDateBounds('UTC', new Date('2028-02-29T12:00:00Z')), {today:'2028-02-29',end:'2029-02-28'});
+test('six-month and daylight-saving boundaries never shift selected wall times', () => {
+  assert.deepEqual(weeks.availabilityDateBounds('UTC', new Date('2028-08-31T12:00:00Z')), {today:'2028-08-31',end:'2029-02-28'});
   assert.equal(weeks.availabilityDateBounds('America/Los_Angeles',new Date('2026-09-13T01:00:00Z')).today,'2026-09-12');
   assert.equal(availability.localDateTimeToUtc('2027-03-14T10:00:00','America/Los_Angeles').toISOString(),'2027-03-14T17:00:00.000Z');
   assert.equal(availability.localDateTimeToUtc('2026-11-01T10:00:00','America/Los_Angeles').toISOString(),'2026-11-01T18:00:00.000Z');

@@ -62,6 +62,11 @@
   through, and text that is too large for its container.
 - If a browser QA step cannot be completed, say that clearly before presenting
   the work.
+- For auth/email repairs, retest the user's original entry link with its query
+  parameters intact; direct dashboard access does not prove an invite works.
+- Admin and creator logins share a session across tabs in one browser profile.
+  Use separate profiles when available, explain account switches, and restore
+  the user's requested account. Follow `docs/creator-onboarding-lessons.md`.
 
 ## Deployment
 

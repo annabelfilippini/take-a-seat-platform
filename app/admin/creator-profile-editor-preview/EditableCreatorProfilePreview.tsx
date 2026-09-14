@@ -312,10 +312,7 @@ export function EditableCreatorProfilePreview({
 
   const helpItems = useMemo(
     () =>
-      profile.helpItems
-        .split("\n")
-        .map((item) => item.trim())
-        .filter(Boolean),
+      profile.helpItems ? profile.helpItems.split("\n") : ["", "", "", ""],
     [profile.helpItems],
   );
 
@@ -677,7 +674,8 @@ export function EditableCreatorProfilePreview({
                 <b>{profile.name.slice(0, 2) || "TS"}</b>
               )}
             </span>
-            <div className="editable-profile-photo-controls">
+            <details className="editable-profile-photo-controls">
+              <summary>Profile photo</summary>
               <label>
                 <span>Upload profile picture</span>
                 <input
@@ -713,15 +711,17 @@ export function EditableCreatorProfilePreview({
                   <span aria-hidden="true">+</span>
                 </button>
               </div>
-            </div>
+            </details>
           </div>
-          <EditableInput
+          <EditableTextarea
             ariaLabel="Creator hero name"
             className="editable-profile-title"
+            rows={2}
             value={profile.name}
             onChange={(value) => update("name", value)}
           />
-          <div className="editable-social-url-fields">
+          <details className="editable-social-url-fields">
+            <summary>Social links</summary>
             <label>
               <span>Instagram URL</span>
               <input
@@ -746,7 +746,7 @@ export function EditableCreatorProfilePreview({
                 }
               />
             </label>
-          </div>
+          </details>
           <p className="amber-meta">
             <SocialProfileLink
               href={profile.instagramUrl}
@@ -758,12 +758,6 @@ export function EditableCreatorProfilePreview({
               icon="tiktok"
               label={`Open ${profile.name} on TikTok`}
             />
-            <EditableInput
-              ariaLabel="Location"
-              className="editable-inline-text"
-              value={profile.location}
-              onChange={(value) => update("location", value)}
-            />
           </p>
           <EditableTextarea
             ariaLabel="Public profile intro"
@@ -772,13 +766,14 @@ export function EditableCreatorProfilePreview({
             value={profile.profileIntro}
             onChange={(value) => update("profileIntro", value)}
           />
+          <a className="seat-primary-button profile-primary-button" href="#reserve">Choose a call</a>
         </div>
 
-        <EditableMediaGallery items={profile.mediaItems} name={profile.name} />
-      </section>
-
-      <section className="editable-profile-workspace editable-image-workspace" id="media">
-        <div className="editable-editor-panel editable-media-panel">
+        <div className="editable-gallery-column">
+          <EditableMediaGallery items={profile.mediaItems} name={profile.name} />
+          <details className="editable-gallery-controls">
+            <summary>Photos and videos</summary>
+        <div className="editable-media-panel">
           <div className="creator-form-header editable-media-header">
             <div className="editable-section-heading">
               <span>Images</span>
@@ -805,6 +800,10 @@ export function EditableCreatorProfilePreview({
             </div>
           </div>
           <div className="editable-social-accounts">
+            <label>
+              <span>Location</span>
+              <input aria-label="Location" className="editable-profile-field editable-basic-input" value={profile.location} onChange={(event) => update("location", event.target.value)} />
+            </label>
             <label>
               <span>Homepage category</span>
               <select
@@ -874,6 +873,8 @@ export function EditableCreatorProfilePreview({
             </button>
           </div>
         </div>
+          </details>
+        </div>
       </section>
 
       <section className="amber-about-section" id="about">
@@ -888,19 +889,21 @@ export function EditableCreatorProfilePreview({
           />
 
           <div className="help-card">
-            <h3>{profile.name.split(" ")[0] || "Creator"} can help with</h3>
-            <EditableTextarea
-              ariaLabel="What people can ask"
-              className="editable-help-input"
-              rows={6}
-              value={profile.helpItems}
-              onChange={(value) => update("helpItems", value)}
-            />
-            <ul>
-              {helpItems.map((item) => (
-                <li key={item}>{item}</li>
+            <h3>{profile.name.split(" ")[0] || "Creator"} <span>can help with</span></h3>
+            <ul className="editable-help-topics">
+              {helpItems.map((item, index) => (
+                <li key={index}>
+                  <EditableTextarea
+                    ariaLabel={index === 0 ? "What people can ask" : `Help topic ${index + 1}`}
+                    className="editable-help-topic"
+                    rows={2}
+                    value={item}
+                    onChange={(value) => update("helpItems", helpItems.map((topic, topicIndex) => topicIndex === index ? value : topic).join("\n"))}
+                  />
+                </li>
               ))}
             </ul>
+            <button className="editable-secondary-button" type="button" onClick={() => update("helpItems", [...helpItems, ""].join("\n"))}>Add topic</button>
           </div>
 
           <div className="why-card">
@@ -916,7 +919,7 @@ export function EditableCreatorProfilePreview({
         </div>
 
         <aside className="reserve-panel" id="reserve" aria-label={`Book ${profile.name}`}>
-          <h2 className="editable-reserve-heading">Choose a Time</h2>
+          <h2 className="editable-reserve-heading">Choose a call</h2>
           <p>Private video call on Google Meet.</p>
           <div className="seat-options">
             <EditableSeatOption
@@ -940,6 +943,14 @@ export function EditableCreatorProfilePreview({
               onPriceChange={(value) => update("seat30PriceAmount", value)}
             />
           </div>
+          <button className="seat-primary-button editable-preview-booking-button" disabled type="button">
+            Find availability
+          </button>
+          <p className="reserve-note editable-reserve-note">No account needed.</p>
+          <p className="reserve-note editable-reserve-note">
+            You won&apos;t be charged unless {profile.name.split(" ")[0] || "the creator"} accepts your
+            appointment.
+          </p>
         </aside>
       </section>
       <section className="editable-profile-save-footer" aria-label="Save profile changes">
@@ -1083,6 +1094,10 @@ function EditableAvailabilityPanel({
   let bounds;
   try { bounds = availabilityDateBounds(timezone); } catch { bounds = availabilityDateBounds(initialTimezone); }
   const { today, end } = bounds;
+  const weekOptions = useMemo(
+    () => getAvailabilityWeekOptions(today, end),
+    [today, end],
+  );
   const disabledDays = availabilityDays.filter((day) => {
     const date = addCalendarDays(weekStart, day.value);
     return date < today || date > end;
@@ -1300,7 +1315,7 @@ function EditableAvailabilityPanel({
       </div>
 
       <p className="availability-instructions" id="weekly-availability-help">
-        Set different hours each week, up to a year ahead. Tap a time or drag with
+        Set different hours each week, up to six months ahead. Tap a time or drag with
         a mouse, then save this week. Other weeks stay unchanged.
         {weekRules.some((rule) => !rule.weekStart) && " This week starts with your existing repeating hours."}
       </p>
@@ -1316,12 +1331,20 @@ function EditableAvailabilityPanel({
       </div>
       <div className="availability-settings-row">
         <label className="availability-timezone-picker">
-          <span>Jump to date</span>
-          <input type="date" aria-label="Jump to availability date"
+          <span>Week</span>
+          <select
+            aria-label="Choose availability week"
             className="editable-profile-field editable-basic-input"
-            disabled={saveStatus === "saving"} min={today} max={end}
-            value={weekStart < today ? today : weekStart}
-            onChange={(event) => showWeek(event.target.value)} />
+            disabled={saveStatus === "saving"}
+            value={weekStart}
+            onChange={(event) => showWeek(event.target.value)}
+          >
+            {weekOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
         </label>
         <label className="availability-timezone-picker">
           <span>Timezone</span>
@@ -1726,7 +1749,14 @@ function EditableMediaGallery({
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
 
-  if (!items.length) return null;
+  if (!items.length) return (
+    <div className="amber-hero-gallery editable-empty-gallery" aria-label={`${name} photos and videos`}>
+      <div className="amber-gallery-track">
+        <span className="amber-gallery-frame">Photo or video</span>
+        <span className="amber-gallery-frame">Photo or video</span>
+      </div>
+    </div>
+  );
 
   function scrollGallery(direction: -1 | 1) {
     const track = trackRef.current;
@@ -1872,44 +1902,31 @@ function EditableSeatOption({
         />
         <span>Offer this seat option</span>
       </label>
-      <div className="seat-option-heading">
-        <h3>{label}</h3>
-        <span>Private video call</span>
+      <div className="seat-option-heading editable-seat-option-heading">
+        <label className="editable-duration-field editable-seat-duration-field">
+          <input
+            aria-label={`${label} duration in minutes`}
+            inputMode="numeric"
+            max="240"
+            min="5"
+            type="number"
+            value={durationMinutes}
+            onChange={(event) => onDurationChange(event.target.value)}
+          />
+          <span>minutes</span>
+        </label>
+        <label className="editable-price-field editable-seat-price-field">
+          <span>$</span>
+          <input
+            aria-label={`${label} price`}
+            inputMode="numeric"
+            min="0"
+            type="number"
+            value={price}
+            onChange={(event) => onPriceChange(event.target.value)}
+          />
+        </label>
       </div>
-      <dl className="seat-detail-list">
-        <div>
-          <dt>Time</dt>
-          <dd>
-            <label className="editable-duration-field">
-              <input
-                aria-label={`${label} duration in minutes`}
-                inputMode="numeric"
-                max="240"
-                min="5"
-                type="number"
-                value={durationMinutes}
-                onChange={(event) => onDurationChange(event.target.value)}
-              />
-              <span>minutes</span>
-            </label>
-          </dd>
-        </div>
-        <div>
-          <dt>Price</dt>
-          <dd>
-            <label className="editable-price-field">
-              <span>$</span>
-              <input
-                inputMode="numeric"
-                min="0"
-                type="number"
-                value={price}
-                onChange={(event) => onPriceChange(event.target.value)}
-              />
-            </label>
-          </dd>
-        </div>
-      </dl>
       <EditableTextarea
         ariaLabel={`${label} description`}
         className="editable-seat-description"
@@ -1917,9 +1934,6 @@ function EditableSeatOption({
         value={description}
         onChange={onDescriptionChange}
       />
-      <button className="seat-primary-button" disabled={!enabled} type="button">
-        {enabled ? "Book this seat" : "Hidden from profile"}
-      </button>
     </article>
   );
 }
@@ -1998,27 +2012,6 @@ function getAvailabilitySlotPayload(selectedSlots: Set<string>) {
     .filter((slot) => Boolean(slot.startTime));
 }
 
-function EditableInput({
-  ariaLabel,
-  className,
-  value,
-  onChange,
-}: {
-  ariaLabel: string;
-  className: string;
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <input
-      aria-label={ariaLabel}
-      className={`editable-profile-field ${className}`}
-      value={value}
-      onChange={(event) => onChange(event.target.value)}
-    />
-  );
-}
-
 function EditableTextarea({
   ariaLabel,
   className,
@@ -2036,6 +2029,7 @@ function EditableTextarea({
     <textarea
       aria-label={ariaLabel}
       className={`editable-profile-field ${className}`}
+      placeholder={ariaLabel}
       rows={rows}
       value={value}
       onChange={(event) => onChange(event.target.value)}
@@ -2372,4 +2366,19 @@ function formatAvailabilityDate(value: string) {
 function formatAvailabilityWeek(value: string) {
   const format = new Intl.DateTimeFormat("en-US", { timeZone: "UTC", month: "short", day: "numeric", year: "numeric" });
   return format.formatRange(new Date(`${value}T00:00:00Z`), new Date(`${addCalendarDays(value, 6)}T00:00:00Z`));
+}
+
+function getAvailabilityWeekOptions(today: string, end: string) {
+  const options: Array<{ label: string; value: string }> = [];
+  const firstWeek = availabilityWeekStart(today);
+  const lastWeek = availabilityWeekStart(end);
+
+  for (let week = firstWeek; week <= lastWeek; week = addCalendarDays(week, 7)) {
+    options.push({
+      label: formatAvailabilityWeek(week),
+      value: week,
+    });
+  }
+
+  return options;
 }
