@@ -563,7 +563,7 @@ test("wires accepted creators to public profile publishing", async () => {
     readFile(new URL("../app/api/stripe/checkout/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/api/bookings/request/route.ts", import.meta.url), "utf8"),
     readFile(
-      new URL("../app/with/ella/CustomerBookingFlow.tsx", import.meta.url),
+      new URL("../app/_components/CustomerBookingFlow.tsx", import.meta.url),
       "utf8",
     ),
   ]);
@@ -618,13 +618,13 @@ test("wires accepted creators to public profile publishing", async () => {
   assert.match(requestRoute, /reserveBookingRequest/);
   assert.match(requestRoute, /isBookingSlotAvailable/);
   assert.match(checkoutRoute, /export \{ POST \} from "..\/..\/bookings\/request\/route"/);
-  assert.match(customerBookingFlow, /Find Availability/);
+  assert.match(customerBookingFlow, /Find availability/);
   assert.match(customerBookingFlow, /action="\/api\/bookings\/request"/);
   assert.match(customerBookingFlow, /selectedSlot\?\.sourceAppointmentStartAt/);
   assert.match(customerBookingFlow, /selectedSlot\?\.sourceTimezone/);
   assert.match(customerBookingFlow, /What do you want to talk about with \{creatorName\}\?/);
   assert.match(customerBookingFlow, /You won't be charged unless \$\{creatorName\} accepts/);
-  assert.match(customerBookingFlow, /Go to payment next/);
+  assert.match(customerBookingFlow, /Continue to payment/);
   assert.match(bookingsLib, /accepted: "accepted"/);
   assert.match(bookingsLib, /paymentAuthorized: "payment_authorized"/);
   assert.match(bookingsLib, /markBookingPaymentAuthorized/);
@@ -1045,7 +1045,7 @@ test("server-renders Ella's profile page", async () => {
   assert.doesNotMatch(html, /play_button=0/);
   assert.doesNotMatch(html, /description=0/);
   assert.doesNotMatch(html, /music_info=0/);
-  assert.match(html, /Find Availability/);
+  assert.match(html, /Find availability/);
   assert.match(html, /You won&#x27;t be charged unless Ella accepts your appointment/);
   assert.doesNotMatch(html, /Choose a time and then Ella will get a short note/);
   assert.doesNotMatch(html, /Providence College/);

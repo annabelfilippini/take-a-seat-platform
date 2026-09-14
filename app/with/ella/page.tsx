@@ -6,7 +6,8 @@ import {
   getProfileImageObjectPosition,
   getProfileImageTransform,
 } from "../../_lib/profile-image";
-import { CustomerBookingFlow } from "./CustomerBookingFlow";
+import { BookingEntryLink } from "../../_components/BookingEntryLink";
+import { CustomerBookingFlow } from "../../_components/CustomerBookingFlow";
 import { EllaGallery } from "./EllaGallery";
 
 export const metadata: Metadata = {
@@ -135,6 +136,7 @@ export default async function EllaProfile({ searchParams }: EllaProfileProps) {
             ) : null}
           </p>
           <p>{intro}</p>
+          {creator.seats.length > 0 ? <BookingEntryLink seats={creator.seats} /> : null}
         </div>
 
         <EllaGallery items={creator.mediaItems?.length ? creator.mediaItems : undefined} />
