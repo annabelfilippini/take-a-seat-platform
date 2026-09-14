@@ -1,5 +1,24 @@
 # Blank creator profiles
 
+## Ella layout release, September 13
+
+The accepted creator editor, its draft preview, and `/with/[slug]` now follow
+Ella's layout: round headshot and intro beside a wide gallery; About, help
+topics, and the one-to-one explanation below; call descriptions and prices on
+the right. Content, media, and prices start blank, retaining application identity.
+Empty fields stay empty on save; a headshot no longer fills an empty gallery.
+
+Profile, Availability, Payments, Go live, and Settings use the top navigation.
+The newer private-draft and explicit-publish protections from PR #22 remain.
+The current booking modal and availability behavior also remain. This change
+requires no migration or new secrets. Annabel approved production deployment.
+
+Verification: all 70 current-main tests pass, including private save, publish
+readiness, draft/live separation, and blank content. The approved editor was
+checked on desktop/mobile before integration. Public browser checks were rerun
+on the release. Automatic approval blocked a fresh local admin test session;
+the integrated editor's state and persistence are covered by lifecycle tests.
+
 ## Profile setup revision, September 13
 
 PR #22 combines the accepted-creator setup and public profile. Annabel approved

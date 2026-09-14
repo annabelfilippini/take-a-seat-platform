@@ -2,7 +2,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { CreatorMediaGallery } from "../../_components/CreatorMediaGallery";
-import { CreatorSeatHowItWorks } from "../../_components/CreatorSeatHowItWorks";
 import { creators } from "../../_lib/creators";
 import { getPublicCreatorBySlug } from "../../_lib/creator-onboarding";
 import {
@@ -10,6 +9,7 @@ import {
   getProfileImageTransform,
 } from "../../_lib/profile-image";
 import { CustomerBookingFlow } from "../../_components/CustomerBookingFlow";
+import { BookingEntryLink } from "../../_components/BookingEntryLink";
 
 type CreatorProfilePageProps = {
   params: {
@@ -58,7 +58,7 @@ export async function generateMetadata({
 
   return {
     title: `Take a Seat with ${creator.name}`,
-    description: creator.profile.about[0]?.slice(0, 160) ?? creator.title,
+    description: creator.profile.intro,
   };
 }
 
@@ -73,7 +73,7 @@ export default async function CreatorProfilePage({
     notFound();
   }
 
-  const socialLabel = creator.tiktokHandle ?? creator.instagramHandle ?? creator.name;
+  const firstName = creator.name.split(/\s+/u)[0] || creator.name;
   const waitlistHref = `mailto:annabel@takeaseatwith.com?subject=${encodeURIComponent(
     profile.waitlistSubject,
   )}`;
@@ -81,7 +81,7 @@ export default async function CreatorProfilePage({
   const bookingNotice = getBookingNotice(searchParams, creator.name);
 
   return (
-    <main className="platform-shell amber-profile-page creator-profile-template">
+    <main className="platform-shell amber-profile-page">
       <div className="profile-announcement">{profile.announcement}</div>
       <header className="topbar profile-topbar">
         <a className="brand-mark" href="/" aria-label="Take a Seat home">
@@ -99,8 +99,17 @@ export default async function CreatorProfilePage({
 
       <section className="amber-profile-hero">
         <div className="amber-hero-copy">
-          <span className="test-profile-badge">
-            {isBookable ? "Now booking" : "Opening soon"}
+          <span className="creator-headshot-frame">
+            {creator.image ? (
+              <img
+                alt={creator.name}
+                src={creator.image}
+                style={{
+                  objectPosition: getProfileImageObjectPosition(creator),
+                  transform: getProfileImageTransform(creator),
+                }}
+              />
+            ) : null}
           </span>
           <h1>{creator.name}</h1>
           <p className="amber-meta">
@@ -122,60 +131,42 @@ export default async function CreatorProfilePage({
                 <TikTokIcon />
               </a>
             ) : null}
-            <span>{socialLabel}</span>
-            {creator.location ? <span>{creator.location}</span> : null}
           </p>
-          {profile.helpItems.length ? (
-            <div className="help-card creator-conversation-topics">
-              <h2>Pull up a seat for…</h2>
-              <ul>
-                {profile.helpItems.map((item, index) => (
-                  <li key={`${index}-${item}`}>{item}</li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
+          <p>{profile.intro}</p>
+          <BookingEntryLink seats={creator.seats} />
         </div>
 
         {creator.mediaItems?.length ? (
-          <CreatorMediaGallery items={creator.mediaItems} name={creator.name} showCaptions={false} />
-        ) : (
-          <div
-            className={`test-profile-preview profile-concept-preview profile-${creator.accent}${
-              creator.image ? " profile-concept-preview-image" : ""
-            }`}
-            aria-label={`${creator.name} profile preview`}
-          >
-            {creator.image ? (
-              <img
-                alt={`${creator.name} profile`}
-                src={creator.image}
-                style={{
-                  objectPosition: getProfileImageObjectPosition(creator),
-                  transform: getProfileImageTransform(creator),
-                }}
-              />
-            ) : null}
-            <span>{creator.category}</span>
-            <strong>{creator.offer}</strong>
-            <p>{creator.title}</p>
-          </div>
-        )}
+          <CreatorMediaGallery items={creator.mediaItems} name={creator.name} />
+        ) : null}
       </section>
 
       <section className="amber-about-section" id="about">
         <div className="about-main">
-          <h2>A little about me</h2>
+          <h2>About</h2>
           {profile.about.map((paragraph) => (
             <p key={paragraph}>{paragraph}</p>
           ))}
 
+          <div className="help-card">
+            <h3>{firstName} <span>can help with</span></h3>
+            <ul>
+              {profile.helpItems.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="why-card">
+            <h3>{profile.whyTitle}</h3>
+            <p>{profile.whyBody}</p>
+          </div>
         </div>
 
         <aside className="reserve-panel" id="reserve" aria-label={`Reserve with ${creator.name}`}>
           {isBookable ? (
             <>
-              <h2>Schedule a time to meet</h2>
+              <h2>Choose a call</h2>
               <p>Private video call on Google Meet.</p>
               {bookingNotice ? (
                 <p className="booking-notice booking-status-notice">
@@ -188,10 +179,9 @@ export default async function CreatorProfilePage({
                 creatorName={creator.name}
                 returnTo={`/with/${creator.slug}`}
                 seats={creator.seats}
-                showDescriptions={false}
               />
               <p className="reserve-note">
-                You won&apos;t be charged unless the creator accepts your
+                You won&apos;t be charged unless {firstName} accepts your
                 appointment.
               </p>
             </>
@@ -216,7 +206,6 @@ export default async function CreatorProfilePage({
           )}
         </aside>
       </section>
-      <CreatorSeatHowItWorks />
     </main>
   );
 }

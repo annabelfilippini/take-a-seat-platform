@@ -349,14 +349,14 @@ test("first-time creators receive a blank editor and cleared fields stay blank a
 
   const { EditableCreatorProfilePreview } = await import("../app/admin/creator-profile-editor-preview/EditableCreatorProfilePreview.tsx");
   const blankEditorHtml = renderToStaticMarkup(createElement(EditableCreatorProfilePreview, { initialProfile: editor }));
-  assert.match(blankEditorHtml, /Your photos go here/);
+  assert.match(blankEditorHtml, /Photo or video/);
   assert.doesNotMatch(blankEditorHtml, /Show next media|Show previous media|amber-reference|Private application answer/);
-  assert.doesNotMatch(blankEditorHtml, /aria-label="(?:Public profile intro|One-to-one reason|15 minutes description|30 minutes description)"/);
+  assert.match(blankEditorHtml, /aria-label="(?:Public profile intro|One-to-one reason|15 minutes description|30 minutes description)"/);
   assert.match(blankEditorHtml, /aria-label="What people can ask"[^>]*><\/textarea>/);
   assert.match(blankEditorHtml, /aria-label="About section"[^>]*><\/textarea>/);
-  assert.match(blankEditorHtml, /How does your seat work\?/);
-  assert.ok(blankEditorHtml.indexOf("Your photos go here") < blankEditorHtml.indexOf("Schedule a time to meet"));
-  assert.ok(blankEditorHtml.indexOf("Save profile changes") < blankEditorHtml.indexOf("How does your seat work?"));
+  assert.match(blankEditorHtml, /Why a 1:1 call\?/);
+  assert.ok(blankEditorHtml.indexOf("Photo or video") < blankEditorHtml.indexOf('id="reserve"'));
+  assert.ok(blankEditorHtml.indexOf('aria-label="One-to-one reason"') < blankEditorHtml.indexOf('id="reserve"'));
 
   process.env.TAKE_A_SEAT_DEV_ADMIN_ENABLED = "true";
   try {
@@ -382,6 +382,10 @@ test("first-time creators receive a blank editor and cleared fields stay blank a
     assert.equal(stored.profileDetails, application.profileDetails);
     const published = await domain.getPublishedCreatorBySlug(stored.publicSlug);
     assert.equal(published, null);
+    assert.deepEqual(getEditableCreatorProfile({ ...stored, profileImageUrl: "/ella-profile.jpg" }).mediaItems, []);
+    assert.deepEqual(domain.createPublishedCreator({ ...stored, profileIntro: "Intro", bio: "Intro", about: "" }).profile.about, []);
+    assert.equal(domain.createPublishedCreator({ ...stored, profileIntro: "", bio: "About", about: "About" }).profile.intro, "");
+    assert.equal(domain.createPublishedCreator(stored).profile.whyBody, "");
     assert.equal((await domain.publishCreatorProfile(stored.id)).status, "error");
   } finally {
     delete process.env.TAKE_A_SEAT_DEV_ADMIN_ENABLED;

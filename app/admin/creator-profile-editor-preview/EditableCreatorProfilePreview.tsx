@@ -21,7 +21,7 @@ type EditableGalleryItem = {
   title: string;
 };
 
-type EditableCreatorTab = "profile" | "calls" | "availability" | "payments" | "publish" | "settings";
+type EditableCreatorTab = "profile" | "availability" | "payments" | "publish" | "settings";
 type EditableDurationValue = number | string;
 type EditablePriceValue = number | string;
 type ProfileImagePointer = {
@@ -97,11 +97,11 @@ type EditableAvailabilityRule = {
 };
 
 const creatorTabs: Array<{ id: EditableCreatorTab; label: string }> = [
-  { id: "profile", label: "Your profile" },
-  { id: "calls", label: "Your calls" },
+  { id: "profile", label: "Profile" },
   { id: "availability", label: "Availability" },
-  { id: "payments", label: "Get paid" },
+  { id: "payments", label: "Payments" },
   { id: "publish", label: "Go live" },
+  { id: "settings", label: "Settings" },
 ];
 
 const homepageCategories = [
@@ -635,10 +635,6 @@ export function EditableCreatorProfilePreview({
     window.scrollTo({ top: 0, behavior: "instant" });
   }
 
-  async function saveAndContinue(step: EditableCreatorTab) {
-    if (await saveProfileChanges()) setActiveCreatorTab(step);
-  }
-
   async function publishProfile() {
     setPublishing(true);
     setPublishMessage("");
@@ -666,41 +662,57 @@ export function EditableCreatorProfilePreview({
   const callsReady = enabledCalls.length > 0 && enabledCalls.every((call) => call.price > 0);
   const setupChecks = [
     { id: "profile" as const, label: "Profile picture, about text, and conversation topics", done: profileReady },
-    { id: "calls" as const, label: "Call lengths and prices", done: callsReady },
+    { id: "profile" as const, label: "Call lengths and prices", done: callsReady },
     { id: "availability" as const, label: "Saved availability and Google Calendar", done: hasAvailability && Boolean(profile.calendarConnectedAt) },
     { id: "payments" as const, label: "Stripe payouts connected", done: Boolean(profile.stripeConnectedAt) },
   ];
   const allReady = setupChecks.every((check) => check.done);
-  const stepNumber = creatorTabs.findIndex((tab) => tab.id === activeCreatorTab) + 1;
+  const helpItems = profile.helpItems ? profile.helpItems.split("\n") : ["", "", "", ""];
 
   return (
-    <main className="platform-shell editable-profile-page creator-setup">
-      <header className="creator-setup-header">
-        <div><a className="brand-mark" href="/">Take a Seat</a><p>Creator setup</p></div>
-        <div className="creator-setup-header-actions">
-          <span>{profile.publishedAt ? "Live page · private edits" : "Private draft"}</span>
-          <button type="button" onClick={() => previewDialog.current?.showModal()}>Preview page</button>
-          <button className="seat-secondary-button" disabled={profileSaving || publishing} onClick={() => { void saveProfileChanges(); }} type="button">{profileSaving ? "Saving…" : "Save draft"}</button>
-        </div>
-      </header>
-      {calendarStatus ? <p role="status" className="calendar-connection-notice">{calendarStatus === "connected" && profile.calendarConnectedAt ? "Google Calendar connected." : "Calendar connection is incomplete. You can try again in Availability."}</p> : null}
-      {stripeStatus ? <p role="status" className="calendar-connection-notice">{profile.stripeConnectedAt ? "Stripe payouts connected." : "Stripe setup is incomplete. Continue in Get paid."}</p> : null}
-      {mediaSaveStatus === "error" ? <p role="alert" className="calendar-connection-notice">Your draft could not be saved. Please try Save draft again before leaving this page.</p> : null}
-      <div className="creator-setup-layout">
-        <nav className="creator-setup-sidebar" aria-label="Creator setup steps">
-          <p className="creator-setup-eyebrow">Setup</p>
-          <ol>{creatorTabs.map((tab, index) => <li key={tab.id}>
-            <button type="button" aria-current={activeCreatorTab === tab.id ? "step" : undefined} disabled={profileSaving || publishing} onClick={() => { void changeStep(tab.id); }}>
-              <span className="creator-step-number">{index + 1}</span>{tab.label}
+    <main className="platform-shell amber-profile-page editable-profile-page">
+      {calendarStatus ? (
+        <p role={calendarStatus === "connected" && profile.calendarConnectedAt ? "status" : "alert"} className="calendar-connection-notice">
+          {calendarStatus === "connected" && profile.calendarConnectedAt ? "Google Calendar connected. Your saved hours will be checked for calendar conflicts."
+            : calendarStatus === "cancelled" ? "Calendar connection was cancelled. You can connect again when you are ready."
+              : "Google Calendar could not connect. Please try Connect calendar again. Your saved profile has not changed."}
+        </p>
+      ) : null}
+
+      <div className="profile-announcement">{profile.publishedAt ? "Live page · private edits" : "Your creator profile · Private draft"}</div>
+      <header className="topbar profile-topbar">
+        <a className="brand-mark" href="/" aria-label="Take a Seat home">
+          Take a Seat
+        </a>
+        <nav className="profile-nav" aria-label="Editable profile preview tabs">
+          {creatorTabs.map((tab) => (
+            <button
+              aria-label={tab.id === "settings" ? tab.label : undefined}
+              aria-controls={`editable-creator-${tab.id}`}
+              aria-selected={activeCreatorTab === tab.id}
+              className={`profile-nav-tab${tab.id === "settings" ? " settings-tab-button" : ""}`}
+              id={`editable-creator-tab-${tab.id}`}
+              key={tab.id}
+              disabled={profileSaving || publishing}
+              onClick={() => { void changeStep(tab.id); }}
+              role="tab"
+              type="button"
+            >
+              {tab.id === "settings" ? <SettingsTabIcon /> : tab.label}
             </button>
-          </li>)}</ol>
-          <button type="button" className="creator-settings-link" aria-label="Settings" onClick={() => { void changeStep("settings"); }}><SettingsTabIcon />Requests &amp; settings</button>
+          ))}
         </nav>
-        <div className="creator-setup-editor">
-          <p className="creator-setup-eyebrow">{stepNumber ? `Step ${stepNumber} of 5` : "Your account"}</p>
-          <h1 tabIndex={-1}>{creatorTabs.find((tab) => tab.id === activeCreatorTab)?.label ?? "Requests & settings"}</h1>
-          <fieldset className="creator-setup-fields" disabled={publishing}>
-          <section hidden={activeCreatorTab !== "profile"} aria-label="Your profile" id="editable-creator-profile">
+      </header>
+
+      <div
+        aria-labelledby="editable-creator-tab-profile"
+        hidden={activeCreatorTab !== "profile"}
+        id="editable-creator-profile"
+        role="tabpanel"
+      >
+      <fieldset className="creator-setup-fields" disabled={publishing}>
+      <section className="amber-profile-hero editable-public-preview" id="public-preview">
+        <div className="amber-hero-copy">
           <div className="editable-profile-photo-editor">
             <span
               aria-label={profile.image ? "Drag profile picture to reposition it" : "Profile picture placeholder"}
@@ -723,7 +735,8 @@ export function EditableCreatorProfilePreview({
                 <b>{profile.name.slice(0, 2) || "TS"}</b>
               )}
             </span>
-            <div className="editable-profile-photo-controls">
+            <details className="editable-profile-photo-controls">
+              <summary>Profile photo</summary>
               <label>
                 <span>Upload profile picture</span>
                 <input
@@ -759,35 +772,17 @@ export function EditableCreatorProfilePreview({
                   <span aria-hidden="true">+</span>
                 </button>
               </div>
-            </div>
+            </details>
           </div>
-
-          <label className="creator-name-field" htmlFor="creator-hero-name"><span>Your name</span><EditableInput ariaLabel="Creator hero name" className="editable-basic-input" value={profile.name} onChange={(value) => update("name", value)} /></label>
-          <div className="help-card creator-conversation-topics">
-            <h2>Pull up a seat for…</h2>
-            <p>Share three things someone could ask you about, one per line.</p>
-            <EditableTextarea
-              ariaLabel="What people can ask"
-              className="editable-help-input"
-              rows={4}
-              value={profile.helpItems}
-              onChange={(value) => update("helpItems", value)}
-            />
-          </div>
-        <div className="about-main">
-          <h2>A little about me</h2>
-          <p>Write a short introduction in your own voice.</p>
           <EditableTextarea
-            ariaLabel="About section"
-            className="editable-about-copy"
-            rows={6}
-            value={profile.about}
-            onChange={(value) => update("about", value)}
+            ariaLabel="Creator hero name"
+            className="editable-profile-title"
+            rows={2}
+            value={profile.name}
+            onChange={(value) => update("name", value)}
           />
-
-        </div>
-
-          <div className="editable-social-url-fields">
+          <details className="editable-social-url-fields">
+            <summary>Social links</summary>
             <label>
               <span>Instagram URL</span>
               <input
@@ -812,7 +807,7 @@ export function EditableCreatorProfilePreview({
                 }
               />
             </label>
-          </div>
+          </details>
           <p className="amber-meta">
             <SocialProfileLink
               href={profile.instagramUrl}
@@ -824,19 +819,52 @@ export function EditableCreatorProfilePreview({
               icon="tiktok"
               label={`Open ${profile.name} on TikTok`}
             />
-            <label htmlFor="location">
-              <span>Location (optional)</span>
-              <EditableInput
-                ariaLabel="Location"
-                className="editable-inline-text"
-                value={profile.location}
-                onChange={(value) => update("location", value)}
-              />
-            </label>
           </p>
+          <EditableTextarea
+            ariaLabel="Public profile intro"
+            className="editable-profile-paragraph"
+            rows={4}
+            value={profile.profileIntro}
+            onChange={(value) => update("profileIntro", value)}
+          />
+          <a className="seat-primary-button profile-primary-button" href="#reserve">Choose a call</a>
+        </div>
 
-          <section className="creator-setup-media" id="media"><h2>Photos and videos</h2><p>Add photos to the carousel at the top of your page.</p>
+        <div className="editable-gallery-column">
+          <EditableMediaGallery items={profile.mediaItems} name={profile.name} />
+          <details className="editable-gallery-controls">
+            <summary>Photos and videos</summary>
+        <div className="editable-media-panel">
+          <div className="creator-form-header editable-media-header">
+            <div className="editable-section-heading">
+              <span>Images</span>
+              <h2>Photos and videos</h2>
+            </div>
+            <div className="editable-save-status-group">
+              <span
+                className={
+                  mediaSaveStatus === "saved"
+                    ? "dashboard-status-complete"
+                    : "dashboard-status"
+                }
+              >
+                {profileSaveLabel}
+              </span>
+              <button
+                className="editable-primary-button editable-save-button"
+                disabled={profileSaving}
+                onClick={saveProfileChanges}
+                type="button"
+              >
+                {profileSaving ? "Saving profile" : "Save draft"}
+              </button>
+            </div>
+          </div>
           <div className="editable-social-accounts">
+            <label>
+              <span>Location</span>
+              <input aria-label="Location" className="editable-profile-field editable-basic-input" value={profile.location} onChange={(event) => update("location", event.target.value)} />
+            </label>
             <label>
               <span>Homepage category</span>
               <select
@@ -905,58 +933,164 @@ export function EditableCreatorProfilePreview({
               Add media
             </button>
           </div>
+        </div>
+          </details>
+        </div>
+      </section>
 
-          </section>
-          <footer className="creator-setup-footer" aria-label="Save profile changes"><span role="status">{profileSaveLabel}</span><button className="editable-primary-button" disabled={profileSaving} onClick={() => { void saveAndContinue("calls"); }} type="button">{profileSaving ? "Saving…" : "Save and continue"}</button></footer>
-          </section>
-          <section hidden={activeCreatorTab !== "calls"} aria-label="Your calls" id="editable-creator-calls">
-            <p>Choose which calls to offer and set your prices. Customers will see the length and price of each call.</p>
-            <label className="creator-currency-field"><span>Currency</span><select aria-label="Call currency" value={profile.currency} onChange={(event) => update("currency", event.target.value)}>{["USD", "GBP", "EUR", "CAD", "AUD"].map((currency) => <option key={currency}>{currency}</option>)}</select></label>
+      <section className="amber-about-section" id="about">
+        <div className="about-main">
+          <h2>About</h2>
+          <EditableTextarea
+            ariaLabel="About section"
+            className="editable-about-copy"
+            rows={6}
+            value={profile.about}
+            onChange={(value) => update("about", value)}
+          />
+
+          <div className="help-card">
+            <h3>{profile.name.split(" ")[0] || "Creator"} <span>can help with</span></h3>
+            <ul className="editable-help-topics">
+              {helpItems.map((item, index) => (
+                <li key={index}>
+                  <EditableTextarea
+                    ariaLabel={index === 0 ? "What people can ask" : `Help topic ${index + 1}`}
+                    className="editable-help-topic"
+                    rows={2}
+                    value={item}
+                    onChange={(value) => update("helpItems", helpItems.map((topic, topicIndex) => topicIndex === index ? value : topic).join("\n"))}
+                  />
+                </li>
+              ))}
+            </ul>
+            <button className="editable-secondary-button" type="button" onClick={() => update("helpItems", [...helpItems, ""].join("\n"))}>Add topic</button>
+          </div>
+
+          <div className="why-card">
+            <h3>Why a 1:1 call?</h3>
+            <EditableTextarea
+              ariaLabel="One-to-one reason"
+              className="editable-profile-paragraph"
+              rows={4}
+              value={profile.oneToOneReason}
+              onChange={(value) => update("oneToOneReason", value)}
+            />
+          </div>
+        </div>
+
+        <aside className="reserve-panel" id="reserve" aria-label={`Book ${profile.name}`}>
+          <h2 className="editable-reserve-heading">Choose a call</h2>
+          <p>Private video call on Google Meet.</p>
+          <label className="editable-call-currency">Currency<select aria-label="Call currency" value={profile.currency} onChange={(event) => update("currency", event.target.value)}>{["USD", "GBP", "EUR", "CAD", "AUD"].map((currency) => <option key={currency}>{currency}</option>)}</select></label>
           <div className="seat-options">
             <EditableSeatOption
               currency={profile.currency}
+              description={profile.seat15Description}
               durationMinutes={profile.seat15DurationMinutes}
               enabled={profile.seat15Enabled}
               price={profile.seat15PriceAmount}
+              onDescriptionChange={(value) => update("seat15Description", value)}
               onDurationChange={(value) => update("seat15DurationMinutes", value)}
               onEnabledChange={(value) => update("seat15Enabled", value)}
               onPriceChange={(value) => update("seat15PriceAmount", value)}
             />
             <EditableSeatOption
               currency={profile.currency}
+              description={profile.seat30Description}
               durationMinutes={profile.seat30DurationMinutes}
               enabled={profile.seat30Enabled}
               price={profile.seat30PriceAmount}
+              onDescriptionChange={(value) => update("seat30Description", value)}
               onDurationChange={(value) => update("seat30DurationMinutes", value)}
               onEnabledChange={(value) => update("seat30Enabled", value)}
               onPriceChange={(value) => update("seat30PriceAmount", value)}
             />
           </div>
+          <button className="seat-primary-button editable-preview-booking-button" disabled type="button">
+            Find availability
+          </button>
+          <p className="reserve-note editable-reserve-note">No account needed.</p>
+          <p className="reserve-note editable-reserve-note">
+            You won&apos;t be charged unless {profile.name.split(" ")[0] || "the creator"} accepts your
+            appointment.
+          </p>
+        </aside>
+      </section>
+      <section className="editable-profile-save-footer" aria-label="Save profile changes">
+        <div className="editable-save-status-group">
+          <span
+            className={
+              mediaSaveStatus === "saved"
+                ? "dashboard-status-complete"
+                : "dashboard-status"
+            }
+          >
+            {profileSaveLabel}
+          </span>
+          <button
+            className="editable-primary-button editable-save-button"
+            disabled={profileSaving}
+            onClick={saveProfileChanges}
+            type="button"
+          >
+            {profileSaving ? "Saving profile" : "Save draft"}
+          </button>
+        </div>
+      </section>
+      </fieldset>
+      </div>
 
-            <footer className="creator-setup-footer"><span role="status">{profileSaveLabel}</span><button className="editable-primary-button" disabled={profileSaving} onClick={() => { void saveAndContinue("availability"); }} type="button">{profileSaving ? "Saving…" : "Save and continue"}</button></footer>
-          </section>
-          <section hidden={activeCreatorTab !== "availability"} aria-label="Availability" id="editable-creator-availability">
-            {profile.publishedAt ? <p>Your saved availability updates the times customers can book immediately.</p> : null}
-            <EditableAvailabilityPanel calendarConnectedAt={profile.calendarConnectedAt} creatorId={profile.id} initialRules={initialAvailabilityRules} timezone={profile.timezone} onSaved={(hasHours, timezone, advance) => { setHasAvailability(hasHours); setProfile((current) => ({ ...current, timezone })); if (advance) setActiveCreatorTab("payments"); }} />
-          </section>
-          <section hidden={activeCreatorTab !== "payments"} aria-label="Get paid" id="editable-creator-payments">
-            <p>Connect your Stripe account to receive payouts for your calls.</p>
-            <EditablePaymentsPanel profile={profile} onEditProfile={() => { void changeStep("calls"); }} />
-            <footer className="creator-setup-footer"><button type="button" className="editable-primary-button" onClick={() => { void changeStep("publish"); }}>Continue to review</button></footer>
-          </section>
-          <section hidden={activeCreatorTab !== "publish"} aria-label="Go live" id="editable-creator-publish">
+      <section
+        aria-labelledby="editable-creator-tab-availability"
+        className="editable-admin-tab-panel"
+        hidden={activeCreatorTab !== "availability"}
+        id="editable-creator-availability"
+        role="tabpanel"
+      >
+        <EditableAvailabilityPanel
+          calendarConnectedAt={profile.calendarConnectedAt}
+          creatorId={profile.id}
+          initialRules={initialAvailabilityRules}
+          timezone={profile.timezone}
+          onSaved={(hasHours, timezone, advance) => { setHasAvailability(hasHours); setProfile((current) => ({ ...current, timezone })); if (advance) setActiveCreatorTab("payments"); }}
+        />
+      </section>
+
+      <section
+        aria-labelledby="editable-creator-tab-payments"
+        className="editable-admin-tab-panel"
+        hidden={activeCreatorTab !== "payments"}
+        id="editable-creator-payments"
+        role="tabpanel"
+      >
+        <EditablePaymentsPanel
+          profile={profile}
+          onEditProfile={() => { void changeStep("profile"); }}
+        />
+      </section>
+
+      <section
+        aria-labelledby="editable-creator-tab-settings"
+        className="editable-admin-tab-panel"
+        hidden={activeCreatorTab !== "settings"}
+        id="editable-creator-settings"
+        role="tabpanel"
+      >
+        <EditableSettingsPanel
+          creatorId={profile.id}
+          initialNotifications={initialNotifications}
+          initialPreferences={initialNotificationPreferences}
+        />
+      </section>
+          <section hidden={activeCreatorTab !== "publish"} className="editable-admin-tab-panel" role="tabpanel" aria-labelledby="editable-creator-tab-publish" aria-label="Go live" id="editable-creator-publish">
             <p>Review your page and finish these steps before publishing. Your profile and call prices stay private until you publish.</p>
-            <ul className="creator-setup-checklist">{setupChecks.map((check) => <li key={check.id}><span>{check.done ? "Ready" : "To do"}</span><button type="button" onClick={() => { void changeStep(check.id); }}>{check.label}</button></li>)}</ul>
+            <ul className="creator-setup-checklist">{setupChecks.map((check) => <li key={check.label}><span>{check.done ? "Ready" : "To do"}</span><button type="button" onClick={() => { void changeStep(check.id); }}>{check.label}</button></li>)}</ul>
             <button type="button" className="seat-secondary-button" onClick={() => previewDialog.current?.showModal()}>Preview your page</button>
             <footer className="creator-setup-footer"><button type="button" className="editable-primary-button" disabled={!allReady || publishing || profileSaving} onClick={() => { void publishProfile(); }}>{publishing ? "Publishing…" : profile.publishedAt ? "Publish changes" : "Go live"}</button></footer>
             {publishMessage ? <p role="status">{publishMessage}</p> : null}
             {profile.publishedAt && profile.publicSlug ? <a href={`/with/${profile.publicSlug}`} target="_blank" rel="noreferrer">View your live page ↗</a> : null}
           </section>
-          <section hidden={activeCreatorTab !== "settings"} aria-label="Requests and settings" id="editable-creator-settings"><EditableSettingsPanel creatorId={profile.id} initialNotifications={initialNotifications} initialPreferences={initialNotificationPreferences} /></section>
-          </fieldset>
-        </div>
-        <aside className="creator-setup-preview" aria-label="Your public page preview"><p className="creator-setup-eyebrow">Your public page</p><CreatorSetupPagePreview profile={profile} compact /><p className="creator-preview-note">Your changes appear here as you edit.</p></aside>
-      </div>
       <dialog className="creator-full-preview" ref={previewDialog} aria-label="Preview your public page"><div className="creator-preview-toolbar"><span>Draft preview</span><button type="button" onClick={() => previewDialog.current?.close()}>Back to setup</button></div><CreatorSetupPagePreview profile={profile} /></dialog>
     </main>
   );
@@ -1606,6 +1740,93 @@ function formatNotificationDate(value: string) {
   });
 }
 
+function EditableMediaGallery({
+  items,
+  name,
+}: {
+  items: EditableGalleryItem[];
+  name: string;
+}) {
+  const trackRef = useRef<HTMLDivElement>(null);
+
+  if (!items.length) return (
+    <div className="amber-hero-gallery editable-empty-gallery" aria-label={`${name} photos and videos`}>
+      <div className="amber-gallery-track">
+        <span className="amber-gallery-frame">Photo or video</span>
+        <span className="amber-gallery-frame">Photo or video</span>
+      </div>
+    </div>
+  );
+
+  function scrollGallery(direction: -1 | 1) {
+    const track = trackRef.current;
+    if (!track) {
+      return;
+    }
+
+    const frame = track.querySelector(".amber-gallery-frame");
+    const frameWidth = frame?.getBoundingClientRect().width ?? track.clientWidth;
+
+    track.scrollBy({
+      behavior: "smooth",
+      left: direction * (frameWidth + 2),
+    });
+  }
+
+  return (
+    <div className="amber-hero-gallery" aria-label={`${name} photos and videos`}>
+      <button
+        aria-label="Show previous media"
+        className="gallery-arrow gallery-arrow-prev"
+        onClick={() => scrollGallery(-1)}
+        type="button"
+      >
+        <svg aria-hidden="true" viewBox="0 0 24 24">
+          <path d="M15 5 8 12l7 7" />
+        </svg>
+      </button>
+      <div className="amber-gallery-track" ref={trackRef}>
+        {items.map((item) => (
+          <span className="amber-gallery-frame" key={item.id}>
+            {item.kind === "video" && isTikTokVideoSource(item.source) ? (
+              <iframe
+                allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
+                allowFullScreen
+                loading="lazy"
+                src={getVideoEmbedSource(item.source)}
+                title={item.title}
+              />
+            ) : item.kind === "video" ? (
+              <video
+                controls
+                loop
+                muted
+                playsInline
+                preload="metadata"
+                src={item.source}
+              />
+            ) : isSocialMediaUrl(item.source) ? (
+              <SocialMediaFrame source={item.source} title={item.title} />
+            ) : (
+              <img alt={item.title} src={item.source} />
+            )}
+          </span>
+        ))}
+      </div>
+      <button
+        aria-label="Show next media"
+        className="gallery-arrow gallery-arrow-next"
+        onClick={() => scrollGallery(1)}
+        type="button"
+      >
+        <svg aria-hidden="true" viewBox="0 0 24 24">
+          <path d="m9 5 7 7-7 7" />
+        </svg>
+      </button>
+    </div>
+  );
+}
+
 function MediaPreview({ item }: { item: EditableGalleryItem }) {
   return (
     <span className="editable-media-thumb">
@@ -1652,17 +1873,21 @@ function SocialMediaFrame({
 
 function EditableSeatOption({
   currency,
+  description,
   durationMinutes,
   enabled,
   price,
+  onDescriptionChange,
   onDurationChange,
   onEnabledChange,
   onPriceChange,
 }: {
   currency: string;
+  description: string;
   durationMinutes: EditableDurationValue;
   enabled: boolean;
   price: EditablePriceValue;
+  onDescriptionChange: (value: string) => void;
   onDurationChange: (value: EditableDurationValue) => void;
   onEnabledChange: (value: boolean) => void;
   onPriceChange: (value: EditablePriceValue) => void;
@@ -1679,47 +1904,39 @@ function EditableSeatOption({
         />
         <span>Offer this seat option</span>
       </label>
-      <div className="seat-option-heading">
-        <h3>{label}</h3>
-        <span>Private video call</span>
+      <div className="seat-option-heading editable-seat-option-heading">
+        <label className="editable-duration-field editable-seat-duration-field">
+          <input
+            aria-label={`${label} duration in minutes`}
+            inputMode="numeric"
+            max="240"
+            min="5"
+            type="number"
+            value={durationMinutes}
+            onChange={(event) => onDurationChange(event.target.value)}
+          />
+          <span>minutes</span>
+        </label>
+        <label className="editable-price-field editable-seat-price-field">
+          <span>{currency === "USD" ? "$" : currency}</span>
+          <input
+            aria-label={`${label} price`}
+            inputMode="decimal"
+            step="0.01"
+            min="0"
+            type="number"
+            value={price}
+            onChange={(event) => onPriceChange(event.target.value)}
+          />
+        </label>
       </div>
-      <dl className="seat-detail-list">
-        <div>
-          <dt>Time</dt>
-          <dd>
-            <label className="editable-duration-field">
-              <input
-                aria-label={`${label} duration in minutes`}
-                inputMode="numeric"
-                max="240"
-                min="5"
-                type="number"
-                value={durationMinutes}
-                onChange={(event) => onDurationChange(event.target.value)}
-              />
-              <span>minutes</span>
-            </label>
-          </dd>
-        </div>
-        <div>
-          <dt>Price</dt>
-          <dd>
-            <label className="editable-price-field">
-              <span>{currency}</span>
-              <input
-                aria-label={`${label} price in ${currency}`}
-                step="0.01"
-                inputMode="decimal"
-                min="0"
-                type="number"
-                value={price}
-                onChange={(event) => onPriceChange(event.target.value)}
-              />
-            </label>
-          </dd>
-        </div>
-      </dl>
-      <p>{enabled ? "Included on your page when you publish." : "Hidden from your page."}</p>
+      <EditableTextarea
+        ariaLabel={`${label} description`}
+        className="editable-seat-description"
+        rows={3}
+        value={description}
+        onChange={onDescriptionChange}
+      />
     </article>
   );
 }
@@ -1795,28 +2012,6 @@ function getAvailabilitySlotPayload(selectedSlots: Set<string>) {
     .filter((slot) => Boolean(slot.startTime));
 }
 
-function EditableInput({
-  ariaLabel,
-  className,
-  value,
-  onChange,
-}: {
-  ariaLabel: string;
-  className: string;
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <input
-      id={ariaLabel.toLowerCase().replaceAll(" ", "-")}
-      aria-label={ariaLabel}
-      className={`editable-profile-field ${className}`}
-      value={value}
-      onChange={(event) => onChange(event.target.value)}
-    />
-  );
-}
-
 function EditableTextarea({
   ariaLabel,
   className,
@@ -1834,6 +2029,7 @@ function EditableTextarea({
     <textarea
       aria-label={ariaLabel}
       className={`editable-profile-field ${className}`}
+      placeholder={ariaLabel}
       rows={rows}
       value={value}
       onChange={(event) => onChange(event.target.value)}
