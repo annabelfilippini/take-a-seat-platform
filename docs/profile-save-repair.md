@@ -1,6 +1,7 @@
 # Creator profile save repair
 
-Prepared September 14, 2026. Production deployment awaits Annabel's approval.
+Deployed September 14, 2026 after Annabel's approval from merged PR #26,
+commit `f89e915`. Worker version: `d386cbee-4be0-48bc-8c71-15f58ec0fa7b`.
 
 The live editor accepted full camera photos as inline data URLs. A gallery of
 roughly 6 MB was then submitted inside one private profile draft, beyond the
@@ -36,8 +37,16 @@ Tab navigation required that save to succeed, trapping the creator on Profile.
   Settings, and Profile remained accessible and the edited text survived tab
   navigation. Desktop 1280 × 900 and mobile 390 × 844 checks found no clipping
   or overlapping error, navigation, or retry controls.
-- Production save failure was reproduced, but the repaired code has not yet
-  been deployed or verified with the user's production profile.
+- Production verification passed on the affected creator's actual account.
+  The two unsaved gallery uploads were restored from the original browser tab,
+  Save draft reported Saved, and a full reload retained all three distinct
+  photos and every form value. Image sources matched before and after reload
+  and every image loaded. Availability, Payments, and Settings opened normally;
+  mobile Availability was also checked at 390 × 844. The original tab was then
+  refreshed to the repaired build. These were private draft saves, not publication.
+- Preflight confirmed all required Worker secrets and no pending migrations.
+  The first D1 migration check returned Cloudflare access error 7403; a retry
+  succeeded without changing permissions or credentials.
 
 ## Release and limits
 
