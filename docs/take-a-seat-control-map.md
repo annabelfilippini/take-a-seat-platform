@@ -37,9 +37,10 @@ Creator backend:
 
 - Invite-only for accepted creators.
 - Lets creators edit profile content that affects buyer confidence.
-- Profile save repair is prepared, pending deployment: resize large uploaded
-  photos, enforce D1 row budgets, retain edits across failed saves, and let tabs
-  open independently of save success. See [save repair](profile-save-repair.md).
+- Profile save repair is deployed and verified on the affected live account:
+  resize uploaded photos, enforce D1 row budgets, and let tabs open independently
+  of save success. Photos and text survived a production reload. See
+  [save repair](profile-save-repair.md).
 - Lets creators set 15 minute and 30 minute seat pricing.
 - Lets creators set different availability for each dated week through six months
   ahead, with week arrows, a week dropdown, and a separate save for each week. New
