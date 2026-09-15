@@ -1,3 +1,4 @@
+import { claimBookingDecision } from "../../../_lib/booking-decisions";
 import { getSafeReturnTo } from "../../../_lib/safe-redirect";
 import { getRequestAdminEmail } from "../../../_lib/admin-auth";
 import {
@@ -86,6 +87,7 @@ export async function POST(request: Request) {
       return redirectWithStatus(request, safeReturnTo, "setup-needed", "google-calendar");
     }
 
+    if (!await claimBookingDecision(booking.id, "accept")) return redirectWithStatus(request, safeReturnTo, "error", "booking-status");
     let paidBooking = null;
 
     try {

@@ -21,10 +21,10 @@ export function availabilityDateBounds(timezone: string, now = new Date()) {
   }).formatToParts(now).map((part) => [part.type, part.value]));
   const today = `${parts.year}-${parts.month}-${parts.day}`;
   const monthIndex = Number(parts.month) - 1;
-  const target = new Date(Date.UTC(Number(parts.year), monthIndex + 6, 1));
+  const target = new Date(Date.UTC(Number(parts.year), monthIndex + 12, 1));
   const year = target.getUTCFullYear();
   const month = target.getUTCMonth() + 1;
-  // Clamp month-end starts, such as August 31, to the last day six months later.
+  // Clamp month-end starts, such as August 31, to the last day one year later.
   const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
   const end = `${year}-${String(month).padStart(2, "0")}-${String(Math.min(Number(parts.day), lastDay)).padStart(2, "0")}`;
   return { today, end };

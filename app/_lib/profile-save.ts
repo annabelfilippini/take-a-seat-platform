@@ -18,5 +18,6 @@ export function profileSaveError(detail?: string, status?: number) {
     return "Your sign-in could not be verified. Keep this tab open, sign in again in another tab, then retry Save draft.";
   }
   if (detail === "profile-required") return "Your profile needs a valid application email before it can be saved.";
+  if (detail && /[ .]/.test(detail) && detail.length < 400) return detail;
   return "We couldn't save your profile. Your edits are still here. Please retry Save draft.";
 }

@@ -1,5 +1,5 @@
 export const CREATOR_PROFILE_EDITOR_URL =
-  "/creators/dashboard";
+  "/creator/profile";
 
 export function getCreatorProfileEditorUrl(creatorId: string | null | undefined) {
   void creatorId;

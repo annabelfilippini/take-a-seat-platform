@@ -334,7 +334,39 @@ test("a delayed Checkout webhook cannot expose the held time to a second custome
     const seat = { id: "qa15", name: "15 minutes" }, input = { appointmentStartAt: "2026-10-01T09:00:00", timezone: "America/New_York", customerEmail: "qa@example.com", customerName: null, customerNote: null };
     seedBooking("booking_delayed", creator.id, "requested");
     sqlite.prepare("UPDATE customer_bookings SET created_at='2026-01-01' WHERE id='booking_delayed'").run();
-    assert.equal(await bookingDomain.isBookingSlotAvailable({ creator, seat, input }), false);
+    const oldFetch = globalThis.fetch;
+    globalThis.fetch = async (url) => {
+        assert.match(String(url), /checkout\/sessions\//);
+        return Response.json({ id: sqlite.prepare("SELECT stripe_checkout_session_id FROM customer_bookings WHERE id='booking_delayed'").get().stripe_checkout_session_id, status: "complete" });
+    };
+    try { assert.equal(await bookingDomain.isBookingSlotAvailable({ creator, seat, input }), false); }
+    finally { globalThis.fetch = oldFetch; }
     sqlite.prepare("UPDATE customer_bookings SET status='checkout_expired' WHERE id='booking_delayed'").run();
     assert.equal(await bookingDomain.isBookingSlotAvailable({ creator, seat, input }), true);
+});
+
+
+test("schedule changes during the provider check invalidate the atomic reservation", async () => {
+    const creator = { id: "schedule-race", name: "Schedule race", availabilityRules: [{ dayOfWeek: 4, startTime: "09:00", endTime: "12:00", timezone: "America/New_York", bufferMinutes: 0, minNoticeMinutes: 0 }] };
+    const seat = { id: "qa", name: "Quick question", durationMinutes: 15, unitAmount: 1800, currency: "usd" };
+    await connect(creator.id);
+    sqlite.prepare("INSERT INTO creator_availability_rules (creator_id, timezone, day_of_week, start_time, end_time) VALUES (?, 'America/New_York', 4, '09:00', '12:00')").run(creator.id);
+    globalThis.fetch = async (url, options) => {
+        if (String(url).endsWith("/freeBusy")) sqlite.prepare("DELETE FROM creator_availability_rules WHERE creator_id=?").run(creator.id);
+        return provider(url, options);
+    };
+    try {
+        assert.equal(await bookingDomain.reserveBookingRequest({creator,seat,input:{appointmentStartAt:"2026-10-01T09:00:00",timezone:"America/New_York",customerEmail:"qa@example.com",customerName:null,customerNote:null}}), null);
+        assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM customer_bookings WHERE creator_id=?").get(creator.id).n, 0);
+    } finally { globalThis.fetch = originalFetch; }
+});
+
+test("opposite creator decisions cannot both claim a payment authorization", async () => {
+    const { claimBookingDecision } = await import("../app/_lib/booking-decisions.ts");
+    seedBooking("decision-race", "decision-race", "payment_authorized");
+    const results = await Promise.all([claimBookingDecision("decision-race", "accept"), claimBookingDecision("decision-race", "decline")]);
+    assert.equal(results.filter(Boolean).length, 1);
+    const decision = sqlite.prepare("SELECT creator_decision FROM customer_bookings WHERE id='decision-race'").get().creator_decision;
+    assert.equal(await claimBookingDecision("decision-race", decision), true);
+    assert.equal(await claimBookingDecision("decision-race", decision === "accept" ? "decline" : "accept"), false);
 });

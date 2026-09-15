@@ -257,10 +257,6 @@ async function getStripeCheckoutReadiness({
     return { detail: "stripe-connect", ok: false };
   }
 
-  if (!connection.connectedAt) {
-    return { detail: "stripe-onboarding", ok: false };
-  }
-
   let transferStatus: string | null;
 
   try {

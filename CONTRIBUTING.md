@@ -35,6 +35,11 @@ Use this flow for GitHub and source control.
 
 Before merging:
 
+- Follow [the engineering release gate](docs/engineering-release-gate.md), review
+  relevant [bug log](docs/BUG_LOG.md) entries, and record newly encountered bugs.
+- Relevant complete Playwright journeys pass, including real persistence,
+  hard refresh, returning login, and published customer data where applicable.
+  Node tests and visual checks alone do not satisfy the feature release gate.
 - The branch is up to date with `main`.
 - `npm run lint` passes.
 - `npm test` passes, unless the PR explicitly explains why it could not run.

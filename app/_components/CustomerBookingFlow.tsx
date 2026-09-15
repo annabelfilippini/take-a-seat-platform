@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { getAvailabilityWindowStart, getViewerAvailability } from "../_lib/availability";
 import type { CreatorAvailabilityRule, Seat } from "../_lib/creators";
@@ -12,15 +12,19 @@ type CustomerBookingFlowProps = {
   returnTo?: string;
   seats: Seat[];
   showDescriptions?: boolean;
+  previewOnly?: boolean;
 };
 
 const fallbackViewerTimezone = "America/Los_Angeles";
 const weekdayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
+const subscribeHydration = () => () => {};
+
 export function CustomerBookingFlow({
-  availabilityRules = [], creatorId, creatorName, returnTo = "/with/ella", seats, showDescriptions = true,
+  availabilityRules = [], creatorId, creatorName, returnTo = "/with/ella", seats, showDescriptions = true, previewOnly = false,
 }: CustomerBookingFlowProps) {
   const id = useId();
+  const hydrated = useSyncExternalStore(subscribeHydration, () => true, () => false);
   const [activeSeatId, setActiveSeatId] = useState(seats[0]?.id ?? "");
   const activeSeat = seats.find((seat) => seat.id === activeSeatId) ?? seats[0];
   const [customerName, setCustomerName] = useState("");
@@ -190,7 +194,7 @@ export function CustomerBookingFlow({
           ) : (
             <><p className="customer-booking-disclaimer">Payment is authorized next, which may place a temporary hold on your card. {`You won't be charged unless ${creatorName} accepts your appointment.`}</p>
               <div className="customer-booking-footer-actions"><button className="customer-booking-text-button" onClick={() => setStep("time")} type="button">Back</button>
-                <button className="seat-primary-button" disabled={!selectedSlot || isSubmitting} form={`${id}-form`} type="submit">{isSubmitting ? "Opening secure payment…" : `Continue to payment · ${activeSeat.price}`}</button></div></>
+                <button className="seat-primary-button" disabled={previewOnly || !selectedSlot || isSubmitting} form={`${id}-form`} type="submit">{previewOnly ? "Preview only" : isSubmitting ? "Opening secure payment…" : `Continue to payment · ${activeSeat.price}`}</button></div></>
           )}
         </footer>
       </div>
@@ -202,9 +206,9 @@ export function CustomerBookingFlow({
       <div className="booking-seat-options" role="group" aria-label="Choose a call">
         {seats.map((seat) => <button className="booking-seat-choice" aria-pressed={seat.id === activeSeat?.id} key={seat.id} onClick={() => selectSeat(seat.id)} type="button">
           <span className="booking-seat-heading"><strong>{seat.name}</strong><strong>{seat.price}</strong></span>
-          {showDescriptions && seat.description ? <span>{seat.description}</span> : null}
+          {showDescriptions && (seat.description || seat.durationMinutes) ? <span>{seat.durationMinutes ? `${seat.durationMinutes} minutes · ` : ""}{seat.description}</span> : null}
         </button>)}
-        <button className="seat-primary-button" disabled={!activeSeat} onClick={openBooking} type="button">Find availability</button>
+        <button className="seat-primary-button" disabled={!hydrated || !activeSeat} onClick={openBooking} type="button">Find availability</button>
         <p className="booking-guest-note">No account needed.</p>
       </div>
       {typeof document === "undefined" ? null : createPortal(bookingDialog, document.body)}

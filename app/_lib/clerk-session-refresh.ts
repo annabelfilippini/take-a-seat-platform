@@ -22,7 +22,7 @@ export async function withClerkSessionRefresh(
 ) {
   const path = new URL(request.url).pathname;
   const authDocument = request.method === "GET" &&
-    (path === "/sign-in" || path.startsWith("/admin/") || path === "/creators/dashboard");
+    (path === "/sign-in" || path.startsWith("/admin/") || (path === "/creators/dashboard" || path === "/creator/profile"));
   if (!authDocument || !env.CLERK_SECRET_KEY || !env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) {
     return next(request);
   }

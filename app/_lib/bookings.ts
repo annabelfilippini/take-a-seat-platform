@@ -1,3 +1,4 @@
+import { seatDuration } from "./offerings";
 import { and, eq, sql } from "drizzle-orm";
 import { customerBookings } from "../../db/schema";
 import {
@@ -82,6 +83,10 @@ export async function createCheckoutBooking({
     id: bookingId,
     seatId: seat.id,
     seatName: seat.name,
+    offeringDurationMinutes: seatDuration(seat),
+    offeringUnitAmount: seat.unitAmount,
+    offeringCurrency: seat.currency ?? "usd",
+    offeringDescription: seat.description,
     status: BOOKING_STATUS.checkoutStarted,
     timezone: input.timezone,
     updatedAt: now,
@@ -117,7 +122,12 @@ export async function isBookingSlotAvailable({
     return true;
   }
 
-  const existingBookings = bookings ?? await listCreatorBookings(creator.id);
+  let existingBookings = bookings ?? await listCreatorBookings(creator.id);
+  if (!bookings) {
+    const { reconcileCheckoutHolds } = await import("./checkout-holds");
+    await reconcileCheckoutHolds(existingBookings);
+    existingBookings = await listCreatorBookings(creator.id);
+  }
   const blockingBookings = existingBookings.filter(isBlockingBooking);
   let bookingsOnDay = 0;
   let bookingsInWeek = 0;
@@ -210,6 +220,10 @@ export async function createBookingRequest({
     id: bookingId,
     seatId: seat.id,
     seatName: seat.name,
+    offeringDurationMinutes: seatDuration(seat),
+    offeringUnitAmount: seat.unitAmount,
+    offeringCurrency: seat.currency ?? "usd",
+    offeringDescription: seat.description,
     status: BOOKING_STATUS.requested,
     timezone: input.timezone,
     updatedAt: now,
@@ -333,7 +347,7 @@ export async function markBookingPaymentEnded({ bookingId, sessionId, status }: 
   // Session expiry must never revoke an authorization or a captured payment.
   if (status === "checkout_expired" && booking.status === "payment_authorized") return;
   const { getDb } = await import("../../db");
-  await getDb().update(customerBookings).set({ status, updatedAt: new Date().toISOString() })
+  await getDb().update(customerBookings).set({ status: booking.creatorDecision === "decline" ? "declined" : status, updatedAt: new Date().toISOString() })
     .where(and(eq(customerBookings.id, bookingId), eq(customerBookings.stripeCheckoutSessionId, sessionId), eq(customerBookings.status, booking.status)));
 }
 
@@ -380,7 +394,7 @@ export async function getCustomerBooking(bookingId: string) {
   return booking ?? null;
 }
 
-async function listCreatorBookings(creatorId: string) {
+export async function listCreatorBookings(creatorId: string) {
   const { getDb } = await import("../../db");
   const db = getDb();
 
@@ -520,11 +534,7 @@ function cleanTimezone(value: unknown) {
   return timezone.slice(0, 80);
 }
 
-function getSeatDurationMinutes(seat: Seat) {
-  const match = seat.name.match(/\d+/u);
-  const duration = match ? Number(match[0]) : 30;
-  return Number.isSafeInteger(duration) && duration > 0 ? duration : 30;
-}
+function getSeatDurationMinutes(seat: Seat) { return seatDuration(seat); }
 
 function addMinutesToLocalDateTime(value: string, minutes: number) {
   const date = new Date(`${value}Z`);
@@ -608,6 +618,17 @@ export async function reserveBookingRequest({ creator, input, seat }: {
   creator: Creator; input: BookingRequestInput; seat: Seat;
 }) {
   if (isTestBookingStoreEnabled()) return createBookingRequest({ creator, input, seat });
+  const { getDb: getReservationDb } = await import("../../db");
+  const reservationDb = getReservationDb();
+  const rulesVersionQuery = sql`SELECT json_group_array(json_array(id, week_start, timezone, day_of_week, start_time, end_time, enabled, buffer_minutes, min_notice_minutes, max_bookings_per_day, max_bookings_per_week)) AS version FROM (SELECT * FROM creator_availability_rules WHERE creator_id = ${creator.id} ORDER BY id)`;
+  const rulesVersion = (await reservationDb.get<{version:string}>(rulesVersionQuery))!.version;
+  const { getBookableCreatorById } = await import("./creator-onboarding");
+  const currentCreator = await getBookableCreatorById(creator.id);
+  if (currentCreator) {
+    const currentSeat = currentCreator.seats.find((item) => item.id === seat.id);
+    if (!currentSeat || currentSeat.unitAmount !== seat.unitAmount || seatDuration(currentSeat) !== seatDuration(seat)) return null;
+    creator = currentCreator;
+  }
   const bookings = await listCreatorBookings(creator.id);
   if (!await isBookingSlotAvailable({ creator, input, seat, bookings })) return null;
   const slot = getMatchedAvailabilitySlot({ appointmentStartAt: input.appointmentStartAt,
@@ -625,12 +646,13 @@ export async function reserveBookingRequest({ creator, input, seat }: {
   const rows = await getDb().all<{ id: string }>(sql`
     INSERT INTO customer_bookings (id, creator_id, creator_name, seat_id, seat_name,
       customer_name, customer_email, customer_note, appointment_start_at, appointment_end_at,
-      timezone, status, created_at, updated_at)
+      timezone, status, created_at, updated_at, offering_duration_minutes, offering_unit_amount, offering_currency, offering_description)
     SELECT ${id}, ${creator.id}, ${creator.name}, ${seat.id}, ${seat.name},
       ${input.customerName}, ${input.customerEmail}, ${input.customerNote}, ${input.appointmentStartAt},
       ${addMinutesToLocalDateTime(input.appointmentStartAt, getSeatDurationMinutes(seat))},
-      ${input.timezone}, 'requested', ${now}, ${now}
-    WHERE ${snapshot} = (SELECT json_group_array(json_array(id, status, updated_at,
+      ${input.timezone}, 'requested', ${now}, ${now}, ${seatDuration(seat)}, ${seat.unitAmount ?? null}, ${seat.currency ?? 'usd'}, ${seat.description ?? ""}
+    WHERE ${rulesVersion} = (${rulesVersionQuery})
+    AND ${snapshot} = (SELECT json_group_array(json_array(id, status, updated_at,
       stripe_checkout_session_id, appointment_start_at, appointment_end_at, timezone))
       FROM (SELECT * FROM customer_bookings WHERE creator_id = ${creator.id} ORDER BY id))
     RETURNING id

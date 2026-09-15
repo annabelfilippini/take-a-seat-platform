@@ -21,8 +21,8 @@ export default async function CreatorDashboardPage({
 }: CreatorDashboardPageProps) {
   const inviteToken = getInviteToken(searchParams?.invite);
   const requestPath = inviteToken
-    ? `/creators/dashboard?invite=${encodeURIComponent(inviteToken)}`
-    : "/creators/dashboard";
+    ? `/creator/profile?invite=${encodeURIComponent(inviteToken)}`
+    : "/creator/profile";
   const creatorAccount = await getSignedInCreatorEditorAccount(
     requestPath,
     inviteToken,
@@ -60,8 +60,8 @@ function CreatorDashboardAccess({
   isStripeReturn: boolean;
 }) {
   const redirectUrl = inviteToken
-    ? `/creators/dashboard?invite=${encodeURIComponent(inviteToken)}`
-    : "/creators/dashboard";
+    ? `/creator/profile?invite=${encodeURIComponent(inviteToken)}`
+    : "/creator/profile";
   const heading = isStripeReturn
     ? "You're almost done. Sign in to return to your creator dashboard."
     : "Sign in to build your profile.";
@@ -84,7 +84,7 @@ function CreatorDashboardAccess({
             className="creator-phone-auth-widget"
             codeHeading="Enter your verification code."
             redirectUrl={redirectUrl}
-            routeByAccount={!inviteToken}
+            routeByAccount={false}
             showSignedInContinue={!accessError}
             submitLabel="Send verification code"
           />

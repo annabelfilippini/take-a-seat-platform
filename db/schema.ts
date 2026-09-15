@@ -39,6 +39,7 @@ export const creatorOnboardingProfiles = sqliteTable("creator_onboarding_profile
   publishedAt: text("published_at"),
   profileSavedAt: text("profile_saved_at"),
   profileDraft: text("profile_draft"),
+  sessionOfferings: text("session_offerings"),
   draftSavedAt: text("draft_saved_at"),
   applicationStatus: text("application_status").notNull().default("draft"),
   reviewSubmittedAt: text("review_submitted_at"),
@@ -172,6 +173,12 @@ export const customerBookings = sqliteTable(
     creatorName: text("creator_name").notNull(),
     seatId: text("seat_id").notNull(),
     seatName: text("seat_name").notNull(),
+    offeringDurationMinutes: integer("offering_duration_minutes"),
+    offeringUnitAmount: integer("offering_unit_amount"),
+    offeringCurrency: text("offering_currency"),
+    offeringDescription: text("offering_description"),
+    creatorDecision: text("creator_decision"),
+    decisionNotifiedAt: text("decision_notified_at"),
     customerName: text("customer_name"),
     customerEmail: text("customer_email").notNull(),
     customerNote: text("customer_note"),
@@ -231,3 +238,17 @@ export const creatorAccounts = sqliteTable(
     creatorIdx: uniqueIndex("creator_accounts_creator_idx").on(table.creatorId),
   }),
 );
+
+// Bounded original media lives separately from the draft/public profile row.
+export const creatorMedia = sqliteTable('creator_media', {
+  id: text('id').primaryKey(),
+  creatorId: text('creator_id').notNull(),
+  mime: text('mime').notNull(),
+  bytes: integer('bytes').notNull(),
+  createdAt: text('created_at').notNull(),
+});
+export const creatorMediaChunks = sqliteTable('creator_media_chunks', {
+  mediaId: text('media_id').notNull(),
+  position: integer('position').notNull(),
+  content: text('content').notNull(),
+}, (table) => ({ chunkIdx: uniqueIndex('creator_media_chunk_idx').on(table.mediaId, table.position) }));

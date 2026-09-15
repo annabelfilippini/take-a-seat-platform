@@ -100,6 +100,9 @@ Cloudflare production bindings are declared in `wrangler.deploy.jsonc`.
 
 ## Important Docs
 
+- `docs/engineering-release-gate.md`: required persistence, Playwright, regression,
+  and release-report standards; protects the approved customer booking flow.
+- `docs/BUG_LOG.md`: bug index and root-cause records to review before changes.
 - `docs/take-a-seat-control-map.md`: source of truth for product, architecture,
   environments, roles, and cleanup.
 - `CONTRIBUTING.md`: GitHub branch, commit, PR, review, and deploy flow.
@@ -127,3 +130,9 @@ Already handled during repository cleanup:
 - Removed legacy Sites packaging files and starter D1 example code.
 - Moved shared UI and domain helpers out of the route root into
   `app/_components` and `app/_lib`.
+
+## Creator storefront implementation
+
+The creator editor is `/creator/profile`, with authenticated draft preview at
+`/creator/preview`. See [storefront verification and deployment prerequisites](docs/creator-storefront-verification.md).
+Run `npm run test:e2e` for the isolated Playwright creator/customer journeys.

@@ -2,7 +2,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { CreatorMediaGallery } from "../../_components/CreatorMediaGallery";
-import { creators } from "../../_lib/creators";
+import { creators, type Creator } from "../../_lib/creators";
 import { getPublicCreatorBySlug } from "../../_lib/creator-onboarding";
 import {
   getProfileImageObjectPosition,
@@ -73,6 +73,11 @@ export default async function CreatorProfilePage({
     notFound();
   }
 
+  return <CreatorProfileContent creator={creator} searchParams={searchParams} />;
+}
+
+export function CreatorProfileContent({ creator, searchParams, previewOnly = false }: {creator:Creator;searchParams?:CreatorProfilePageProps["searchParams"];previewOnly?:boolean}) {
+  const profile = creator.profile!;
   const firstName = creator.name.split(/\s+/u)[0] || creator.name;
   const waitlistHref = `mailto:annabel@takeaseatwith.com?subject=${encodeURIComponent(
     profile.waitlistSubject,
@@ -174,6 +179,7 @@ export default async function CreatorProfilePage({
                 </p>
               ) : null}
               <CustomerBookingFlow
+                previewOnly={previewOnly}
                 availabilityRules={creator.availabilityRules}
                 creatorId={creator.id}
                 creatorName={creator.name}
@@ -237,6 +243,8 @@ function getBookingNotice(
   if (status === "error" && detail === "booking-details") {
     return "The request needs a valid time and email address.";
   }
+
+  if (status === "error" && detail === "availability") return "That time is no longer available. Please choose another.";
 
   if (status === "error") {
     return "The request could not be sent. Check the details and try again.";
