@@ -43,7 +43,8 @@ Creator backend:
   public fields. Authenticated draft preview reuses the customer profile renderer.
 - Original media is stored in bounded D1 chunks; profiles retain URLs and crop settings.
 - Reliability repairs deployed from PR #30 (`43b586c`): stale-draft protection,
-  timezone inheritance, upload retries and hydration. See the
+  timezone inheritance, upload retries and hydration. PR #31 (`6e96c56`) adds
+  verified email account switching and accurate setup instructions. See the
   [reliability audit](marketplace-reliability-qa-2026-09-14.md) and
   [live rehearsal](marketplace-live-rehearsal-2026-09-14.md).
 - Up to 12 ordered offerings with explicit durations, prices, descriptions, and archival.
@@ -191,7 +192,9 @@ Calendar:
 - Calendar retries reuse a deterministic event ID. A booking stays paid until
   Google provides its Meet link, then becomes approved.
 - Local integration and desktop/mobile verification are recorded in
-  `docs/calendar-rehearsal-2026-09-12.md`; live inbox/calendar proof still gates launch.
+  `docs/calendar-rehearsal-2026-09-12.md`. September 14 live provider rehearsal
+  verified OAuth persistence, busy-time rejection, deterministic event creation
+  and a customer Inbox invitation with Meet; see the live rehearsal report.
 - Booking request and Stripe Checkout routes server-validate submitted times
   against creator availability before creating a booking.
 - Public creator profiles collect the request first, then send the customer to
@@ -205,8 +208,10 @@ Payments:
   returned HTTP 200. Live Connect is accepted and live account creation is
   enabled. The live webhook exists but is disabled; its signing secret is saved
   under the staging name `STRIPE_LIVE_WEBHOOK_SECRET`, which current code does
-  not read. Live credentials, the first creator's account, deployment approval,
-  and a full booking/calendar rehearsal remain. See
+  not read. September 14 sandbox rehearsal passed hosted authorization, creator
+  capture, decline/cancellation, 15% fee, webhook replay and Google invitation.
+  Live credentials, first creator live onboarding and real-money settlement
+  verification remain. See
   `docs/stripe-launch-readiness-2026-09-12.md` for evidence and launch gates.
 
 - Stripe Connect is the chosen marketplace payment model.
@@ -389,9 +394,9 @@ Completed:
 
 Next:
 
-1. Verify Cloudflare and D1.
-   Confirm the intended D1 migrations are applied to the production database and
-   that required secrets exist.
+1. Keep deployment preflight current.
+   September 14 deployments verified required Worker secret names and no pending
+   D1 migrations. Repeat before a launch-critical deployment.
 
 2. Configure accepted-creator notifications.
    Decide whether launch requires SMS, then either configure Twilio secrets and
@@ -399,10 +404,10 @@ Next:
    notifications first with SMS disabled.
 
 3. Finish integration reliability.
-   Complete a Stripe Connect onboarding pass from an accepted creator profile,
-   test the signed Stripe webhook with a full checkout, complete Google Calendar
-   busy/free conflict checks, and test a full booking flow before taking real
-   payments.
+   Sandbox checkout, capture, decline, signed webhook replay and Google Calendar
+   busy/free and invitation checks passed September 14. Complete first-creator
+   live onboarding, activate and verify live credentials/webhook, and verify
+   real-money settlement before taking real customer payments.
 
 ## Launch Gate
 
@@ -422,8 +427,8 @@ have:
 - Customer request notification rehearsal completed: creator email delivered
   and the request appears in the creator dashboard.
 - Creator request acceptance rehearsal completed: creator can click “Accept
-  this appointment,” the customer receives a post-acceptance payment email, and
-  no customer payment is collected before acceptance.
+  this appointment,” captures the existing authorization, and the customer
+  receives the calendar invitation; no payment is captured before acceptance.
 - Stripe Connect test account onboarding completed from an accepted creator
   profile.
 - Stripe webhook handling tested with a full Checkout event.

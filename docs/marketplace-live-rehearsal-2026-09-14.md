@@ -6,7 +6,9 @@ deployment and live integration testing. Payments remain in Stripe sandbox mode.
 ## Deployment
 
 - PR #30 merged as `43b586c`; its tree matches the locally verified QA changes.
-- Production Worker version: `45a1a16f-efb3-4ba7-83bb-9ab02e52095f`.
+- Initial Worker version: `45a1a16f-efb3-4ba7-83bb-9ab02e52095f`.
+- Auth and email follow-up PR #31 merged as `6e96c56`, deployed as Worker
+  `6811bc8b-08a0-4e5d-8077-cd39699f78ed` from the verified clean tree.
 - Required Clerk, Google, Resend and Stripe secret names verified; no values exported.
 - D1 reports no pending migrations. Dry run and deploy succeeded from a clean tree.
 
@@ -16,7 +18,7 @@ deployment and live integration testing. Payments remain in Stripe sandbox mode.
 | --- | --- |
 | New creator application and admin acceptance | Private QA identity created through public application and authenticated admin UI; application, admin alert and setup emails arrived in Inbox |
 | First sign-in and returning login | One-use setup link opened private starter profile after reload; saved draft survived hard refresh and real Clerk email-code logout/login; publication timestamp stayed null |
-| Wrong-account email switch | Reproduced same-document stall twice; repaired with explicit reload after sign-out; local regression passes; post-deploy live recheck pending |
+| Wrong-account email switch | Reproduced same-document stall twice; repaired with explicit reload after sign-out; local regression passes; two post-deploy switches reached the correct saved profile without manual reload; original admin session restored |
 | Published data | Existing creator's published $45 offering remained distinct from newer private draft edits |
 | Google OAuth | Live connection persisted with free/busy and owned-event scopes, and the creator UI showed connected |
 | Checkout and capture | Two real hosted sandbox Checkouts authorized $45 each; creator acceptance captured and advanced each to approved |
@@ -24,6 +26,8 @@ deployment and live integration testing. Payments remain in Stripe sandbox mode.
 | Webhook delivery/replay | Checkout event delivered with HTTP 200 and manually replayed with HTTP 200 after acceptance; D1 retained one booking, one event ID and one notification per type |
 | Calendar/Meet | One deterministic Google event per accepted booking, with a real Meet URL; separate customer inbox received the second event invitation with correct timezone conversion |
 | Real busy-time rejection | Temporarily moved the first disposable event to a free slot; booking submission rejected it before Checkout. Restored the event to its original time afterward |
+| Decline and authorization release | Third $45 hosted sandbox authorization declined in creator UI; Stripe cancel API returned 200, payment is Canceled with $0 net, D1 is declined with no calendar event, and customer cancellation email arrived in Inbox |
+| Acceptance copy | Fresh post-deploy branded email and admin panel correctly distinguish Save draft from Preview & Publish |
 | Creator inbox | Request and paid-booking emails arrived in the creator's Inbox |
 
 The first invitation addressed the calendar owner itself, so it did not generate
@@ -34,7 +38,9 @@ Non-secret evidence references: first booking
 `booking_7f2461f4-47b1-43b3-a7a4-df362a12199f`, payment
 `pi_3UFnb31B3wHKPpd61W5NcKFH`, Checkout event
 `evt_1UFnb41B3wHKPpd6vXNorMS9`; second booking
-`booking_7fd8559e-ec90-487c-bb7e-67117f0e34d8`.
+`booking_7fd8559e-ec90-487c-bb7e-67117f0e34d8`; declined booking
+`booking_2723e3b3-9a13-4aa7-923c-733ff030f15d`, payment
+`pi_3UFntT1B3wHKPpd618FHqiKN`.
 No invitation credentials, email codes, private messages or calendar tokens are
 stored in this report.
 
@@ -47,18 +53,32 @@ stored in this report.
 2. Setup emails and the admin acceptance panel incorrectly described saving as
    publication. Both now instruct creators to use Preview & Publish.
 
+3. A refreshed declined booking page fell through to the generic payment-needed
+   text. Added a declined heading and cancellation explanation, and removed the
+   creator approval panel for declined requests. The existing full booking
+   journey now checks the customer result, refresh and creator controls.
+
 Root causes and regression coverage are in [BUG_LOG.md](BUG_LOG.md).
 Customer booking component and CSS remain unchanged.
 
 ## Scope and outstanding checks
 
-- Final live account-switch recheck and follow-up deployment are pending.
+- Local release checks: 20 Playwright journeys, 80 Node tests, lint and TypeScript
+  passed again with the final decline-copy repair (20 browser journeys in 50.7s,
+  no retries or skips). Production confirmation follows the committed deployment.
 - Sandbox proves authorization/capture/webhook/fee logic, not live-bank payouts,
   legal onboarding, settlement or real-card readiness. Live webhook remains disabled.
 - The existing picker displays scheduled hours; final submission checks current
   D1 reservations and Google conflicts. Busy slots are safely rejected there.
-- Chrome and narrow viewport coverage does not certify Safari or Firefox.
+- Local Playwright covers desktop and narrow layouts. Live browser auth checks
+  passed at desktop width with no captured console errors. The in-app viewport
+  override reported success but remained 1280 pixels wide, so this is not live
+  mobile proof. Safari and Firefox were not exercised.
 - Link CLI was run at the user's request; financial-wallet setup was then skipped
   by the user. The user explicitly approved continuing with public test cards.
-- The private QA profile and two sandbox bookings are retained as test evidence;
-  calendar cleanup and final artifact state will be recorded before completion.
+- Retained evidence: one private QA profile, two accepted sandbox bookings and
+  one declined sandbox booking. Two test Google events remain on September 16
+  at 09:15 and 10:15 America/Los_Angeles (15 minutes each). These accepted
+  bookings still reserve those slots. No real money was charged.
+- Original Chrome creator tab and its saved private draft were preserved. The
+  isolated browser was restored to the original admin account and viewport override reset.

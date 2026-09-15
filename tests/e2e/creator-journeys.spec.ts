@@ -261,6 +261,15 @@ test('protected customer flow, immutable purchase, request acceptance/decline, r
   await declineCard.getByRole('button',{name:'Decline',exact:true}).click(); await expect(declineCard).toContainText('Declined');
   await page.reload(); await page.getByRole('tab',{name:'Requests',exact:true}).click(); await expect(page.locator('.creator-request-card:visible').filter({hasText:'Race Customer'})).toContainText('Declined');
   expect((await sql(request,"SELECT * FROM e2e_provider_events WHERE kind='cancel'")).length).toBe(1);
+  const [declinedBooking]=await sql(request,"SELECT id FROM customer_bookings WHERE customer_name='Race Customer'");
+  await customer.goto(`/bookings/${declinedBooking.id}`);
+  await expect(customer.getByRole('heading',{name:'Request declined.',exact:true})).toBeVisible();
+  await expect(customer.getByText(/no payment was captured/)).toBeVisible();
+  await customer.reload();
+  await expect(customer.getByRole('heading',{name:'Request declined.',exact:true})).toBeVisible();
+  await expect(customer.getByText(/Payment authorization is still required/)).toHaveCount(0);
+  await page.goto(`/bookings/${declinedBooking.id}`);
+  await expect(page.getByRole('button',{name:'Accept this appointment',exact:true})).toHaveCount(0);
   // A customer's loaded page remains valid; its stale time is rejected at submit.
   await customer.goto('http://127.0.0.1:4173/with/e2e-creator');
   await customer.getByRole('button',{name:'Find availability'}).click(); await customer.locator('.customer-time-options button').last().click();

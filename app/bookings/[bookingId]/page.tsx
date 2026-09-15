@@ -112,7 +112,7 @@ export default async function BookingPage({
           ) : null}
         </article>
 
-        {canApprove ? (
+        {canApprove && booking.status !== "declined" ? (
           <aside className="creator-invite" aria-label="Approve booking">
             <span>Creator approval</span>
             <h2>Accept this appointment</h2>
@@ -187,6 +187,7 @@ function formatStatus(value: string) {
 }
 
 function getBookingHeading(status: string) {
+  if (status === "declined") return "Request declined.";
   if (status === "checkout_expired") return "Checkout expired.";
   if (status === "payment_canceled") return "Payment authorization ended.";
   if (status === "approved") {
@@ -256,6 +257,9 @@ function requestUrlFromHeaders(requestHeaders: Headers, path: string) {
 }
 
 function getPaymentDescription(status: string) {
+  if (status === "declined") {
+    return "The creator could not accept this request. Your payment authorization has been canceled and no payment was captured. You can choose another time from the creator's profile.";
+  }
   if (status === "payment_canceled" || status === "checkout_expired") {
     return "This request is no longer active. Your payment has not been captured. Please start a new booking request.";
   }
