@@ -10,6 +10,7 @@ export function CreatorEmailSignIn() {
   const { signOut } = useClerk();
   const started = useRef(false);
   const [error, setError] = useState("");
+  const [switchingAccount, setSwitchingAccount] = useState(false);
   const href = useSyncExternalStore(subscribeToLocation, () => window.location.href, () => "");
   const url = new URL(href || "https://takeaseatwith.com/creators/email-sign-in");
   const fragment = new URLSearchParams(url.hash.slice(1));
@@ -20,7 +21,7 @@ export function CreatorEmailSignIn() {
   const switchAccount = Boolean(user && ticket && (!email || user.primaryEmailAddress?.emailAddress.toLowerCase() !== email));
 
   useEffect(() => {
-    if (!href || !isLoaded || !userLoaded || !signIn || started.current || switchAccount) return;
+    if (!href || !isLoaded || !userLoaded || !signIn || started.current || switchAccount || switchingAccount) return;
     started.current = true;
     const target = destination;
     if (user) {
@@ -47,12 +48,20 @@ export function CreatorEmailSignIn() {
         window.clearTimeout(timeout);
       }
     })();
-  }, [href, isLoaded, userLoaded, signIn, setActive, user, switchAccount, destination, ticket]);
+  }, [href, isLoaded, userLoaded, signIn, setActive, user, switchAccount, switchingAccount, destination, ticket]);
+
+  if (switchingAccount) return <p role="status">Switching accounts and opening your creator profile…</p>;
 
   if (switchAccount) return <div className="phone-auth-heading">
     <p>You’re signed in with a different account. Switch to the creator account in your acceptance email to continue.</p>
     <button className="phone-auth-submit" type="button" onClick={() => {
-      void signOut({ redirectUrl: window.location.href }).catch(() => setError("We could not switch accounts. Please try again."));
+      setSwitchingAccount(true);
+      // A same-URL SDK redirect can keep the signed-out legacy hook mounted.
+      // Recreate Clerk on a fresh document before redeeming the retained ticket.
+      void signOut(() => window.location.reload()).catch(() => {
+        setSwitchingAccount(false);
+        setError("We could not switch accounts. Please try again.");
+      });
     }}>Switch to my creator account</button>
     {error ? <p role="alert">{error}</p> : null}
   </div>;

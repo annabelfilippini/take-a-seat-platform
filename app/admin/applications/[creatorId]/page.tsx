@@ -170,7 +170,7 @@ export default async function AdminApplicationPage({
             <section className="admin-accept-panel" aria-label="Accept application">
               <span>Decision</span>
               <h2>Accept application</h2>
-              <p>Acceptance creates a private starter profile and emails the creator. Their card appears after they save their profile.</p>
+              <p>Acceptance creates a private starter profile and emails the creator. Their card appears after they publish from Preview &amp; Publish.</p>
               <form action="/api/creators/applications/accept" method="post">
                 <input name="creatorId" type="hidden" value={application.id} />
                 <label className="admin-public-id-field">

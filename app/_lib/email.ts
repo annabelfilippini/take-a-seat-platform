@@ -177,7 +177,7 @@ export async function sendCreatorAcceptedEmail({
     `Build your profile: ${setupUrl}`,
     "Sign in with the email address from your accepted application.",
     "",
-    "Save your profile when you are ready for your card to appear on the website.",
+    "Save your draft as you build. When everything is ready, use Preview & Publish to make your profile public.",
     "",
     "We can’t wait for you to begin inspiring!!!",
     "",
@@ -188,7 +188,7 @@ export async function sendCreatorAcceptedEmail({
     "<p>Congratulations — your Take a Seat application has been accepted! You can now create your profile, set your availability, and choose what you’d like to offer.</p>",
     `<p><a href="${escapeHtml(setupUrl)}">Build your profile</a></p>`,
     "<p>Sign in with the email address from your accepted application.</p>",
-    "<p>Save your profile when you are ready for your card to appear on the website.</p>",
+    "<p>Save your draft as you build. When everything is ready, use Preview &amp; Publish to make your profile public.</p>",
     "<p>We can’t wait for you to begin inspiring!!!</p>",
     "<p>Annabel</p>",
   ].join("");
