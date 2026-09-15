@@ -9,7 +9,7 @@ import {
 import { getRequestAdminEmail } from "../../../_lib/admin-auth";
 import { getSignedInClerkUser } from "../../../_lib/clerk-auth";
 import { CREATOR_PROFILE_EDITOR_URL } from "../../../_lib/creator-destination";
-import { ProfileSizeError } from "../../../_lib/profile-save";
+import { ProfileSizeError, ProfileConflictError } from "../../../_lib/profile-save";
 import {
   sendCreatorApplicationEmail,
   sendCreatorApplicationReceivedEmail,
@@ -29,7 +29,7 @@ function profileStatusResponse(
         status,
         ...extraParams,
       },
-      { status: status === "saved" ? 200 : detail === "profile-too-large" ? 413 : 400 },
+      { status: status === "saved" ? 200 : detail === "draft-conflict" ? 409 : detail === "profile-too-large" ? 413 : 400 },
     );
   }
 
@@ -121,9 +121,14 @@ export async function POST(request: Request) {
     }
   }
 
+  let saved;
   try {
-    await saveCreatorProfileSettings(creatorId, input);
+    // Older open editors have no revision: permit an initial draft, but never
+    // let them overwrite an existing saved draft without reloading first.
+    input.expectedDraftSavedAt ??= null;
+    saved = await saveCreatorProfileSettings(creatorId, input);
   } catch (error) {
+    if (error instanceof ProfileConflictError) return profileStatusResponse(request, "error", "draft-conflict");
     return profileStatusResponse(
       request,
       error instanceof ProfileSizeError ? "error" : "setup-needed",
@@ -162,5 +167,6 @@ export async function POST(request: Request) {
     "saved",
     undefined,
     typeof returnTo === "string" ? returnTo : null,
+    saved?.draftSavedAt ? { draftSavedAt: saved.draftSavedAt } : {},
   );
 }

@@ -2,6 +2,12 @@
 export const MAX_PROFILE_BYTES = 800_000;
 export const PROFILE_MEDIA_BUDGET = 650_000;
 
+export class ProfileConflictError extends Error {
+  constructor() {
+    super("This draft changed in another tab. Copy your unsaved edits, reload to see the latest saved draft, then reapply your changes.");
+  }
+}
+
 export function profileByteLength(value: unknown) {
   return new TextEncoder().encode(JSON.stringify(value)).byteLength;
 }
@@ -13,6 +19,7 @@ export class ProfileSizeError extends Error {
 }
 
 export function profileSaveError(detail?: string, status?: number) {
+  if (detail === "draft-conflict") return new ProfileConflictError().message;
   if (status === 413 || detail === "profile-too-large") return new ProfileSizeError().message;
   if (detail === "creator-access" || detail === "creator-auth" || status === 401 || status === 403) {
     return "Your sign-in could not be verified. Keep this tab open, sign in again in another tab, then retry Save draft.";

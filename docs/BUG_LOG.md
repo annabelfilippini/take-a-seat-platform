@@ -356,3 +356,244 @@ media ownership and image MIME type on the server.
 
 `EditableCreatorProfilePreview.tsx`, `app/_lib/creator-media.ts`, `tests/e2e/creator-journeys.spec.ts`.
 September 14; found during final review, local verification in the storefront report.
+
+## 2026-09-14: Untouched weeks reused the old default timezone
+
+### Bug
+
+The adversarial Playwright journey saves default hours in America/New_York, then
+opens an untouched future week. Its hours inherit the new default, but its timezone
+still shows America/Los_Angeles until refresh.
+
+### User impact
+
+Saving that week can unintentionally move customer availability by three hours.
+
+### Root cause
+
+Week navigation reads updated default slot keys from local saved state but resolves
+the timezone from the original server rules. The two parts use different fallback
+precedence. Earlier timezone coverage reloaded first, masking this stale-state path.
+
+### Fix
+
+Resolve inherited default timezones from the same saved state as inherited hours,
+while keeping a dated override's own timezone authoritative.
+
+### Regression prevention
+
+Playwright checks an untouched week immediately after changing an existing default
+schedule's timezone and again after refresh. Verified in the final 19-journey Playwright run; all passed.
+
+### Related files
+
+`app/admin/creator-profile-editor-preview/EditableCreatorProfilePreview.tsx`,
+`tests/e2e/creator-journeys.spec.ts`.
+
+### Date / feature
+
+September 14, 2026; adversarial creator/customer reliability audit, isolated local D1.
+
+## 2026-09-14: A stale editor could overwrite another tab's saved draft
+
+### Bug
+
+Two creator tabs load the same draft. The first saves a new name; the second edits
+About and saves its whole stale form, silently restoring the original name.
+
+### User impact
+
+Previously confirmed saved work is lost. Publishing from the stale tab can replace
+public content with the overwritten draft.
+
+### Root cause
+
+Client revision tracking protected only edits within one tab. The server accepted
+whole-form replacements without checking the version loaded by that editor.
+Publication compared the draft during its own request, after the stale save had
+already overwritten it. Existing fresh-login tests never interleaved two writers.
+
+### Fix
+
+Add a server-confirmed draft revision to editor writes and atomically reject stale
+updates, keeping local edits visible with instructions to copy them before reloading.
+Increment the stored revision timestamp monotonically and return it after commit.
+Older browser clients without a revision must reload before replacing an existing draft. Internal callers also receive a database guard against simultaneous writes.
+
+### Regression prevention
+
+Playwright interleaves two tabs, checks the conflict and retained local edits, reads
+D1 to prove the first save remains, and verifies publication cannot bypass the conflict.
+Verified in the final 19-journey Playwright run; all passed.
+
+### Related files
+
+`app/_lib/creator-onboarding.ts`, `app/_lib/profile-save.ts`,
+`app/api/creators/profile/route.ts`, `EditableCreatorProfilePreview.tsx`,
+`tests/e2e/creator-journeys.spec.ts`.
+
+### Date / feature
+
+September 14, 2026; adversarial persistence and publication audit, local D1.
+
+## 2026-09-14: Publication still required a stale Stripe profile timestamp
+
+### Bug
+
+Payments reports a currently ready Stripe account and enables Publish, but publishing
+fails if `creator_onboarding_profiles.stripe_connected_at` is null.
+
+### User impact
+
+A payout-ready creator cannot publish despite a complete readiness checklist.
+
+### Root cause
+
+The previous Stripe repair removed a stale timestamp check in checkout, but publication
+retained a second check on the profile row before its authoritative Stripe lookup.
+The prior fixture cleared only the connection-row timestamp, leaving this copy populated.
+
+### Fix
+
+Remove the historical profile timestamp prerequisite. Publication continues to require
+a saved account and a successful current Stripe capability check.
+
+### Regression prevention
+
+Playwright publishes with the profile timestamp absent and current provider readiness
+active; existing restricted/disconnected cases plus provider-failure tests enforce
+fail-closed behavior. Verified in the final 19-journey Playwright run; all passed.
+
+### Related files
+
+`app/_lib/creator-onboarding.ts`, `tests/e2e/creator-journeys.spec.ts`.
+
+### Date / feature
+
+September 14, 2026; adversarial Stripe readiness audit, isolated provider boundary.
+
+## 2026-09-14: Fresh browser contexts requested a missing conventional favicon
+
+### Bug / user impact
+
+Two isolated customer browsers emitted console 404 errors for `/favicon.ico`.
+
+### Root cause / fix
+
+Document metadata supplies `/favicon.png`, but the conventional browser icon request
+had no route. Redirect that request to the existing icon; no new visual asset is needed.
+
+### Regression prevention / related files
+
+The two-browser journey monitors errors with source URLs; `app/favicon.ico/route.ts`
+resolves the exact failing URL. Browser rerun passes this check.
+
+## 2026-09-14: Retrying the same failed photo upload did nothing
+
+### Bug
+
+After an induced HTTP 503 uploading a replacement profile photo, selecting that same
+file again issued no upload. The original photo remained despite provider recovery.
+
+### User impact
+
+Creators cannot retry the failed file without first selecting something different.
+
+### Root cause
+
+The file input retained its selected value. Browsers do not fire a change event when
+the same file is selected again. Prior upload tests covered invalid and duplicate
+files, but not retrying an identical file after a network failure.
+
+### Fix
+
+Clear each upload input immediately after extracting its File, for profile photos,
+gallery replacement and new gallery media. The upload retains the File object.
+
+### Regression prevention
+
+Playwright induces an upload failure, selects the exact same file after recovery,
+saves/reloads, and verifies draft/public access before and after publication.
+Verified in the final 19-journey Playwright run; all passed.
+
+### Related files
+
+`EditableCreatorProfilePreview.tsx`, `tests/e2e/creator-journeys.spec.ts`.
+
+### Date / feature
+
+September 14, 2026; adversarial media recovery audit, local D1.
+
+## 2026-09-14: Browser-forward navigation produced mismatched header IDs
+
+### Bug
+
+Navigate from the saved creator editor to About, back to the editor, then forward
+and open mobile navigation. React reports different server/client `aria-controls`
+and nav IDs. The strengthened Playwright observer fails the journey.
+
+### User impact
+
+Browser history produces a hydration error and risks a broken accessible association
+between the mobile navigation button and menu.
+
+### Root cause
+
+The shared header's positional React `useId` differs between the initial server tree
+and vinext's history-restored tree (`_R_ma_` versus `_R_2p_`). Earlier navigation tests
+stopped at the URL change before hydration and did not interact with the returned page.
+
+### Fix
+
+Derive the shared header ID from its stable, route-specific navigation label. All four
+callers supply distinct labels and render one header per page. No layout changes.
+
+### Regression prevention
+
+The history journey opens the narrow-screen menu after forward navigation and waits
+for its expanded state, keeping error monitoring active through hydration.
+Verified in the final 19-journey Playwright run; all passed.
+
+### Related files
+
+`app/_components/PageHeader.tsx`, `tests/e2e/creator-journeys.spec.ts`.
+
+### Date / feature
+
+September 14, 2026; creator browser-resilience audit, local Chrome/vinext.
+
+## 2026-09-14: Native disclosure controls bypassed the hydration guard
+
+### Bug
+
+The full Playwright suite opened Photos and videos immediately after navigation.
+React then reported that the server-closed details element was already open.
+
+### User impact
+
+A fast native disclosure click can cause a creator-editor hydration error.
+
+### Root cause
+
+The earlier pre-hydration repair disabled form controls, but HTML fieldset disabling
+does not disable native details/summary toggles. Those could mutate server markup
+before React attached, unlike the guarded form fields.
+
+### Fix
+
+Make the creator editor inert until its existing hydration signal is ready, covering
+native disclosure controls as well as forms and buttons without changing layout.
+
+### Regression prevention
+
+The gallery journey opens its native disclosure immediately after navigation. Every
+journey now monitors hydration errors, including tests previously missing observers.
+Full suite and deterministic delayed-script regression passed (19 journeys).
+
+### Related files
+
+`EditableCreatorProfilePreview.tsx`, `tests/e2e/creator-journeys.spec.ts`.
+
+### Date / feature
+
+September 14, 2026; regression of incomplete initial-interaction protection.

@@ -9,7 +9,7 @@ export async function GET(request: Request) {
   if (url.searchParams.has('checkout')) {
     const id = url.searchParams.get('checkout')!;
     await markBookingPaymentAuthorized({bookingId:id,stripeCheckoutSessionId:`cs_${id}`,stripePaymentIntentId:`pi_${id}`});
-    return new Response('Payment authorized in the isolated Stripe fixture.');
+    return new Response('<!doctype html><link rel="icon" href="/favicon.png"><p>Payment authorized in the isolated Stripe fixture.</p>', {headers:{'content-type':'text/html'}});
   }
   const events = await env.DB.prepare('SELECT * FROM e2e_provider_events').all();
   return Response.json(events.results);
