@@ -281,6 +281,7 @@ export function EditableCreatorProfilePreview({
   >("saved");
   const profileEditRevision = useRef(0);
   const profileSaveInFlight = useRef(false);
+  const draftRevision = useRef(initialProfile.draftSavedAt ?? null);
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileSaveMessage, setProfileSaveMessage] = useState("");
   const profileSaveLabel =
@@ -658,22 +659,25 @@ export function EditableCreatorProfilePreview({
     try {
       const [image, ...sources] = await prepareProfileMedia([profile.image, ...profile.mediaItems.map((item) => item.source)]);
       const preparedProfile = { ...profile, image, mediaItems: profile.mediaItems.map((item, index) => ({ ...item, source: sources[index] })) };
+      const body = getProfileSettingsFormData(preparedProfile);
+      body.set("expectedDraftSavedAt", draftRevision.current ?? "");
       const response = await fetch("/api/creators/profile", {
-        body: getProfileSettingsFormData(preparedProfile),
+        body,
         headers: { accept: "application/json" },
         method: "POST",
         signal: AbortSignal.timeout(30_000),
       });
-      const result = await response.json().catch(() => null) as { status?: string; detail?: string } | null;
+      const result = await response.json().catch(() => null) as { status?: string; detail?: string; draftSavedAt?: string } | null;
       if (!response.ok || result?.status !== "saved") {
         throw new Error(profileSaveError(result?.detail, response.status));
       }
 
+      draftRevision.current = result.draftSavedAt ?? draftRevision.current;
       if (profileEditRevision.current === savedRevision) {
         setProfile((current) => ({ ...current, image, mediaItems: preparedProfile.mediaItems }));
       }
       setUploadState("");
-      setLastSavedAt(new Date().toISOString());
+      setLastSavedAt(result.draftSavedAt ?? new Date().toISOString());
       setMediaSaveStatus(
         profileEditRevision.current === savedRevision ? "saved" : "idle",
       );
@@ -734,7 +738,7 @@ export function EditableCreatorProfilePreview({
   const helpItems = profile.helpItems ? profile.helpItems.split("\n") : ["", "", "", ""];
 
   return (
-    <main className="platform-shell amber-profile-page editable-profile-page">
+    <main className="platform-shell amber-profile-page editable-profile-page" inert={!hydrated}>
       {calendarStatus ? (
         <p role={calendarStatus === "connected" && profile.calendarConnectedAt ? "status" : "alert"} className="calendar-connection-notice">
           {calendarStatus === "connected" && profile.calendarConnectedAt ? "Google Calendar connected. Your saved hours will be checked for calendar conflicts."
@@ -817,7 +821,7 @@ export function EditableCreatorProfilePreview({
                   aria-label="Upload profile picture"
                   className="editable-profile-field editable-file-input"
                   type="file"
-                  onChange={(event) => chooseProfileImage(event.target.files?.[0])}
+                  onChange={(event) => chooseProfileImage(takeUploadFile(event.currentTarget))}
                 />
               </label>
               {profileImageFileName ? (
@@ -965,7 +969,7 @@ export function EditableCreatorProfilePreview({
                     className="editable-profile-field editable-file-input"
                     type="file"
                     onChange={(event) =>
-                      chooseMediaItemFile(item.id, event.target.files?.[0])
+                      chooseMediaItemFile(item.id, takeUploadFile(event.currentTarget))
                     }
                   />
                   {item.sourceKind === "upload" && item.fileName ? (
@@ -994,7 +998,7 @@ export function EditableCreatorProfilePreview({
                 className="editable-profile-field editable-file-input"
                 ref={draftMediaFileInputRef}
                 type="file"
-                onChange={(event) => chooseDraftMediaFile(event.target.files?.[0])}
+                onChange={(event) => chooseDraftMediaFile(takeUploadFile(event.currentTarget))}
               />
               {draftMedia.fileName ? (
                 <p className="editable-upload-note">Uploaded {draftMedia.fileName}</p>
@@ -1283,7 +1287,9 @@ function EditableAvailabilityPanel({
     const nextRules = rulesForAvailabilityWeek(initialRules, nextWeekStart);
     const nextSlotKeys = getSlotKeysForWeek(nextWeekStart);
     setWeekStart(nextWeekStart);
-    setTimezone(weekTimezones[nextWeekStart] ?? nextRules[0]?.timezone ?? initialTimezone);
+    setTimezone(weekTimezones[nextWeekStart]
+      ?? (!initialRules.some((rule) => rule.weekStart === nextWeekStart) ? weekTimezones.default : undefined)
+      ?? nextRules[0]?.timezone ?? initialTimezone);
     setSaveError("");
     setSelectedSlots(new Set(nextSlotKeys));
     setWeekStatus(nextWeekStart, nextSlotKeys);
@@ -2221,6 +2227,13 @@ function getMediaTitleFromFileName(fileName: string) {
     .replace(/\.[^.]+$/, "")
     .replace(/[-_]+/g, " ")
     .trim();
+}
+
+function takeUploadFile(input: HTMLInputElement) {
+  const file = input.files?.[0];
+  // Selecting the same file after a failed upload must fire change again.
+  input.value = "";
+  return file;
 }
 
 function getProfileSettingsFormData(profile: EditableProfileState) {

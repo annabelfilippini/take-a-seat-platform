@@ -61,6 +61,10 @@ const { getRequestAdminEmail } = await import("../app/_lib/admin-auth.ts");
 const { getEditableCreatorProfile } = await import("../app/admin/creator-profile-editor-preview/creator-profile-editor-data.ts");
 
 function formRequest(path, values, admin = false) {
+  if (path === "/api/creators/profile" && values.creatorId && values.expectedDraftSavedAt === undefined) {
+    const stored = sqlite.prepare("SELECT draft_saved_at FROM creator_onboarding_profiles WHERE id=?").get(values.creatorId);
+    values = { ...values, expectedDraftSavedAt: stored?.draft_saved_at ?? "" };
+  }
   return new Request(`http://localhost${path}`, { method: "POST", body: new URLSearchParams(values), headers: { accept: "application/json", ...(admin ? { cookie: "tas_local_admin=1" } : {}) } });
 }
 

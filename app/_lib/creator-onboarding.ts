@@ -44,6 +44,7 @@ export type CreatorOnboardingInput = {
 };
 
 export type CreatorProfileSettingsInput = CreatorOnboardingInput & {
+  expectedDraftSavedAt?: string | null;
   sessionOfferings?: string | null;
   about: string;
   category: string;
@@ -194,6 +195,7 @@ export async function getCreatorProfileSettingsInput(
   );
 
   return {
+    expectedDraftSavedAt: formData.has("expectedDraftSavedAt") ? getString(formData, "expectedDraftSavedAt") || null : undefined,
     sessionOfferings: formData.has("sessionOfferings") ? JSON.stringify(parseOfferings(getString(formData, "sessionOfferings") ?? "[]")) : undefined,
     about,
     bio,
@@ -378,6 +380,11 @@ export async function saveCreatorProfileSettings(
   const now = new Date().toISOString();
   const existing = await getCreatorApplication(creatorId);
   if (existing?.applicationStatus === "accepted") {
+    const { ProfileConflictError } = await import("./profile-save");
+    if (input.expectedDraftSavedAt !== undefined && input.expectedDraftSavedAt !== existing.draftSavedAt) {
+      throw new ProfileConflictError();
+    }
+    const draftSavedAt = new Date(Math.max(Date.now(), Date.parse(existing.draftSavedAt ?? "") + 1 || 0)).toISOString();
     const { validateOwnedMedia } = await import("./creator-media");
     await validateOwnedMedia(creatorId, [input.profileImageUrl ?? "", ...input.profileGallery.split("\n")], input.profileImageUrl ?? "");
     const previous = existing.profileDraft ? JSON.parse(existing.profileDraft) : existing;
@@ -394,12 +401,15 @@ export async function saveCreatorProfileSettings(
     // Legacy public uploads can already occupy much of D1's 2 MB row budget.
     if (profileByteLength({ ...existing, profileDraft }) > 1_900_000) throw new ProfileSizeError();
     // Accepted creators edit a private snapshot. Public fields remain untouched.
-    await db.update(creatorOnboardingProfiles).set({
+    const updated = await db.update(creatorOnboardingProfiles).set({
       profileDraft,
-      draftSavedAt: now,
+      draftSavedAt,
       updatedAt: now,
-    }).where(and(eq(creatorOnboardingProfiles.id, creatorId), eq(creatorOnboardingProfiles.applicationStatus, "accepted")));
-    return;
+    }).where(and(eq(creatorOnboardingProfiles.id, creatorId), eq(creatorOnboardingProfiles.applicationStatus, "accepted"),
+      sql`${creatorOnboardingProfiles.draftSavedAt} IS ${existing.draftSavedAt}`,
+    )).returning({ id: creatorOnboardingProfiles.id });
+    if (!updated.length) throw new ProfileConflictError();
+    return { draftSavedAt };
   }
   const applicationStatus = input.reviewSubmitted ? "in_review" : "draft";
   const reviewSubmittedAt = input.reviewSubmitted ? now : undefined;
@@ -528,7 +538,7 @@ export async function publishCreatorProfile(creatorId: string) {
   const rules = await db.select().from(creatorAvailabilityRules).where(and(
     eq(creatorAvailabilityRules.creatorId, creatorId), eq(creatorAvailabilityRules.enabled, true),
   ));
-  if (!rules.length || !profile.calendarConnectedAt || !profile.stripeConnectedAt) {
+  if (!rules.length || !profile.calendarConnectedAt) {
     return { status: "error", detail: "Save your availability, connect Google Calendar, and finish Stripe payouts before going live." };
   }
   const { getCreatorStripeConnection, getConnectedAccountTransferStatus, getStripeSecretKey } = await import("./stripe-connect");

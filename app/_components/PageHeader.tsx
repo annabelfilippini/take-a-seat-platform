@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useState } from "react";
 
 type PageHeaderProps = {
   ctaLabel?: string;
@@ -16,7 +16,8 @@ export function PageHeader({
   showCreatorSearch = false,
 }: PageHeaderProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const navId = useId();
+  // Route labels stay stable across SSR and history restoration in vinext.
+  const navId = `page-nav-${navLabel.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
 
   return (
     <header className={`about-topbar${isMobileMenuOpen ? " mobile-nav-open" : ""}`}>

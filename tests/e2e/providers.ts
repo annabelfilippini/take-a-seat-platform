@@ -11,9 +11,18 @@ export async function fixtureFetch(input: RequestInfo | URL, init?: RequestInit)
   if (url.startsWith('https://api.stripe.com/')) {
     if (url.includes('/v2/core/accounts/')) {
       const state = await db.prepare("SELECT value FROM e2e_state WHERE id='stripe'").first<{value:string}>();
+      if(state?.value === 'error') return Response.json({error:{message:'Isolated Stripe outage'}},{status:503});
       return Response.json({ id:'acct_e2e', configuration:{recipient:{capabilities:{stripe_balance:{stripe_transfers:{status:state?.value || 'active'}}}}} });
     }
     if (url.includes('/checkout/sessions/cs_expired')) return Response.json({id:'cs_expired',status:'expired'});
+    const sessionMatch = new URL(url).pathname.match(/^\/v1\/checkout\/sessions\/(cs_booking_[a-z0-9-]+)$/);
+    if(sessionMatch) {
+      const booking=await db.prepare('SELECT * FROM customer_bookings WHERE stripe_checkout_session_id=?').bind(sessionMatch[1]).first<{id:string;offering_unit_amount:number}>();
+      if(!booking) return Response.json({error:'Unknown fixture checkout'},{status:404});
+      const captured=await db.prepare("SELECT id FROM e2e_provider_events WHERE kind='capture' AND payload=?").bind(`pi_${booking.id}`).first();
+      return Response.json({id:sessionMatch[1],status:'complete',payment_status:captured?'paid':'unpaid',client_reference_id:booking.id,
+        payment_intent:{id:`pi_${booking.id}`,status:captured?'succeeded':'requires_capture',capture_method:'manual',amount_capturable:booking.offering_unit_amount}});
+    }
     if (url.endsWith('/balance')) return Response.json({available:[{amount:12345,currency:'usd'}],pending:[{amount:5000,currency:'usd'}]});
     if (url.endsWith('/login_links')) return Response.json({url:'http://127.0.0.1:4173/e2e-control?stripe-dashboard=1'});
     if (url.endsWith('/checkout/sessions')) {
@@ -31,6 +40,7 @@ export async function fixtureFetch(input: RequestInfo | URL, init?: RequestInit)
   if(url.includes('googleapis.com/calendar/v3/freeBusy')) return Response.json({calendars:{primary:{busy:[]}}});
   if(url.includes('googleapis.com/calendar/v3/calendars/primary/events')) {
     const body = JSON.parse(String(init?.body || '{}'));
+    await db.prepare('INSERT OR IGNORE INTO e2e_provider_events (id,kind,payload) VALUES (?,?,?)').bind(body.id || 'event_e2e','calendar',JSON.stringify(body)).run();
     return Response.json({id:body.id || 'event_e2e',htmlLink:'https://calendar.google.com/e2e',conferenceData:{entryPoints:[{entryPointType:'video',uri:'https://meet.google.com/e2e-fixture'}]}});
   }
   throw new Error(`Unexpected provider request in isolated E2E: ${url}`);

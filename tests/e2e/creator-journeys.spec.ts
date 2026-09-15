@@ -1,6 +1,7 @@
 import { test, expect, type APIRequestContext, type Page } from '@playwright/test';
 import { readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { createHmac } from 'node:crypto';
 import { encryptToken } from '../../app/_lib/token-encryption';
 const creatorId='onboard_e2e';
 async function sql(request:APIRequestContext, statement:string, args:unknown[] = []) {
@@ -33,15 +34,33 @@ async function seedDraft(request:APIRequestContext) {
   await sql(request,'UPDATE creator_onboarding_profiles SET profile_draft=?,draft_saved_at=? WHERE id=?',[JSON.stringify(draft),new Date().toISOString(),creatorId]);
 }
 async function publish(page:Page) { await page.getByRole('tab',{name:'Preview & Publish'}).click(); await page.getByRole('button',{name:/^Publish (profile|changes)$/}).click(); await expect(page.getByText('Your page is live. You can share it now.')).toBeVisible(); }
+let observedPages = new Map<Page,string[]>();
+let expectedHttp = new Map<Page,Set<string>>();
+function expectHttpFailure(page:Page, path:string, status:number) {
+  const allowed=expectedHttp.get(page) ?? new Set<string>();
+  allowed.add(`${status} ${path}`); expectedHttp.set(page,allowed);
+}
 function observe(page:Page) {
-  const failures:string[]=[];
+  if(observedPages.has(page)) return observedPages.get(page)!;
+  const failures:string[]=[]; observedPages.set(page,failures);
+  const expected=(url:string,status:number)=>expectedHttp.get(page)?.has(`${status} ${new URL(url).pathname}`);
   page.on('pageerror',(error)=>failures.push(error.message));
-  page.on('console',(message)=>{if(message.type()==='error') failures.push(message.text());});
+  page.on('console',(message)=>{
+    if(message.type()!=='error') return;
+    const status=message.text().match(/server responded with a status of (\d+)/)?.[1];
+    const url=message.location().url;
+    if(status && url && expected(url,Number(status))) return;
+    failures.push(`${message.text()} ${url}`);
+  });
   page.on('requestfailed',(request)=>{if(!request.failure()?.errorText.includes('ERR_ABORTED')) failures.push(request.url());});
-  page.on('response',(response)=>{if(response.status()>=400) failures.push(`${response.status()} ${response.url()}`);});
+  page.on('response',(response)=>{if(response.status()>=400 && !expected(response.url(),response.status())) failures.push(`${response.status()} ${response.url()}`);});
   return failures;
 }
-test.beforeEach(async({request})=>reset(request));
+test.beforeEach(async({request,page,context})=>{
+  observedPages=new Map(); expectedHttp=new Map();
+  observe(page); context.on('page',observe); await reset(request);
+});
+test.afterEach(()=>expect([...observedPages.values()].flat(),'Unexpected browser errors or HTTP failures').toEqual([]));
 
 test('acceptance destination, complete profile persistence, original media, draft/publish isolation and fresh login',async({page,request,browser})=>{
   const errors=observe(page);
@@ -66,6 +85,7 @@ test('acceptance destination, complete profile persistence, original media, draf
   await page.getByLabel('What people can ask').fill('Work outfits');
   await page.getByLabel('Help topic 2').fill('Trip packing');
   await page.getByText('Profile photo',{exact:true}).click();
+  await expect(page.getByLabel('Upload profile picture',{exact:true})).toBeEnabled();
   await page.getByLabel('Upload profile picture',{exact:true}).setInputFiles(resolve('public/ella-profile.jpg'));
   await expect(page.getByLabel('Upload profile picture',{exact:true})).toBeEnabled();
   await expect(page.locator('.editable-profile-photo-frame img')).toHaveAttribute('src',/\/api\/creators\/media\//);
@@ -104,7 +124,7 @@ test('acceptance destination, complete profile persistence, original media, draf
   await page.screenshot({path:'.wrangler/creator-profile-mobile.png',fullPage:true});
   await page.setViewportSize({width:1280,height:900});
   await publish(page);
-  const customer=await browser.newPage(); await customer.goto('http://127.0.0.1:4173/with/e2e-creator');
+  const customer=await browser.newPage(); observe(customer); await customer.goto('http://127.0.0.1:4173/with/e2e-creator');
   await expect(customer.getByRole('heading',{name:'Studio Creator',exact:true})).toBeVisible();
   await page.getByRole('tab',{name:'Profile',exact:true}).click(); await page.getByLabel('Creator hero name').fill('New Studio Creator'); await save(page);
   await customer.reload(); await expect(customer.getByRole('heading',{name:'Studio Creator',exact:true})).toBeVisible();
@@ -118,7 +138,7 @@ test('acceptance destination, complete profile persistence, original media, draf
   await publish(page); await expect(customer.getByRole('heading',{name:'Studio Creator',exact:true})).toBeVisible();
   await customer.reload(); await expect(customer.getByRole('heading',{name:'New Studio Creator',exact:true})).toBeVisible();
   await page.goto('/e2e-control?logout=1'); await expect(page.getByText('Sign in to build your profile.')).toBeVisible();
-  const fresh=await browser.newPage(); await fresh.goto('http://127.0.0.1:4173/e2e-control?login=1');
+  const fresh=await browser.newPage(); observe(fresh); await fresh.goto('http://127.0.0.1:4173/e2e-control?login=1');
   await expect(fresh.getByLabel('Creator hero name')).toHaveValue('New Studio Creator');
   await expect(fresh.getByLabel('Offering 1 description')).toHaveValue('For one specific outfit question.');
   await customer.close(); await fresh.close(); expect(errors).toEqual([]);
@@ -126,6 +146,7 @@ test('acceptance destination, complete profile persistence, original media, draf
 
 test('failed save keeps edits and never claims success, then retry persists',async({page,request})=>{
   await seedDraft(request); await login(page); await page.getByLabel('Creator hero name').fill('Retry Creator');
+  expectHttpFailure(page,'/api/creators/profile',503);
   await page.route('**/api/creators/profile',route=>route.fulfill({status:503,json:{status:'error'}}));
   await page.getByRole('button',{name:'Save draft',exact:true}).last().click();
   await expect(page.locator('.creator-profile-save-notice')).toContainText('couldn');
@@ -262,7 +283,7 @@ test('multiple offerings retain order and archive without exposing inactive sess
   await expect(page.getByLabel('Offering 1 title')).toHaveValue('Closet planning');
   await expect(page.getByLabel('Offering 1 duration')).toHaveValue('45');
   await publish(page);
-  const customer=await browser.newPage(); await customer.goto('http://127.0.0.1:4173/with/e2e-creator');
+  const customer=await browser.newPage(); observe(customer); await customer.goto('http://127.0.0.1:4173/with/e2e-creator');
   await expect(customer.getByRole('button',{name:/Closet planning/})).toContainText('45 min');
   await expect(customer.getByRole('button',{name:/Closet planning/})).toContainText('$65');
   await page.getByRole('tab',{name:'Profile',exact:true}).click();
@@ -287,4 +308,246 @@ test('duplicate and unsupported media show recovery without ghost items',async({
   await page.getByLabel('Upload new media file').setInputFiles({name:'unsupported.txt',mimeType:'text/plain',buffer:Buffer.from('invalid')});
   await expect(page.getByText('Use a JPG, PNG, WebP photo or MP4/WebM video.',{exact:true})).toBeVisible();
   await save(page); await page.reload(); await expect(page.locator('.editable-media-row')).toHaveCount(1);
+});
+
+test('slow save preserves newer edits and double clicks send one write', async ({page,request}) => {
+  const errors=observe(page); await seedDraft(request); await login(page);
+  let release!: () => void;
+  const gate=new Promise<void>((resolve)=>{ release=resolve; });
+  let writes=0;
+  await page.route('**/api/creators/profile',async route=>{ writes++; await gate; await route.continue(); });
+  await page.getByLabel('Creator hero name').fill('First revision');
+  await page.getByRole('button',{name:'Save draft',exact:true}).last().dblclick();
+  await expect.poll(()=>writes).toBe(1);
+  await expect(page.locator('.creator-storefront-bar')).toContainText('Saving');
+  await page.getByLabel('Creator hero name').fill('Newer revision');
+  release();
+  await expect(page.locator('.creator-storefront-bar')).toContainText('Unsaved');
+  await expect(page.getByLabel('Creator hero name')).toHaveValue('Newer revision');
+  const [stored]=await sql(request,'SELECT profile_draft FROM creator_onboarding_profiles WHERE id=?',[creatorId]);
+  expect(JSON.parse(stored.profile_draft).name).toBe('First revision');
+  await page.unroute('**/api/creators/profile'); await save(page); await page.reload();
+  await expect(page.getByLabel('Creator hero name')).toHaveValue('Newer revision');
+  expect(errors).toEqual([]);
+});
+
+test('saved default timezone carries into untouched weeks before and after refresh', async ({page,request})=>{
+  const errors=observe(page); await seedDraft(request); await login(page);
+  await page.getByRole('tab',{name:'Availability',exact:true}).click();
+  await page.getByRole('button',{name:'Default weekly hours',exact:true}).click();
+  await page.getByPlaceholder('Search timezone').fill('America/New_York');
+  await page.getByRole('button',{name:'Save availability',exact:true}).last().click();
+  await expect(page.getByText('Availability saved for default weekly schedule.')).toBeVisible();
+  await page.getByRole('button',{name:'Week overrides',exact:true}).click();
+  await page.getByRole('button',{name:'Next availability week'}).click();
+  const week=await page.getByLabel('Choose availability week').inputValue();
+  await expect(page.getByPlaceholder('Search timezone')).toHaveValue('America/New_York');
+  await page.reload(); await page.getByRole('tab',{name:'Availability',exact:true}).click();
+  await page.getByLabel('Choose availability week').selectOption(week);
+  await expect(page.getByPlaceholder('Search timezone')).toHaveValue('America/New_York');
+  expect(errors).toEqual([]);
+});
+
+async function prepareCustomer(page:Page, name:string) {
+  await page.goto('http://127.0.0.1:4173/with/e2e-creator');
+  await page.getByRole('button',{name:'Find availability'}).click();
+  await page.locator('.customer-time-options button').first().click();
+  await page.getByRole('button',{name:'Continue',exact:true}).click();
+  await page.getByLabel('Name',{exact:true}).fill(name);
+  await page.getByLabel('Email address',{exact:true}).fill(`${name.toLowerCase()}@example.com`);
+  await page.getByLabel(/What do you want to talk about/).fill('Help with an outfit.');
+}
+
+test('isolated customers contend through the UI and opposite creator decisions stay atomic',async({page,request,browser})=>{
+  await seedDraft(request); await login(page); await publish(page);
+  const a=await browser.newContext(), b=await browser.newContext();
+  const first=await a.newPage(),second=await b.newPage();
+  const errors=[observe(page),observe(first),observe(second)];
+  await Promise.all([prepareCustomer(first,'First'),prepareCustomer(second,'Second')]);
+  expect(await first.locator('input[name=appointmentStartAt]').inputValue()).toBe(await second.locator('input[name=appointmentStartAt]').inputValue());
+  await Promise.all([first.getByRole('button',{name:/Continue to payment/}).click(),second.getByRole('button',{name:/Continue to payment/}).click()]);
+  await expect.poll(async()=> (await sql(request,'SELECT status FROM customer_bookings')).map((r:{status:string})=>r.status)).toEqual(['payment_authorized']);
+  const [booking]=await sql(request,'SELECT * FROM customer_bookings');
+  const winner=booking.customer_name==='First'?first:second, loser=winner===first?second:first;
+  await expect(winner.getByText('Payment authorized in the isolated Stripe fixture.')).toBeVisible();
+  await expect(loser.getByText('That time is no longer available. Please choose another.')).toBeVisible();
+  const other=await page.context().newPage(); errors.push(observe(other)); await other.goto('/creator/profile');
+  for(const p of [page,other]) { await p.getByRole('tab',{name:'Requests',exact:true}).click(); await p.getByRole('button',{name:'Refresh requests'}).click(); }
+  const accept=page.locator('.creator-request-card:visible').getByRole('button',{name:'Accept request',exact:true});
+  const decline=other.locator('.creator-request-card:visible').getByRole('button',{name:'Decline',exact:true});
+  expectHttpFailure(page,'/api/creators/requests',409); expectHttpFailure(other,'/api/creators/requests',409);
+  // The losing action deliberately returns a conflict response.
+  const responses=await Promise.all([
+    page.waitForResponse(r=>r.url().endsWith('/api/creators/requests') && r.request().method()==='POST'),
+    other.waitForResponse(r=>r.url().endsWith('/api/creators/requests') && r.request().method()==='POST'),
+    accept.click(),decline.click(),
+  ]);
+  expect(responses.slice(0,2).map(r=>r!.status()).sort()).toEqual([200,409]);
+  const rejected=responses[0]!.status()===409?page:other;
+  await expect(rejected.getByRole('alert')).toBeVisible();
+  await expect.poll(async()=> (await sql(request,'SELECT status FROM customer_bookings'))[0].status).toMatch(/^(approved|declined)$/);
+  const events=await sql(request,"SELECT kind FROM e2e_provider_events WHERE kind IN ('capture','cancel')");
+  expect(events).toHaveLength(1);
+  await page.reload(); await other.reload();
+  for(const p of [page,other]) { await p.getByRole('tab',{name:'Requests',exact:true}).click(); await expect(p.locator('.creator-request-card:visible')).toContainText(events[0].kind==='capture'?'Booked':'Declined'); }
+  // Only the asserted conflict from the competing decision is expected.
+  expect(errors.flat()).toEqual([]);
+  await a.close(); await b.close(); await other.close();
+});
+
+test('a stale creator tab cannot overwrite or publish another tab saved edits',async({page,request})=>{
+  await seedDraft(request); await login(page);
+  const other=await page.context().newPage(); await other.goto('/creator/profile');
+  await page.getByLabel('Creator hero name').fill('Saved in first tab'); await save(page);
+  expectHttpFailure(other,'/api/creators/profile',409);
+  await other.getByLabel('About section').fill('Changed in a stale second tab');
+  await other.getByRole('button',{name:'Save draft',exact:true}).last().click();
+  await expect(other.locator('.creator-profile-save-notice')).toContainText('another');
+  const [stored]=await sql(request,'SELECT profile_draft FROM creator_onboarding_profiles WHERE id=?',[creatorId]);
+  expect(JSON.parse(stored.profile_draft).name).toBe('Saved in first tab');
+  await expect(other.getByLabel('About section')).toHaveValue('Changed in a stale second tab');
+  // An editor loaded before revision support cannot bypass the server guard.
+  const legacy=await request.post('/api/creators/profile',{form:{creatorId,email:'creator@example.com',name:'Old browser overwrite'},headers:{cookie:'tas_e2e_creator=1',accept:'application/json'}});
+  expect(legacy.status()).toBe(409);
+  await other.setViewportSize({width:390,height:844});
+  expect(await other.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
+  await other.evaluate(()=>window.scrollTo(0,0));
+  await other.screenshot({path:'.wrangler/creator-conflict-mobile.png'});
+  await other.setViewportSize({width:1280,height:900});
+  await other.evaluate(()=>window.scrollTo(0,0));
+  await other.screenshot({path:'.wrangler/creator-conflict-desktop.png'});
+  await other.getByRole('tab',{name:'Preview & Publish'}).click();
+  await other.getByRole('button',{name:'Publish profile',exact:true}).click();
+  await expect(other.getByText('Your page is live. You can share it now.')).toHaveCount(0);
+  await expect(other.locator('.creator-profile-save-notice')).toContainText('another');
+  expect((await sql(request,'SELECT published_at FROM creator_onboarding_profiles WHERE id=?',[creatorId]))[0].published_at).toBeNull();
+  await other.close();
+});
+
+test('publish trusts current Stripe readiness even when the profile timestamp is stale',async({page,request})=>{
+  await seedDraft(request); await sql(request,'UPDATE creator_onboarding_profiles SET stripe_connected_at=NULL WHERE id=?',[creatorId]);
+  await login(page); await publish(page);
+  expect((await sql(request,'SELECT published_at FROM creator_onboarding_profiles WHERE id=?',[creatorId]))[0].published_at).toBeTruthy();
+});
+
+test('private media stays private, profile replacement persists and upload failure recovers',async({page,request,browser})=>{
+  await seedDraft(request); await login(page);
+  await expect(page.getByLabel('Upload profile picture',{exact:true})).toBeEnabled();
+  await page.getByLabel('Upload profile picture',{exact:true}).setInputFiles(resolve('public/ella-profile.jpg'));
+  await expect(page.locator('.editable-profile-photo-frame img')).toHaveAttribute('src',/\/api\/creators\/media\//);
+  await save(page);
+  const original=await page.locator('.editable-profile-photo-frame img').getAttribute('src');
+  const customer=await browser.newContext();
+  expect((await customer.request.get(`http://127.0.0.1:4173${original}`)).status()).toBe(404);
+  await publish(page);
+  expect((await customer.request.get(`http://127.0.0.1:4173${original}`)).status()).toBe(200);
+  await page.getByRole('tab',{name:'Profile',exact:true}).click();
+  expectHttpFailure(page,'/api/creators/media',503);
+  await page.route('**/api/creators/media',route=>route.fulfill({status:503,json:{error:'Upload unavailable. Retry.'}}));
+  await expect(page.getByLabel('Upload profile picture',{exact:true})).toBeEnabled();
+  await page.getByLabel('Upload profile picture',{exact:true}).setInputFiles(resolve('public/amber-reference-trench.png'));
+  await expect(page.getByText('Upload unavailable. Retry.',{exact:true})).toBeVisible();
+  await expect(page.locator('.editable-profile-photo-frame img')).toHaveAttribute('src',original!);
+  await page.unroute('**/api/creators/media');
+  await expect(page.getByLabel('Upload profile picture',{exact:true})).toBeEnabled();
+  await page.getByLabel('Upload profile picture',{exact:true}).setInputFiles(resolve('public/amber-reference-trench.png'));
+  await expect(page.locator('.editable-profile-photo-frame img')).not.toHaveAttribute('src',original!);
+  await save(page); const replacement=await page.locator('.editable-profile-photo-frame img').getAttribute('src');
+  await page.reload(); await expect(page.locator('.editable-profile-photo-frame img')).toHaveAttribute('src',replacement!);
+  expect((await customer.request.get(`http://127.0.0.1:4173${replacement}`)).status()).toBe(404);
+  await publish(page);
+  expect((await customer.request.get(`http://127.0.0.1:4173${replacement}`)).status()).toBe(200);
+  expect((await customer.request.get(`http://127.0.0.1:4173${original}`)).status()).toBe(404);
+  await customer.close();
+});
+
+test('expired creator session cannot save; reauthentication retains destination and pending edits',async({page,request})=>{
+  await seedDraft(request); await login(page,'/creator/profile?section=profile');
+  await page.getByLabel('Creator hero name').fill('After returning login');
+  await page.context().clearCookies();
+  expectHttpFailure(page,'/api/creators/profile',400);
+  await page.getByRole('button',{name:'Save draft',exact:true}).last().click();
+  await expect(page.locator('.creator-profile-save-notice')).toContainText('sign-in');
+  expect(JSON.parse((await sql(request,'SELECT profile_draft FROM creator_onboarding_profiles WHERE id=?',[creatorId]))[0].profile_draft).name).toBe('Published Creator');
+  for(const path of ['/api/creators/requests','/api/creators/payments']) {
+    const response=await page.request.get(`${path}?creatorId=${creatorId}`); expect(response.status()).toBe(403);
+  }
+  const second=await page.context().newPage(); await login(second,'/creator/profile?section=profile');
+  expect(new URL(second.url()).searchParams.get('section')).toBe('profile');
+  await page.getByRole('button',{name:'Retry Save draft'}).click();
+  await expect(page.locator('.creator-storefront-bar')).toContainText('Saved at');
+  await page.reload(); await expect(page.getByLabel('Creator hero name')).toHaveValue('After returning login');
+  await page.goto('/about'); await page.goBack(); await expect(page.getByLabel('Creator hero name')).toHaveValue('After returning login');
+  await page.goForward(); await expect(page).toHaveURL(/\/about$/);
+  await page.setViewportSize({width:390,height:844});
+  await page.getByRole('button',{name:'Open navigation',exact:true}).click();
+  await expect(page.getByRole('button',{name:'Open navigation',exact:true})).toHaveAttribute('aria-expanded','true');
+  await second.close();
+});
+
+test('Stripe provider failure clears readiness and recovery rechecks the server',async({page,request})=>{
+  await seedDraft(request); await login(page); await page.getByRole('tab',{name:'Payments',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'Connected to Stripe ✓'})).toBeVisible();
+  await sql(request,"UPDATE e2e_state SET value='error' WHERE id='stripe'");
+  expectHttpFailure(page,'/api/creators/payments',503);
+  await page.getByRole('button',{name:'Refresh Stripe status'}).click();
+  await expect(page.getByRole('heading',{name:'Stripe status unavailable'})).toBeVisible();
+  await page.getByRole('tab',{name:'Preview & Publish'}).click();
+  await expect(page.getByRole('button',{name:'Publish profile',exact:true})).toBeDisabled();
+  await sql(request,"UPDATE e2e_state SET value='active' WHERE id='stripe'");
+  await page.getByRole('tab',{name:'Payments',exact:true}).click();
+  await page.getByRole('button',{name:'Refresh Stripe status'}).click();
+  await expect(page.getByRole('heading',{name:'Connected to Stripe ✓'})).toBeVisible();
+  await publish(page);
+});
+
+test('signed duplicate webhooks preserve one authorization, capture, notification and calendar event',async({page,request})=>{
+  await seedDraft(request); await login(page); await publish(page);
+  const day=new Date(Date.now()+2*86400000).toISOString().slice(0,10);
+  const checkout=await request.post('/api/bookings/request',{form:{creatorId,seatId:'offer_quick',appointmentStartAt:`${day}T09:00:00`,timezone:'America/Los_Angeles',customerEmail:'webhook@example.com',customerName:'Webhook Customer'},maxRedirects:0});
+  expect(checkout.headers().location).toContain('checkout=');
+  const [booking]=await sql(request,'SELECT * FROM customer_bookings');
+  const body=JSON.stringify({id:'evt_replayed',type:'checkout.session.completed',data:{object:{id:booking.stripe_checkout_session_id,client_reference_id:booking.id}}});
+  const timestamp=Math.floor(Date.now()/1000);
+  const signature=createHmac('sha256','whsec_e2e_fixture').update(`${timestamp}.${body}`).digest('hex');
+  const send=()=>request.post('/api/stripe/webhook',{data:body,headers:{'stripe-signature':`t=${timestamp},v1=${signature}`,'content-type':'application/json'}});
+  for(const response of await Promise.all([send(),send()])) expect(response.status(),await response.text()).toBe(200);
+  expect((await sql(request,'SELECT status FROM customer_bookings'))).toEqual([{status:'payment_authorized'}]);
+  expect((await sql(request,"SELECT * FROM creator_notifications WHERE type='booking_requested'"))).toHaveLength(1);
+  expect((await sql(request,"SELECT * FROM e2e_provider_events WHERE id=?",[`take-a-seat-booking-request-${booking.id}`]))).toHaveLength(1);
+  await page.getByRole('tab',{name:'Requests',exact:true}).click(); await page.getByRole('button',{name:'Refresh requests'}).click();
+  await page.locator('.creator-request-card:visible').getByRole('button',{name:'Accept request',exact:true}).click();
+  await expect(page.locator('.creator-request-card:visible')).toContainText('Booked');
+  for(const response of await Promise.all([send(),send()])) expect(response.status()).toBe(200);
+  expect((await sql(request,'SELECT status FROM customer_bookings'))).toEqual([{status:'approved'}]);
+  for(const kind of ['capture','calendar']) expect(await sql(request,'SELECT * FROM e2e_provider_events WHERE kind=?',[kind])).toHaveLength(1);
+  expect(await sql(request,"SELECT * FROM creator_notifications WHERE type='booking_paid'")).toHaveLength(1);
+  const invalid=await request.post('/api/stripe/webhook',{data:body,headers:{'stripe-signature':`t=${timestamp},v1=invalid`}}); expect(invalid.status()).toBe(400);
+  await page.reload(); await page.getByRole('tab',{name:'Requests',exact:true}).click(); await expect(page.locator('.creator-request-card:visible')).toContainText('Booked');
+});
+
+test('repeated Publish clicks commit one coherent public version',async({page,request})=>{
+  await seedDraft(request); await login(page); await page.getByRole('tab',{name:'Preview & Publish'}).click();
+  let publishes=0; page.on('request',req=>{if(req.url().endsWith('/api/creators/profile') && req.postData()?.includes('publish')) publishes++;});
+  await page.getByRole('button',{name:'Publish profile',exact:true}).dblclick();
+  await expect(page.getByText('Your page is live. You can share it now.')).toBeVisible();
+  expect(publishes).toBe(1);
+  const [stored]=await sql(request,'SELECT name,profile_intro,session_offerings,published_at FROM creator_onboarding_profiles WHERE id=?',[creatorId]);
+  expect(stored.name).toBe('Published Creator'); expect(stored.profile_intro).toBe('Styling help for real life.');
+  expect(JSON.parse(stored.session_offerings)[0].unitAmount).toBe(1800); expect(stored.published_at).toBeTruthy();
+});
+
+test('native gallery disclosure cannot mutate server markup while hydration is delayed',async({page,request})=>{
+  await seedDraft(request);
+  await page.context().addCookies([{name:'tas_e2e_creator',value:'1',url:'http://127.0.0.1:4173'}]);
+  let release!:()=>void; const gate=new Promise<void>(resolve=>{release=resolve;});
+  await page.route('**/*',async route=>{ if(route.request().resourceType()==='script') await gate; await route.continue(); });
+  await page.goto('/creator/profile',{waitUntil:'commit'});
+  const main=page.locator('main'); await expect(main).toHaveAttribute('inert','');
+  const summary=page.getByText('Photos and videos',{exact:true}).first();
+  await summary.scrollIntoViewIfNeeded(); const box=await summary.boundingBox();
+  await page.mouse.click(box!.x+box!.width/2,box!.y+box!.height/2);
+  await expect(page.locator('.editable-gallery-controls')).not.toHaveAttribute('open','');
+  release(); await expect(main).not.toHaveAttribute('inert','');
+  await summary.click(); await expect(page.locator('.editable-gallery-controls')).toHaveAttribute('open','');
 });
