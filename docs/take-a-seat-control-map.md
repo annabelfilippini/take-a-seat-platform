@@ -46,7 +46,9 @@ Creator backend:
   timezone inheritance, upload retries and hydration. PR #31 (`6e96c56`) adds
   verified email account switching and accurate setup instructions. Booking
   confirmations distinguish declines; native anchors avoid the production
-  framework navigation failure and resolve published creator slugs. See the
+  framework navigation failure and resolve published creator slugs. Final code
+  deployed from main `d8cec92`; full sandbox provider and production navigation
+  checks passed. Real-money launch gates remain below. See the
   [reliability audit](marketplace-reliability-qa-2026-09-14.md) and
   [live rehearsal](marketplace-live-rehearsal-2026-09-14.md).
 - Up to 12 ordered offerings with explicit durations, prices, descriptions, and archival.

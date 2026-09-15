@@ -33,7 +33,9 @@ tested. They do not establish that the new Playwright release gate has passed.
   No dependency or framework upgrade is required.
 - **Protection:** The complete booking browser journey now follows Creator from
   a declined confirmation back to the public booking controls. Production smoke
-  must verify this transition and fresh-document console output after deploy.
+  verified this transition after deployment: the declined page opened the
+  published profile with no captured console errors; admin detail/queue links
+  also worked. All 20 browser journeys, 80 Node tests, lint and TypeScript passed.
 - **Files:** `app/bookings/[bookingId]/page.tsx`, `app/admin/applications/page.tsx`,
   `app/admin/applications/[creatorId]/page.tsx`, `app/about/page.tsx`,
   `app/with/annabel/page.tsx`, `app/_components/PublicCreatorProfile.tsx`,
@@ -52,6 +54,7 @@ tested. They do not establish that the new Playwright release gate has passed.
 - **Protection:** Extend the full Playwright booking journey through decline,
   customer confirmation, hard refresh and absence of creator acceptance controls.
   Live Stripe and D1 independently confirmed cancellation before the copy repair.
+  A fresh production browser confirmed the corrected declined text after deploy.
 - **Files:** `app/bookings/[bookingId]/page.tsx`,
   `tests/e2e/creator-journeys.spec.ts`.
 
