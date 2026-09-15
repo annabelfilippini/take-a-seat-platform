@@ -47,8 +47,9 @@ Creator backend:
   Saved availability affects live bookings immediately; empty overrides close that week.
 - Requests support authorized acceptance/capture and decline/cancellation, with retries.
 - Payments reads current Stripe transfer readiness, balances, and historical sessions.
-- New storefront implementation is verified locally and awaits deployment approval.
-  See [verification and migrations](creator-storefront-verification.md).
+- Storefront deployed September 14 from merged PR #28 (`a5259fd`), with migrations
+  0018–0020 applied and production public/creator-entry browser smoke checks passing.
+  See [verification and deployment](creator-storefront-verification.md).
 
 Admin:
 
