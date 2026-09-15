@@ -268,6 +268,9 @@ test('protected customer flow, immutable purchase, request acceptance/decline, r
   await customer.reload();
   await expect(customer.getByRole('heading',{name:'Request declined.',exact:true})).toBeVisible();
   await expect(customer.getByText(/Payment authorization is still required/)).toHaveCount(0);
+  await customer.getByRole('link',{name:'Creator',exact:true}).click();
+  await expect(customer).toHaveURL(/\/with\/e2e-creator$/);
+  await expect(customer.getByRole('button',{name:'Find availability'})).toBeVisible();
   await page.goto(`/bookings/${declinedBooking.id}`);
   await expect(page.getByRole('button',{name:'Accept this appointment',exact:true})).toHaveCount(0);
   // A customer's loaded page remains valid; its stale time is rejected at submit.

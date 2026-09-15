@@ -15,6 +15,30 @@ Follow the [engineering release gate](engineering-release-gate.md).
 Historical checks in these records are evidence only for what they explicitly
 tested. They do not establish that the new Playwright release gate has passed.
 
+## 2026-09-14: Production framework links failed to navigate
+
+- **Reproduction:** Open a fresh production declined-booking confirmation and
+  click Creator. Both normal browser and accessibility clicks left the URL and
+  page unchanged. The console reported a vinext RSC prefetch setup TypeError.
+- **Root cause:** These routes still used next/link and its production vinext
+  client-navigation path. The built prefetch module attempted to call a missing
+  function. The development-server journeys did not reproduce this production
+  framework behavior, so passing those tests alone missed it. The new return-link
+  regression also exposed a second mismatch: a booking stores the internal
+  creator ID, while its public profile can use a different published slug.
+- **Fix:** Replace the remaining next/link uses in booking, admin, About and
+  public-profile routes with normal anchors. Browser document navigation avoids
+  the failing framework path and preserves classes and layout. The booking
+  return link resolves the creator application's public slug before linking.
+  No dependency or framework upgrade is required.
+- **Protection:** The complete booking browser journey now follows Creator from
+  a declined confirmation back to the public booking controls. Production smoke
+  must verify this transition and fresh-document console output after deploy.
+- **Files:** `app/bookings/[bookingId]/page.tsx`, `app/admin/applications/page.tsx`,
+  `app/admin/applications/[creatorId]/page.tsx`, `app/about/page.tsx`,
+  `app/with/annabel/page.tsx`, `app/_components/PublicCreatorProfile.tsx`,
+  `tests/e2e/creator-journeys.spec.ts`.
+
 ## 2026-09-14: Declined customer confirmation still asked for payment
 
 - **Reproduction:** Authorize a sandbox booking, decline it in creator Requests,

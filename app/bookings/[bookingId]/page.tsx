@@ -1,11 +1,11 @@
 /* eslint-disable @next/next/no-html-link-for-pages */
 import type { Metadata } from "next";
-import Link from "next/link";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { getSignedInAdminEmail } from "../../_lib/admin-auth";
 import {
   canManageCreatorProfile,
+  getCreatorApplication,
 } from "../../_lib/creator-onboarding";
 import { getSignedInClerkUserFromHeaders } from "../../_lib/clerk-auth";
 import {
@@ -40,6 +40,8 @@ export default async function BookingPage({
 
   const calendarStatus = getStatus(searchParams?.calendar);
   const canApprove = await canApproveBooking(booking);
+  const creator = await getCreatorApplication(booking.creatorId);
+  const creatorHref = `/with/${encodeURIComponent(creator?.publicSlug || booking.creatorId)}`;
   const googleCalendarHref = getGoogleCalendarTemplateUrl(booking);
   const calendarFileHref = `/api/bookings/${encodeURIComponent(
     booking.id,
@@ -52,7 +54,7 @@ export default async function BookingPage({
           Take a Seat
         </a>
         <nav className="profile-nav" aria-label="Booking navigation">
-          <Link href={`/with/${booking.creatorId}`}>Creator</Link>
+          <a href={creatorHref}>Creator</a>
           <form action="/sign-in" className="nav-action-form" method="get">
             <button className="profile-sign-in-link" type="submit">
               Sign In

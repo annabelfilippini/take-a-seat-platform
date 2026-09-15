@@ -1,5 +1,5 @@
+/* eslint-disable @next/next/no-html-link-for-pages */
 import type { Metadata } from "next";
-import Link from "next/link";
 import {
   DEFAULT_ADMIN_EMAIL,
   getAdminSignInHref,
@@ -95,19 +95,19 @@ export default async function AdminApplicationPage({
   return (
     <main className="admin-page">
       <header className="admin-topbar">
-        <Link href="/" className="admin-brand">
+        <a href="/" className="admin-brand">
           Take a Seat
-        </Link>
+        </a>
         <nav aria-label="Admin navigation">
-          <Link href="/admin/applications">Applications</Link>
-          <Link href={acceptedLink}>Creator view</Link>
+          <a href="/admin/applications">Applications</a>
+          <a href={acceptedLink}>Creator view</a>
         </nav>
       </header>
 
       <section className="admin-shell" aria-labelledby="review-heading">
-        <Link className="admin-back-link" href="/admin/applications">
+        <a className="admin-back-link" href="/admin/applications">
           Back to queue
-        </Link>
+        </a>
 
         {noticeMessage ? (
           <p
@@ -237,7 +237,7 @@ export default async function AdminApplicationPage({
                   </a>
                 ))}
               </div>
-              <Link href="/admin/applications">Open full queue</Link>
+              <a href="/admin/applications">Open full queue</a>
             </section>
           </aside>
         </div>
@@ -250,12 +250,12 @@ function AdminMissingApplication({ creatorId }: { creatorId: string }) {
   return (
     <main className="admin-page">
       <header className="admin-topbar">
-        <Link href="/" className="admin-brand">
+        <a href="/" className="admin-brand">
           Take a Seat
-        </Link>
+        </a>
         <nav aria-label="Admin navigation">
-          <Link href="/admin/applications">Applications</Link>
-          <Link href={CREATOR_PROFILE_EDITOR_URL}>Creator view</Link>
+          <a href="/admin/applications">Applications</a>
+          <a href={CREATOR_PROFILE_EDITOR_URL}>Creator view</a>
         </nav>
       </header>
       <section className="admin-shell admin-locked" aria-labelledby="missing-heading">
@@ -265,9 +265,9 @@ function AdminMissingApplication({ creatorId }: { creatorId: string }) {
           The application ID {creatorId} was not found. It may have already been
           accepted and published under a public creator ID.
         </p>
-        <Link className="creator-apply-primary" href="/admin/applications">
+        <a className="creator-apply-primary" href="/admin/applications">
           Back to applications
-        </Link>
+        </a>
       </section>
     </main>
   );

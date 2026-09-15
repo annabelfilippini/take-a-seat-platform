@@ -44,7 +44,9 @@ Creator backend:
 - Original media is stored in bounded D1 chunks; profiles retain URLs and crop settings.
 - Reliability repairs deployed from PR #30 (`43b586c`): stale-draft protection,
   timezone inheritance, upload retries and hydration. PR #31 (`6e96c56`) adds
-  verified email account switching and accurate setup instructions. See the
+  verified email account switching and accurate setup instructions. Booking
+  confirmations distinguish declines; native anchors avoid the production
+  framework navigation failure and resolve published creator slugs. See the
   [reliability audit](marketplace-reliability-qa-2026-09-14.md) and
   [live rehearsal](marketplace-live-rehearsal-2026-09-14.md).
 - Up to 12 ordered offerings with explicit durations, prices, descriptions, and archival.
