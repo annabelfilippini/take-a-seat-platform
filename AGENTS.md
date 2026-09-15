@@ -52,6 +52,14 @@
 
 ## Verification
 
+- Before making changes, read [the engineering release gate](docs/engineering-release-gate.md)
+  and relevant entries in [the bug log](docs/BUG_LOG.md), including linked incident notes.
+- Feature work is complete only when the relevant Playwright journeys pass,
+  including real persistence, refresh, returning login, and published customer
+  data. Compilation, simulated saves, and component tests alone are insufficient.
+- Fix meaningful bugs encountered, record their actual root causes in the bug
+  log, and add regression protection whenever practical. Fix shared bad patterns
+  centrally. Do not present known failing or flaky feature behavior as complete.
 - Run `npm run lint` after code changes.
 - Run `npm test` before presenting a meaningful repo change.
 - For customer-facing UI changes, also open the affected flow in a real browser
@@ -82,3 +90,7 @@
 ## Customer-Facing UI QA
 
 - Follow the verification rules above for every customer-facing UI change.
+- Preserve the approved customer paid session/time-selection layout and behavior,
+  including payment progression and button placement. Creator configuration must
+  feed that flow through the data layer. Consider backend solutions first; change
+  the customer experience only when required for a bug fix or explicit requirement.
