@@ -48,6 +48,9 @@ registerHooks({
     return next(url, context);
   },
 });
+const nativeFetch = globalThis.fetch;
+const readinessFetch = async (url, options) => String(url).includes("api.stripe.com/v2/core/accounts/") ? Response.json({ configuration: { recipient: { capabilities: { stripe_balance: { stripe_transfers: { status: "active" } } } } } }) : nativeFetch(url, options);
+globalThis.fetch = readinessFetch;
 const domain = await import("../app/_lib/creator-onboarding.ts");
 const availability = await import("../app/_lib/availability.ts");
 const availabilityWeeks = await import("../app/_lib/availability-weeks.ts");
@@ -62,6 +65,8 @@ function formRequest(path, values, admin = false) {
 }
 
 function readyConnections(creatorId) {
+  process.env.STRIPE_SECRET_KEY = "sk_test_fixture";
+  sqlite.prepare("INSERT OR IGNORE INTO creator_stripe_connections (creator_id,stripe_account_id,account_country) VALUES (?, ?, ?)").run(creatorId, `acct_${creatorId}`, "US");
   sqlite.prepare("UPDATE creator_onboarding_profiles SET calendar_connected_at = '2026-09-13', stripe_connected_at = '2026-09-13' WHERE id = ?").run(creatorId);
   sqlite.prepare("INSERT INTO creator_availability_rules (creator_id, timezone, day_of_week, start_time, end_time) VALUES (?, 'America/Los_Angeles', 1, '09:00', '17:00')").run(creatorId);
 }
@@ -73,6 +78,7 @@ test("application → review email → acceptance → verified owner → saved p
   const originalFetch = globalThis.fetch;
   const emails = [];
   globalThis.fetch = async (url, options) => {
+    if (String(url).includes("api.stripe.com/")) return readinessFetch(url, options);
     assert.equal(url, "https://api.resend.com/emails");
     emails.push(JSON.parse(options.body));
     return Response.json({ id: "test-email" });
@@ -100,7 +106,7 @@ test("application → review email → acceptance → verified owner → saved p
     const acceptanceEmail = emails.at(-1);
     assert.deepEqual(acceptanceEmail.to, [values.email]);
     const setup = new URL(acceptanceEmail.text.match(/https?:\/\/\S+\?invite=\S+/)[0]);
-    assert.equal(setup.pathname, "/creators/dashboard");
+    assert.equal(setup.pathname, "/creator/profile");
     const token = setup.searchParams.get("invite");
     const owner = { userId: "user_lifecycle", email: values.email, phone: null, sessionId: "session_test" };
     assert.equal((await domain.claimCreatorInvite(token, { ...owner, userId: "stranger", email: "stranger@example.com" })).status, "identity-mismatch");
@@ -572,7 +578,7 @@ test("a failed availability insertion rolls back the deletion", async () => {
   assert.deepEqual(await domain.listCreatorAvailabilityRules(input.creatorId), before);
 });
 
-test("customer selection and server validation reach the six-month limit with notice, buffer and timezone intact", async () => {
+test("customer selection and server validation reach the one-year limit with notice, buffer and timezone intact", async () => {
   const { end } = availabilityWeeks.availabilityDateBounds("America/Los_Angeles");
   const endDayOfWeek = new Date(`${end}T00:00:00Z`).getUTCDay();
   const input = await availabilityInput(availabilityWeeks.availabilityWeekStart(end), [{ dayOfWeek: endDayOfWeek, startTime: "12:00" }]);
@@ -612,8 +618,8 @@ test("customer selection and server validation reach the six-month limit with no
   assert.deepEqual(viewerDays([{ ...repeating[0], minNoticeMinutes: 600000 }]), []);
 });
 
-test("six-month and daylight-saving boundaries never shift selected wall times", () => {
-  assert.deepEqual(availabilityWeeks.availabilityDateBounds("UTC", new Date("2028-08-31T12:00:00Z")), { today: "2028-08-31", end: "2029-02-28" });
+test("one-year and daylight-saving boundaries never shift selected wall times", () => {
+  assert.deepEqual(availabilityWeeks.availabilityDateBounds("UTC", new Date("2028-08-31T12:00:00Z")), { today: "2028-08-31", end: "2029-08-31" });
   assert.equal(availabilityWeeks.availabilityDateBounds("America/Los_Angeles", new Date("2026-09-13T01:00:00Z")).today, "2026-09-12");
   assert.equal(availability.localDateTimeToUtc("2027-03-14T10:00:00", "America/Los_Angeles").toISOString(), "2027-03-14T17:00:00.000Z");
   assert.equal(availability.localDateTimeToUtc("2026-11-01T10:00:00", "America/Los_Angeles").toISOString(), "2026-11-01T18:00:00.000Z");

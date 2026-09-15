@@ -1,3 +1,4 @@
+import { parseOfferings, type Offering } from "../../_lib/offerings";
 import type { CreatorOnboardingProfile } from "../../_lib/creator-onboarding";
 
 export type EditableCreatorMediaItem = {
@@ -8,6 +9,8 @@ export type EditableCreatorMediaItem = {
 };
 
 export type EditableCreatorProfile = {
+  offerings?: Offering[];
+  draftSavedAt?: string | null;
   publishedAt?: string | null;
   publicSlug?: string | null;
   about: string;
@@ -47,6 +50,10 @@ export type EditableCreatorProfile = {
 };
 
 export const annabelMockProfile: EditableCreatorProfile = {
+  offerings: [
+    {id:"mock-15",title:"15 minutes",durationMinutes:15,unitAmount:4500,description:"A quick working session.",active:true},
+    {id:"mock-30",title:"30 minutes",durationMinutes:30,unitAmount:8000,description:"A fuller profile review.",active:true},
+  ],
   about:
     "I built Take a Seat to make the kind of advice people already ask for in DMs feel easier to book, clearer to prepare for, and more useful in real time. This mock profile lets us pressure-test the exact fields creators will control before Ella and the first accepted creators use them.",
   bio: "Founder test profile for checking the creator editor, pricing, and booking setup.",
@@ -125,6 +132,11 @@ export function getEditableCreatorProfile(
   }
 
   return {
+    draftSavedAt: profile.draftSavedAt,
+    offerings: profile.sessionOfferings ? parseOfferings(profile.sessionOfferings) : [
+      { id: `${profile.id}-15`, title: `${profile.seat15DurationMinutes ?? 15} minutes`, durationMinutes: profile.seat15DurationMinutes ?? 15, unitAmount: profile.seat15PriceAmount ?? 0, description: profile.seat15Description ?? "", active: hasSavedProfile && Boolean(profile.seat15Enabled) },
+      { id: `${profile.id}-30`, title: `${profile.seat30DurationMinutes ?? 30} minutes`, durationMinutes: profile.seat30DurationMinutes ?? 30, unitAmount: profile.seat30PriceAmount ?? 0, description: profile.seat30Description ?? "", active: hasSavedProfile && Boolean(profile.seat30Enabled) },
+    ],
     publishedAt: profile.publishedAt,
     publicSlug: profile.publicSlug,
     about: hasSavedProfile ? profile.about ?? "" : "",
@@ -189,7 +201,7 @@ function getEditablePriceAmount(value: number | null) {
 }
 
 function isVideoSource(source: string) {
-  return /(?:tiktok\.com|youtube\.com|youtu\.be|vimeo\.com|\.mp4(?:\?|$)|^data:video\/)/i.test(
+  return /(?:[?]video=1|tiktok\.com|youtube\.com|youtu\.be|vimeo\.com|\.mp4(?:\?|$)|^data:video\/)/i.test(
     source,
   );
 }

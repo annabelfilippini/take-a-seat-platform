@@ -1,3 +1,4 @@
+import { env as workerEnv } from "cloudflare:workers";
 import { eq } from "drizzle-orm";
 import { creatorStripeConnections } from "../../db/schema";
 
@@ -50,7 +51,7 @@ export function getRuntimeEnv(name: string) {
     globalEnv && typeof globalEnv === "object"
       ? (globalEnv as Record<string, unknown>)[name]
       : undefined;
-  const processValue = process.env[name];
+  const processValue = (workerEnv as unknown as Record<string, unknown>)[name] ?? process.env[name];
   const value =
     typeof cloudflareValue === "string" ? cloudflareValue : processValue;
   return typeof value === "string" && value.trim() ? value.trim() : null;

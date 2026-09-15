@@ -7,11 +7,16 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type PointerEvent,
   type WheelEvent,
 } from "react";
+import { CreatorOfferingsEditor } from "../../_components/CreatorOfferingsEditor";
+import { CreatorRequestsPanel } from "../../_components/CreatorRequestsPanel";
+import { CreatorPaymentsPanel } from "../../_components/CreatorPaymentsPanel";
+import type { Offering } from "../../_lib/offerings";
 import { CREATOR_PROFILE_EDITOR_URL } from "../../_lib/creator-destination";
-import { CreatorSetupPagePreview } from "../../_components/CreatorSetupPagePreview";
+
 import { prepareProfileMedia } from "../../_lib/profile-media";
 import { profileSaveError } from "../../_lib/profile-save";
 import {
@@ -30,7 +35,7 @@ type EditableGalleryItem = {
   title: string;
 };
 
-type EditableCreatorTab = "profile" | "availability" | "payments" | "publish" | "settings";
+type EditableCreatorTab = "profile" | "availability" | "payments" | "publish" | "requests";
 type EditableDurationValue = number | string;
 type EditablePriceValue = number | string;
 type ProfileImagePointer = {
@@ -39,6 +44,8 @@ type ProfileImagePointer = {
 };
 
 type EditableProfileState = {
+  offerings?: Offering[];
+  draftSavedAt?: string | null;
   publishedAt?: string | null;
   publicSlug?: string | null;
   about: string;
@@ -109,9 +116,9 @@ type EditableAvailabilityRule = {
 const creatorTabs: Array<{ id: EditableCreatorTab; label: string }> = [
   { id: "profile", label: "Profile" },
   { id: "availability", label: "Availability" },
+  { id: "requests", label: "Requests" },
   { id: "payments", label: "Payments" },
-  { id: "publish", label: "Go live" },
-  { id: "settings", label: "Settings" },
+  { id: "publish", label: "Preview & Publish" },
 ];
 
 const homepageCategories = [
@@ -192,6 +199,8 @@ const tiktokPlayerOptions = [
   "closed_caption=0",
 ].join("&");
 
+const subscribeHydration = () => () => {};
+
 export function EditableCreatorProfilePreview({
   calendarStatus,
   stripeStatus,
@@ -207,10 +216,21 @@ export function EditableCreatorProfilePreview({
   initialNotificationPreferences?: EditableNotificationPreferences;
   initialNotifications?: EditableCreatorNotification[];
 }) {
+  const hydrated = useSyncExternalStore(subscribeHydration, () => true, () => false);
   const [profile, setProfile] = useState(initialProfile);
+  const [stripeReady, setStripeReady] = useState(false);
+  const [lastSavedAt, setLastSavedAt] = useState(initialProfile.draftSavedAt);
+  const [uploadState, setUploadState] = useState("");
+  const uploadBusy = useRef(false);
   const [activeCreatorTab, setActiveCreatorTab] =
     useState<EditableCreatorTab>(calendarStatus ? "availability" : stripeStatus ? "payments" : "profile");
   const previewDialog = useRef<HTMLDialogElement>(null);
+  const [previewRevision, setPreviewRevision] = useState(0);
+  async function openPreview() {
+    if (!await saveProfileChanges()) return;
+    setPreviewRevision((revision) => revision + 1);
+    previewDialog.current?.showModal();
+  }
   const [publishMessage, setPublishMessage] = useState("");
   const [publishing, setPublishing] = useState(false);
   const [hasAvailability, setHasAvailability] = useState(initialAvailabilityRules.some((rule) => rule.enabled !== false));
@@ -267,10 +287,10 @@ export function EditableCreatorProfilePreview({
     profileSaving
       ? "Saving"
       : mediaSaveStatus === "saved"
-        ? "Saved"
+        ? lastSavedAt ? `Saved at ${new Date(lastSavedAt).toLocaleTimeString("en-US", {hour:"numeric",minute:"2-digit",timeZone:profile.timezone})}` : "No changes"
         : mediaSaveStatus === "error"
           ? "Save failed"
-          : "Unsaved";
+          : "Unsaved changes";
 
   useEffect(() => {
     function warnOnLeave(event: BeforeUnloadEvent) {
@@ -364,12 +384,29 @@ export function EditableCreatorProfilePreview({
     }));
   }
 
+  async function uploadFile(file: File, onLoad: (source: string) => void) {
+    if (uploadBusy.current) return;
+    uploadBusy.current = true; setUploadState("Uploading…");
+    try {
+      if (file.size > 8 * 1024 * 1024) throw new Error("Choose a file up to 8 MB.");
+      const body = new FormData(); body.set("creatorId", profile.id); body.set("file", file);
+      const response = await fetch("/api/creators/media", { method: "POST", body });
+      const result = await response.json() as {source?:string;error?:string};
+      if (!response.ok || !result.source) throw new Error(result.error || "Upload failed. Please retry.");
+      onLoad(result.source); setUploadState("Upload ready. Save your draft to keep this selection.");
+    } catch (error) { setUploadState(error instanceof Error ? error.message : "Upload failed. Please retry."); }
+    finally { uploadBusy.current = false; }
+  }
+
   function chooseMediaItemFile(id: string, file: File | undefined) {
-    if (!file || !isSupportedMediaFile(file)) {
+    if (!file) return;
+    if (!isSupportedMediaFile(file)) {
+      setUploadState("Use a JPG, PNG, WebP photo or MP4/WebM video.");
       return;
     }
 
-    readFileAsDataUrl(file, (source) => {
+    void uploadFile(file, (source) => {
+      if (profile.mediaItems.some((item) => item.id !== id && item.source === source)) throw new Error("That file is already in your gallery.");
       markProfileDirty();
       setProfile((current) => ({
         ...current,
@@ -400,13 +437,13 @@ export function EditableCreatorProfilePreview({
   function addMediaItem() {
     const source = draftMedia.uploadedSource;
 
-    if (!source) {
+    if (!source || profile.mediaItems.length >= 8 || profile.mediaItems.some((item) => item.source === source)) {
       return;
     }
 
     setProfile((current) => ({
       ...current,
-      mediaItems: [
+      mediaItems: current.mediaItems.some((item) => item.source === source) ? current.mediaItems : [
         ...current.mediaItems,
         {
           fileName: draftMedia.fileName || undefined,
@@ -435,11 +472,10 @@ export function EditableCreatorProfilePreview({
   }
 
   function chooseProfileImage(file: File | undefined) {
-    if (!file) {
-      return;
-    }
+    if (!file) return;
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) { setUploadState("Choose a JPG, PNG or WebP profile photo."); return; }
 
-    readFileAsDataUrl(file, (source) => {
+    void uploadFile(file, (source) => {
       setProfile((current) => ({
         ...current,
         image: source,
@@ -589,11 +625,15 @@ export function EditableCreatorProfilePreview({
   }
 
   function chooseDraftMediaFile(file: File | undefined) {
-    if (!file || !isSupportedMediaFile(file)) {
+    if (!file) return;
+    if (!isSupportedMediaFile(file)) {
+      setUploadState("Use a JPG, PNG, WebP photo or MP4/WebM video.");
       return;
     }
 
-    readFileAsDataUrl(file, (source) => {
+    setDraftMedia((current) => ({ ...current, uploadedSource: "" }));
+    void uploadFile(file, (source) => {
+      if (profile.mediaItems.some((item) => item.source === source)) throw new Error("That file is already in your gallery.");
       setDraftMedia((current) => ({
         ...current,
         fileName: file.name,
@@ -605,7 +645,7 @@ export function EditableCreatorProfilePreview({
   }
 
   async function saveProfileChanges() {
-    if (profileSaveInFlight.current) {
+    if (profileSaveInFlight.current || uploadBusy.current) {
       return false;
     }
 
@@ -632,6 +672,8 @@ export function EditableCreatorProfilePreview({
       if (profileEditRevision.current === savedRevision) {
         setProfile((current) => ({ ...current, image, mediaItems: preparedProfile.mediaItems }));
       }
+      setUploadState("");
+      setLastSavedAt(new Date().toISOString());
       setMediaSaveStatus(
         profileEditRevision.current === savedRevision ? "saved" : "idle",
       );
@@ -677,7 +719,7 @@ export function EditableCreatorProfilePreview({
   }
 
   const profileReady = Boolean(profile.name.trim() && profile.about.trim() && profile.helpItems.trim() && profile.image);
-  const enabledCalls = [
+  const enabledCalls = profile.offerings ? profile.offerings.filter((item) => item.active && !item.archived).map((item) => ({ enabled: true, price: item.unitAmount })) : [
     { enabled: profile.seat15Enabled, price: Number(profile.seat15PriceAmount) },
     { enabled: profile.seat30Enabled, price: Number(profile.seat30PriceAmount) },
   ].filter((call) => call.enabled);
@@ -686,7 +728,7 @@ export function EditableCreatorProfilePreview({
     { id: "profile" as const, label: "Profile picture, about text, and conversation topics", done: profileReady },
     { id: "profile" as const, label: "Call lengths and prices", done: callsReady },
     { id: "availability" as const, label: "Saved availability and Google Calendar", done: hasAvailability && Boolean(profile.calendarConnectedAt) },
-    { id: "payments" as const, label: "Stripe payouts connected", done: Boolean(profile.stripeConnectedAt) },
+    { id: "payments" as const, label: "Stripe payouts connected", done: stripeReady },
   ];
   const allReady = setupChecks.every((check) => check.done);
   const helpItems = profile.helpItems ? profile.helpItems.split("\n") : ["", "", "", ""];
@@ -701,31 +743,32 @@ export function EditableCreatorProfilePreview({
         </p>
       ) : null}
 
-      <div className="profile-announcement">{profile.publishedAt ? "Live page · private edits" : "Your creator profile · Private draft"}</div>
+      <div className="profile-announcement">{profile.publishedAt ? "Your storefront · Live · Private draft edits" : "Your storefront · Draft"}</div>
       <header className="topbar profile-topbar">
         <a className="brand-mark" href="/" aria-label="Take a Seat home">
           Take a Seat
         </a>
-        <nav className="profile-nav" aria-label="Editable profile preview tabs">
+        <div className="profile-nav" aria-label="Your storefront" role="tablist">
           {creatorTabs.map((tab) => (
             <button
-              aria-label={tab.id === "settings" ? tab.label : undefined}
+              aria-label={tab.label}
               aria-controls={`editable-creator-${tab.id}`}
               aria-selected={activeCreatorTab === tab.id}
-              className={`profile-nav-tab${tab.id === "settings" ? " settings-tab-button" : ""}`}
+              className="profile-nav-tab"
               id={`editable-creator-tab-${tab.id}`}
               key={tab.id}
-              disabled={publishing}
+              disabled={!hydrated || publishing}
               onClick={() => { void changeStep(tab.id); }}
               role="tab"
               type="button"
             >
-              {tab.id === "settings" ? <SettingsTabIcon /> : tab.label}
+              {tab.label}
             </button>
           ))}
-        </nav>
+        </div>
       </header>
 
+      <div className="creator-storefront-bar"><span role="status">{uploadState === "Uploading…" ? uploadState : profileSaveLabel}</span><button type="button" onClick={() => void openPreview()}>Preview profile</button></div>
       {profileSaveMessage ? (
         <div className="creator-profile-save-notice" role="alert">
           <p>{profileSaveMessage}</p>
@@ -739,7 +782,8 @@ export function EditableCreatorProfilePreview({
         id="editable-creator-profile"
         role="tabpanel"
       >
-      <fieldset className="creator-setup-fields" disabled={publishing}>
+      {uploadState && <p role="status" className="creator-upload-status">{uploadState}</p>}
+      <fieldset className="creator-setup-fields" disabled={!hydrated || publishing || uploadState === "Uploading…"}>
       <section className="amber-profile-hero editable-public-preview" id="public-preview">
         <div className="amber-hero-copy">
           <div className="editable-profile-photo-editor">
@@ -758,7 +802,7 @@ export function EditableCreatorProfilePreview({
                   alt={`${profile.name} profile`}
                   draggable={false}
                   src={profile.image}
-                  style={{ transform: profileImageTransform }}
+                  style={{ objectPosition: `${profileImagePositionX}% ${profileImagePositionY}%`, transform: profileImageTransform }}
                 />
               ) : (
                 <b>{profile.name.slice(0, 2) || "TS"}</b>
@@ -911,7 +955,7 @@ export function EditableCreatorProfilePreview({
             </label>
           </div>
           <div className="editable-media-list">
-            {profile.mediaItems.map((item) => (
+            {profile.mediaItems.map((item, index) => (
               <article className="editable-media-row" key={item.id}>
                 <MediaPreview item={item} />
                 <div className="editable-media-source-control">
@@ -928,6 +972,8 @@ export function EditableCreatorProfilePreview({
                     <p className="editable-upload-note">Uploaded {item.fileName}</p>
                   ) : null}
                 </div>
+                <button type="button" disabled={index === 0} aria-label={`Move media ${index+1} up`} onClick={() => { const next = [...profile.mediaItems]; [next[index-1],next[index]] = [next[index],next[index-1]]; update("mediaItems",next); }}>↑</button>
+                <button type="button" disabled={index === profile.mediaItems.length-1} aria-label={`Move media ${index+1} down`} onClick={() => { const next = [...profile.mediaItems]; [next[index+1],next[index]] = [next[index],next[index+1]]; update("mediaItems",next); }}>↓</button>
                 <button
                   className="editable-secondary-button"
                   onClick={() => removeMediaItem(item.id)}
@@ -939,6 +985,7 @@ export function EditableCreatorProfilePreview({
             ))}
           </div>
 
+          <p>Up to 8 photos or videos, 8 MB each. JPG, PNG, WebP, MP4 or WebM. Originals are kept so you can recrop later.</p>
           <div className="editable-add-media">
             <div className="editable-add-source">
               <input
@@ -955,7 +1002,7 @@ export function EditableCreatorProfilePreview({
             </div>
             <button
               className="editable-primary-button"
-              disabled={!draftMedia.uploadedSource}
+              disabled={!draftMedia.uploadedSource || profile.mediaItems.length >= 8 || profile.mediaItems.some((item) => item.source === draftMedia.uploadedSource)}
               onClick={addMediaItem}
               type="button"
             >
@@ -970,6 +1017,7 @@ export function EditableCreatorProfilePreview({
       <section className="amber-about-section" id="about">
         <div className="about-main">
           <h2>About</h2>
+          <p>Share your background, experience, personal style, and what you enjoy helping people feel confident about.</p>
           <EditableTextarea
             ariaLabel="About section"
             className="editable-about-copy"
@@ -993,7 +1041,7 @@ export function EditableCreatorProfilePreview({
                 </li>
               ))}
             </ul>
-            <button className="editable-secondary-button" type="button" onClick={() => update("helpItems", [...helpItems, ""].join("\n"))}>Add topic</button>
+            <button className="editable-secondary-button" type="button" disabled={helpItems.length >= 5} onClick={() => update("helpItems", [...helpItems, ""].join("\n"))}>Add topic</button>
           </div>
 
           <div className="why-card">
@@ -1012,30 +1060,7 @@ export function EditableCreatorProfilePreview({
           <h2 className="editable-reserve-heading">Choose a call</h2>
           <p>Private video call on Google Meet.</p>
           <label className="editable-call-currency">Currency<select aria-label="Call currency" value={profile.currency} onChange={(event) => update("currency", event.target.value)}>{["USD", "GBP", "EUR", "CAD", "AUD"].map((currency) => <option key={currency}>{currency}</option>)}</select></label>
-          <div className="seat-options">
-            <EditableSeatOption
-              currency={profile.currency}
-              description={profile.seat15Description}
-              durationMinutes={profile.seat15DurationMinutes}
-              enabled={profile.seat15Enabled}
-              price={profile.seat15PriceAmount}
-              onDescriptionChange={(value) => update("seat15Description", value)}
-              onDurationChange={(value) => update("seat15DurationMinutes", value)}
-              onEnabledChange={(value) => update("seat15Enabled", value)}
-              onPriceChange={(value) => update("seat15PriceAmount", value)}
-            />
-            <EditableSeatOption
-              currency={profile.currency}
-              description={profile.seat30Description}
-              durationMinutes={profile.seat30DurationMinutes}
-              enabled={profile.seat30Enabled}
-              price={profile.seat30PriceAmount}
-              onDescriptionChange={(value) => update("seat30Description", value)}
-              onDurationChange={(value) => update("seat30DurationMinutes", value)}
-              onEnabledChange={(value) => update("seat30Enabled", value)}
-              onPriceChange={(value) => update("seat30PriceAmount", value)}
-            />
-          </div>
+          <CreatorOfferingsEditor offerings={profile.offerings ?? []} onChange={(items) => update("offerings",items)} />
           <button className="seat-primary-button editable-preview-booking-button" disabled type="button">
             Find availability
           </button>
@@ -1093,49 +1118,34 @@ export function EditableCreatorProfilePreview({
         id="editable-creator-payments"
         role="tabpanel"
       >
-        <EditablePaymentsPanel
-          profile={profile}
-          onEditProfile={() => { void changeStep("profile"); }}
-        />
+        <CreatorPaymentsPanel creatorId={profile.id} onReadiness={setStripeReady} />
       </section>
 
       <section
-        aria-labelledby="editable-creator-tab-settings"
+        aria-labelledby="editable-creator-tab-requests"
         className="editable-admin-tab-panel"
-        hidden={activeCreatorTab !== "settings"}
-        id="editable-creator-settings"
+        hidden={activeCreatorTab !== "requests"}
+        id="editable-creator-requests"
         role="tabpanel"
       >
-        <EditableSettingsPanel
+        <CreatorRequestsPanel creatorId={profile.id} />
+        <details className="creator-notification-settings"><summary>Notification preferences</summary><EditableSettingsPanel
           creatorId={profile.id}
           initialNotifications={initialNotifications}
           initialPreferences={initialNotificationPreferences}
-        />
+        /></details>
       </section>
-          <section hidden={activeCreatorTab !== "publish"} className="editable-admin-tab-panel" role="tabpanel" aria-labelledby="editable-creator-tab-publish" aria-label="Go live" id="editable-creator-publish">
-            <p>Review your page and finish these steps before publishing. Your profile and call prices stay private until you publish.</p>
+          <section hidden={activeCreatorTab !== "publish"} className="editable-admin-tab-panel" role="tabpanel" aria-labelledby="editable-creator-tab-publish" aria-label="Preview & Publish" id="editable-creator-publish">
+            <h1>Preview & Publish</h1><p>Review your page and finish these steps before publishing. Your profile and call prices stay private until you publish.</p>
             <ul className="creator-setup-checklist">{setupChecks.map((check) => <li key={check.label}><span>{check.done ? "Ready" : "To do"}</span><button type="button" onClick={() => { void changeStep(check.id); }}>{check.label}</button></li>)}</ul>
-            <button type="button" className="seat-secondary-button" onClick={() => previewDialog.current?.showModal()}>Preview your page</button>
-            <footer className="creator-setup-footer"><button type="button" className="editable-primary-button" disabled={!allReady || publishing || profileSaving} onClick={() => { void publishProfile(); }}>{publishing ? "Publishing…" : profile.publishedAt ? "Publish changes" : "Go live"}</button></footer>
+            {!stripeReady && <p>Connect Stripe before accepting paid sessions.</p>}
+            <button type="button" className="seat-secondary-button" onClick={() => void openPreview()}>Preview your page</button>
+            <footer className="creator-setup-footer"><button type="button" className="editable-primary-button" disabled={!allReady || publishing || profileSaving} onClick={() => { void publishProfile(); }}>{publishing ? "Publishing…" : profile.publishedAt ? "Publish changes" : "Publish profile"}</button></footer>
             {publishMessage ? <p role="status">{publishMessage}</p> : null}
             {profile.publishedAt && profile.publicSlug ? <a href={`/with/${profile.publicSlug}`} target="_blank" rel="noreferrer">View your live page ↗</a> : null}
           </section>
-      <dialog className="creator-full-preview" ref={previewDialog} aria-label="Preview your public page"><div className="creator-preview-toolbar"><span>Draft preview</span><button type="button" onClick={() => previewDialog.current?.close()}>Back to setup</button></div><CreatorSetupPagePreview profile={profile} /></dialog>
+      <dialog className="creator-full-preview" ref={previewDialog} aria-label="Preview your public page"><div className="creator-preview-toolbar"><span>Draft preview</span><button type="button" onClick={() => previewDialog.current?.close()}>Back to setup</button></div>{previewRevision > 0 && <iframe title="Your customer profile preview" src={`/creator/preview?revision=${previewRevision}`} />}</dialog>
     </main>
-  );
-}
-
-function SettingsTabIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      className="settings-tab-icon"
-      fill="none"
-      viewBox="0 0 24 24"
-    >
-      <path d="M9.6 2.7h4.8l.8 3 2.7-1.5 3.4 3.4-1.5 2.7 3 .8v4.8l-3 .8 1.5 2.7-3.4 3.4-2.7-1.5-.8 3H9.6l-.8-3-2.7 1.5-3.4-3.4 1.5-2.7-3-.8v-4.8l3-.8-1.5-2.7 3.4-3.4 2.7 1.5.8-3Z" />
-      <circle cx="12" cy="12.5" r="4" />
-    </svg>
   );
 }
 
@@ -1198,6 +1208,8 @@ function EditableAvailabilityPanel({
   const initialWeekStart = availabilityWeekStart(initialBounds.today);
   const [weekStart, setWeekStart] = useState(initialWeekStart);
   const weekRules = rulesForAvailabilityWeek(initialRules, weekStart);
+  const isDefaultWeek = weekStart === "default";
+  const displayWeekStart = isDefaultWeek ? initialWeekStart : weekStart;
   const [timezone, setTimezone] = useState(weekRules[0]?.timezone ?? initialTimezone);
   let availabilityBounds = initialBounds;
   try {
@@ -1210,13 +1222,13 @@ function EditableAvailabilityPanel({
     [availabilityBounds.today, availabilityBounds.end],
   );
   const disabledDays = useMemo(() => new Set(
-    availabilityDays
+    (isDefaultWeek ? [] : availabilityDays)
       .filter((day) => {
         const date = addCalendarDays(weekStart, day.value);
         return date < availabilityBounds.today || date > availabilityBounds.end;
       })
       .map((day) => day.value),
-  ), [availabilityBounds.end, availabilityBounds.today, weekStart]);
+  ), [availabilityBounds.end, availabilityBounds.today, weekStart, isDefaultWeek]);
   const [weekDrafts, setWeekDrafts] = useState<Record<string, string[]>>({});
   const [weekSavedSlots, setWeekSavedSlots] = useState<Record<string, string[]>>({});
   const [weekTimezones, setWeekTimezones] = useState<Record<string, string>>({});
@@ -1233,7 +1245,7 @@ function EditableAvailabilityPanel({
   const paintedSlotsRef = useRef<Set<string>>(new Set());
 
   const currentWeekIndex = Math.max(0, weekOptions.indexOf(weekStart));
-  const selectedWeekLabel = formatAvailabilityWeek(weekStart);
+  const selectedWeekLabel = isDefaultWeek ? "default weekly schedule" : formatAvailabilityWeek(weekStart);
 
   useEffect(() => {
     function warnOnLeave(event: BeforeUnloadEvent) {
@@ -1249,6 +1261,7 @@ function EditableAvailabilityPanel({
   function getSlotKeysForWeek(nextWeekStart: string) {
     return weekDrafts[nextWeekStart]
       ?? weekSavedSlots[nextWeekStart]
+      ?? (!initialRules.some((rule) => rule.weekStart === nextWeekStart) ? weekSavedSlots.default : undefined)
       ?? getAvailabilitySlotKeysFromRules(rulesForAvailabilityWeek(initialRules, nextWeekStart));
   }
 
@@ -1441,7 +1454,8 @@ function EditableAvailabilityPanel({
         method: "POST",
       });
 
-      if (!response.ok) {
+      const result = await response.json().catch(() => null) as {status?:string} | null;
+      if (!response.ok || result?.status !== "saved") {
         throw new Error(response.status === 401 || response.status === 403
           ? "Your session has expired or you no longer have access. Sign in again to save."
           : "Availability could not be saved. Check the timezone and try again. Your changes are still here.");
@@ -1459,6 +1473,7 @@ function EditableAvailabilityPanel({
       setSaveStatus("saved");
       const savedWeeks = { ...weekSavedSlots, [weekStart]: savedSlotKeys };
       const hasHours = weekOptions.some((week) => (savedWeeks[week]
+        ?? (!initialRules.some((rule) => rule.weekStart === week) ? savedWeeks.default : undefined)
         ?? getAvailabilitySlotKeysFromRules(rulesForAvailabilityWeek(initialRules, week))).length > 0);
       onSaved(hasHours, timezone, advance);
       return true;
@@ -1504,17 +1519,20 @@ function EditableAvailabilityPanel({
       </div>
 
       <p className="availability-instructions" id="weekly-availability-help">
-        Choose any week up to six months ahead, then select the times you can take
+        Set your typical weekly hours, or choose any week up to one year ahead to override them. Saved availability changes live bookable hours immediately. Select the times you can take
         calls in your timezone. Tap a time to select it, or use a mouse to drag
         across several times.
       </p>
 
+      <div className="creator-request-actions"><button type="button" disabled={saveStatus === "saving"} aria-pressed={isDefaultWeek} onClick={() => showWeek("default")}>Default weekly hours</button><button type="button" disabled={saveStatus === "saving"} aria-pressed={!isDefaultWeek} onClick={() => showWeek(initialWeekStart)}>Week overrides</button><button type="button" disabled={saveStatus === "saving"} onClick={() => { setSelectedSlots(new Set()); updateWeekDraft(new Set()); setSaveStatus("idle"); }}>Clear hours</button></div>
+      <p>{isDefaultWeek ? "These hours repeat on weeks without an override." : `Editing ${selectedWeekLabel}. Saving replaces this week only; an empty week closes it.`}</p>
+      <button className="editable-primary-button" type="button" disabled={saveStatus === "saving"} onClick={() => void saveAvailability()}>Save availability</button>
       <div className="availability-settings-row">
         <div className="availability-week-controls" aria-label="Availability week">
           <button
             aria-label="Previous availability week"
             className="availability-week-step"
-            disabled={saveStatus === "saving" || currentWeekIndex <= 0}
+            disabled={isDefaultWeek || saveStatus === "saving" || currentWeekIndex <= 0}
             onClick={() => showWeek(weekOptions[currentWeekIndex - 1])}
             type="button"
           >
@@ -1529,6 +1547,7 @@ function EditableAvailabilityPanel({
               value={weekStart}
               onChange={(event) => showWeek(event.target.value)}
             >
+              {isDefaultWeek && <option value="default">Default weekly hours</option>}
               {weekOptions.map((option) => (
                 <option key={option} value={option}>
                   Week of {formatAvailabilityDate(option)}
@@ -1539,13 +1558,14 @@ function EditableAvailabilityPanel({
           <button
             aria-label="Next availability week"
             className="availability-week-step"
-            disabled={saveStatus === "saving" || currentWeekIndex >= weekOptions.length - 1}
+            disabled={isDefaultWeek || saveStatus === "saving" || currentWeekIndex >= weekOptions.length - 1}
             onClick={() => showWeek(weekOptions[currentWeekIndex + 1])}
             type="button"
           >
             <span aria-hidden="true">›</span>
           </button>
         </div>
+        <label>Jump to a date<input aria-label="Jump to availability date" type="date" min={availabilityBounds.today} max={availabilityBounds.end} disabled={saveStatus === "saving"} onChange={(event) => { if (event.target.value) showWeek(availabilityWeekStart(event.target.value)); }} /></label>
         <label className="availability-timezone-picker">
           <span>Timezone</span>
           <input
@@ -1575,7 +1595,7 @@ function EditableAvailabilityPanel({
           <div className="availability-days-row">
             <span className="availability-grid-corner">Time</span>
             {availabilityDays.map((day) => {
-              const date = addCalendarDays(weekStart, day.value);
+              const date = addCalendarDays(displayWeekStart, day.value);
               return (
               <span
                 className={`availability-day-heading${date === availabilityBounds.today ? " active" : ""}`}
@@ -1602,7 +1622,7 @@ function EditableAvailabilityPanel({
                 selectedSlots={selectedSlots}
                 slot={slot}
                 slotIndex={slotIndex}
-                weekStart={weekStart}
+                weekStart={displayWeekStart}
                 toggleSlot={toggleSlot}
               />
             ))}
@@ -1616,8 +1636,9 @@ function EditableAvailabilityPanel({
         onClick={() => { void saveAvailability(); }}
         type="button"
       >
-        {saveStatus === "saving" ? "Saving availability" : `Save ${selectedWeekLabel}`}
+        {saveStatus === "saving" ? "Saving availability…" : "Save availability"}
       </button>
+      {saveStatus === "saved" && <p role="status">Availability saved for {selectedWeekLabel}.</p>}
       {saveError ? <p role="alert">{saveError}</p> : null}
       {Object.keys(weekDrafts).some((week) => week !== weekStart)
         ? <p role="status">Other weeks have unsaved changes.</p> : null}
@@ -1694,68 +1715,6 @@ function EditableAvailabilityRow({
         );
       })}
     </>
-  );
-}
-
-function EditablePaymentsPanel({
-  profile,
-  onEditProfile,
-}: {
-  profile: EditableProfileState;
-  onEditProfile: () => void;
-}) {
-  const stripeConnected = Boolean(profile.stripeConnectedAt);
-  const stripeConnectHref = `/api/stripe/connect/start?creatorId=${encodeURIComponent(
-    profile.id,
-  )}&returnTo=${encodeURIComponent(CREATOR_PROFILE_EDITOR_URL)}`;
-
-  return (
-    <div className="editable-editor-panel editable-wide-editor-panel">
-      <div className="creator-form-header">
-        <div className="editable-section-heading">
-          <span>Payments</span>
-          <h2>Stripe payouts</h2>
-        </div>
-        <span className={stripeConnected ? "dashboard-status-complete" : "dashboard-status"}>
-          {stripeConnected ? "Connected" : "Not connected"}
-        </span>
-      </div>
-
-      <dl className="creator-dashboard-facts creator-payment-facts">
-        <div>
-          <dt>{formatDurationLabel(profile.seat15DurationMinutes)} seat</dt>
-          <dd>
-            {profile.seat15Enabled
-              ? formatMoney(profile.currency, profile.seat15PriceAmount)
-              : "Hidden"}
-          </dd>
-        </div>
-        <div>
-          <dt>{formatDurationLabel(profile.seat30DurationMinutes)} seat</dt>
-          <dd>
-            {profile.seat30Enabled
-              ? formatMoney(profile.currency, profile.seat30PriceAmount)
-              : "Hidden"}
-          </dd>
-        </div>
-        <div>
-          <dt>Payout account</dt>
-          <dd>{stripeConnected ? "Stripe Express" : "Needed before bookings"}</dd>
-        </div>
-      </dl>
-
-      <div className="creator-connect-actions">
-        <a
-          className="seat-primary-button"
-          href={stripeConnectHref}
-        >
-          {stripeConnected ? "Update Stripe" : "Connect Stripe"}
-        </a>
-        <button className="seat-secondary-button" onClick={onEditProfile} type="button">
-          Edit call prices
-        </button>
-      </div>
-    </div>
   );
 }
 
@@ -1936,6 +1895,7 @@ function formatNotificationDate(value: string) {
   }
 
   return date.toLocaleDateString("en-US", {
+    timeZone: "UTC",
     day: "numeric",
     month: "short",
   });
@@ -2072,87 +2032,6 @@ function SocialMediaFrame({
   );
 }
 
-function EditableSeatOption({
-  currency,
-  description,
-  durationMinutes,
-  enabled,
-  price,
-  onDescriptionChange,
-  onDurationChange,
-  onEnabledChange,
-  onPriceChange,
-}: {
-  currency: string;
-  description: string;
-  durationMinutes: EditableDurationValue;
-  enabled: boolean;
-  price: EditablePriceValue;
-  onDescriptionChange: (value: string) => void;
-  onDurationChange: (value: EditableDurationValue) => void;
-  onEnabledChange: (value: boolean) => void;
-  onPriceChange: (value: EditablePriceValue) => void;
-}) {
-  const label = formatDurationLabel(durationMinutes);
-
-  return (
-    <article className={`seat-option${enabled ? "" : " editable-seat-disabled"}`}>
-      <label className="creator-checkbox-row editable-seat-toggle">
-        <input
-          checked={enabled}
-          type="checkbox"
-          onChange={(event) => onEnabledChange(event.target.checked)}
-        />
-        <span>Offer this seat option</span>
-      </label>
-      <div className="seat-option-heading editable-seat-option-heading">
-        <label className="editable-duration-field editable-seat-duration-field">
-          <input
-            aria-label={`${label} duration in minutes`}
-            inputMode="numeric"
-            max="240"
-            min="5"
-            type="number"
-            value={durationMinutes}
-            onChange={(event) => onDurationChange(event.target.value)}
-          />
-          <span>minutes</span>
-        </label>
-        <label className="editable-price-field editable-seat-price-field">
-          <span>{currency === "USD" ? "$" : currency}</span>
-          <input
-            aria-label={`${label} price`}
-            inputMode="decimal"
-            step="0.01"
-            min="0"
-            type="number"
-            value={price}
-            onChange={(event) => onPriceChange(event.target.value)}
-          />
-        </label>
-      </div>
-      <EditableTextarea
-        ariaLabel={`${label} description`}
-        className="editable-seat-description"
-        rows={3}
-        value={description}
-        onChange={onDescriptionChange}
-      />
-    </article>
-  );
-}
-
-function formatDurationLabel(value: EditableDurationValue) {
-  const parsed = Number(String(value).trim());
-
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    return "Set time";
-  }
-
-  const minutes = Math.round(parsed);
-  return `${minutes} ${minutes === 1 ? "minute" : "minutes"}`;
-}
-
 function getAvailabilitySlotKeysFromRules(rules: EditableAvailabilityRule[]) {
   const slotKeys = rules.flatMap((rule) => {
     if (rule.enabled === false) {
@@ -2185,7 +2064,8 @@ function getAvailabilityFormData({
 
   formData.set("creatorId", creatorId);
   formData.set("timezone", timezone);
-  formData.set("weekStart", weekStart);
+  if (weekStart === "default") formData.set("scope", "default");
+  else formData.set("weekStart", weekStart);
   formData.set("returnTo", CREATOR_PROFILE_EDITOR_URL);
   formData.set(
     "availabilitySlots",
@@ -2232,6 +2112,7 @@ function EditableTextarea({
   return (
     <textarea
       aria-label={ariaLabel}
+      maxLength={ariaLabel === "Public profile intro" ? 180 : ariaLabel.includes("topic") || ariaLabel === "What people can ask" ? 100 : 4000}
       className={`editable-profile-field ${className}`}
       placeholder={ariaLabel}
       rows={rows}
@@ -2239,18 +2120,6 @@ function EditableTextarea({
       onChange={(event) => onChange(event.target.value)}
     />
   );
-}
-
-function formatMoney(currency: string, amount: EditablePriceValue) {
-  const cleanAmount = String(amount).trim();
-  const parsedAmount = Number(cleanAmount);
-
-  if (!cleanAmount || !Number.isFinite(parsedAmount)) {
-    return "Set price";
-  }
-
-  const symbol = currency.toUpperCase() === "USD" ? "$" : `${currency.toUpperCase()} `;
-  return `${symbol}${parsedAmount}`;
 }
 
 function createAvailabilityTimeSlots(startHour: number, endHour: number) {
@@ -2339,18 +2208,8 @@ function getAvailabilitySlotKeyFromPointer(event: PointerEvent<HTMLElement>) {
   return cell instanceof HTMLElement ? cell.dataset.availabilityKey ?? null : null;
 }
 
-function readFileAsDataUrl(file: File, onLoad: (source: string) => void) {
-  const reader = new FileReader();
-  reader.addEventListener("load", () => {
-    if (typeof reader.result === "string") {
-      onLoad(reader.result);
-    }
-  });
-  reader.readAsDataURL(file);
-}
-
 function isSupportedMediaFile(file: File) {
-  return file.type.startsWith("image/") || file.type.startsWith("video/");
+  return ["image/jpeg", "image/png", "image/webp", "video/mp4", "video/webm"].includes(file.type);
 }
 
 function getMediaKindForFile(file: File): EditableGalleryItem["kind"] {
@@ -2372,6 +2231,7 @@ function getProfileSettingsFormData(profile: EditableProfileState) {
     .filter(Boolean)
     .join("\n");
 
+  formData.set("sessionOfferings", JSON.stringify(profile.offerings ?? []));
   formData.set("creatorId", profile.id);
   formData.set("about", profile.about);
   formData.set("bio", profile.profileIntro || profile.about);
@@ -2424,6 +2284,7 @@ function getProfileSettingsFormData(profile: EditableProfileState) {
 
 function isUploadedGallerySource(source: string) {
   return (
+    /^\/api\/creators\/media\/media_[a-f0-9]+(?:\?video=1)?$/.test(source) ||
     /^data:image\//i.test(source) ||
     /^data:video\//i.test(source) ||
     /^\/[^?#]+\.(?:avif|gif|jpe?g|png|webp)(?:[?#].*)?$/i.test(source) ||

@@ -16,7 +16,7 @@ export function CreatorEmailSignIn() {
   const ticket = fragment.get("ticket");
   const email = fragment.get("email")?.trim().toLowerCase();
   const invite = url.searchParams.get("invite");
-  const destination = invite ? `/creators/dashboard?${new URLSearchParams({ invite })}` : "/creators/dashboard";
+  const destination = invite ? `/creator/profile?${new URLSearchParams({ invite })}` : "/creator/profile";
   const switchAccount = Boolean(user && ticket && (!email || user.primaryEmailAddress?.emailAddress.toLowerCase() !== email));
 
   useEffect(() => {

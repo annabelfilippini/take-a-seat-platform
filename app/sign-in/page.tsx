@@ -19,7 +19,7 @@ export default function SignInPage({ searchParams }: SignInPageProps) {
   const routeByAccount =
     !redirectUrl ||
     (isCreatorDashboardRedirect(redirectUrl) && !redirectUrl.includes("invite="));
-  const postAuthRedirectUrl = routeByAccount ? "/creators/dashboard" : redirectUrl;
+  const postAuthRedirectUrl = routeByAccount ? "/creator/profile" : redirectUrl;
 
   return (
     <main className="account-auth-page">

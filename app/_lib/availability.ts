@@ -1,3 +1,4 @@
+import { seatDuration } from "./offerings";
 import { availabilityDateBounds, availabilityWeekStart, rulesForAvailabilityWeek } from "./availability-weeks";
 import type { CreatorAvailabilityRule, Seat } from "./creators";
 
@@ -36,8 +37,8 @@ type SourceAvailabilitySlot = {
   timezone: string;
 };
 
-// Include both sides of the date line and the longest six-month creator window.
-const defaultAvailabilityWindowDays = 190;
+// Include both sides of the date line and the longest one-year creator window.
+const defaultAvailabilityWindowDays = 370;
 const ellaAvailability = [
   { date: "2026-09-17", times: ["09:30", "11:00"] },
   { date: "2026-09-22", times: ["10:00", "12:30", "15:00"] },
@@ -291,12 +292,7 @@ function getAvailabilityTimesForRule(
   return times;
 }
 
-function getSeatDurationMinutes(seat: Seat | undefined) {
-  const match = seat?.name.match(/\d+/u);
-  const minutes = match ? Number(match[0]) : 15;
-
-  return Number.isFinite(minutes) && minutes > 0 ? minutes : 15;
-}
+function getSeatDurationMinutes(seat: Seat | undefined) { return seatDuration(seat); }
 
 function getMinutesFromTime(value: string) {
   const [hours, minutes] = value.split(":").map(Number);

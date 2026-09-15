@@ -1,3 +1,4 @@
+import { parseOfferings, offeringSeats } from "./offerings";
 import { addCalendarDays, availabilityDateBounds, availabilityWeekStart, isCalendarDate } from "./availability-weeks";
 import { MAX_PROFILE_BYTES, ProfileSizeError, profileByteLength } from "./profile-save";
 import { and, desc, eq, isNull, isNotNull, or, sql } from "drizzle-orm";
@@ -43,6 +44,7 @@ export type CreatorOnboardingInput = {
 };
 
 export type CreatorProfileSettingsInput = CreatorOnboardingInput & {
+  sessionOfferings?: string | null;
   about: string;
   category: string;
   currency: string;
@@ -192,6 +194,7 @@ export async function getCreatorProfileSettingsInput(
   );
 
   return {
+    sessionOfferings: formData.has("sessionOfferings") ? JSON.stringify(parseOfferings(getString(formData, "sessionOfferings") ?? "[]")) : undefined,
     about,
     bio,
     category: cleanField(getString(formData, "category")) ?? "Style & Beauty",
@@ -268,13 +271,13 @@ export function getCreatorAvailabilityInput(
     || typeof slot.startTime !== "string" || !/^(?:[01]\d|2[0-3]):(?:00|15|30|45)$/u.test(slot.startTime)
   )) return null;
   const rules = getAvailabilityRules(rawSlots);
-  const weekStart = getString(formData, "weekStart");
-  // Require an explicit week for new writes. Existing recurring rows are read-only defaults.
-  if (!weekStart || !isCalendarDate(weekStart) || availabilityWeekStart(weekStart) !== weekStart) return null;
+  const weekStart = formData.get("scope") === "default" ? null : getString(formData, "weekStart");
+  // Explicit default scope preserves dated overrides; other writes require a week.
+  if (formData.get("scope") !== "default" && (!weekStart || !isCalendarDate(weekStart) || availabilityWeekStart(weekStart) !== weekStart)) return null;
   try { new Intl.DateTimeFormat("en-US", { timeZone: timezone }); } catch { return null; }
   const { today, end } = availabilityDateBounds(timezone);
-  if (weekStart < availabilityWeekStart(today) || weekStart > availabilityWeekStart(end)) return null;
-  if (rules.some((rule) => addCalendarDays(weekStart, rule.dayOfWeek) < today
+  if (weekStart && (weekStart < availabilityWeekStart(today) || weekStart > availabilityWeekStart(end))) return null;
+  if (weekStart && rules.some((rule) => addCalendarDays(weekStart, rule.dayOfWeek) < today
     || addCalendarDays(weekStart, rule.dayOfWeek) > end)) return null;
 
   if (!creatorId) {
@@ -375,7 +378,19 @@ export async function saveCreatorProfileSettings(
   const now = new Date().toISOString();
   const existing = await getCreatorApplication(creatorId);
   if (existing?.applicationStatus === "accepted") {
-    const profileDraft = JSON.stringify(getPublishableProfileFields(input));
+    const { validateOwnedMedia } = await import("./creator-media");
+    await validateOwnedMedia(creatorId, [input.profileImageUrl ?? "", ...input.profileGallery.split("\n")], input.profileImageUrl ?? "");
+    const previous = existing.profileDraft ? JSON.parse(existing.profileDraft) : existing;
+    const supplied = input.sessionOfferings ?? previous.sessionOfferings;
+    const offerings = supplied ? parseOfferings(supplied) : null;
+    if (offerings && previous.sessionOfferings) {
+      // Removed IDs retain historical meaning and cannot silently become a different offer.
+      for (const old of parseOfferings(previous.sessionOfferings)) {
+        if (!offerings.some((item) => item.id === old.id)) offerings.push({ ...old, active: false, archived: true });
+      }
+    }
+    if (offerings) parseOfferings(JSON.stringify(offerings));
+    const profileDraft = JSON.stringify({ ...getPublishableProfileFields(input), sessionOfferings: offerings ? JSON.stringify(offerings) : null });
     // Legacy public uploads can already occupy much of D1's 2 MB row budget.
     if (profileByteLength({ ...existing, profileDraft }) > 1_900_000) throw new ProfileSizeError();
     // Accepted creators edit a private snapshot. Public fields remain untouched.
@@ -474,6 +489,7 @@ export async function saveCreatorProfileSettings(
 
 function getPublishableProfileFields(input: CreatorProfileSettingsInput) {
   return {
+    sessionOfferings: input.sessionOfferings ?? null,
     name: input.name, about: input.about, bio: input.about.slice(0, 180),
     category: input.category, currency: input.currency, helpItems: input.helpItems,
     instagramHandle: input.instagramHandle, tiktokHandle: input.tiktokHandle,
@@ -500,7 +516,7 @@ export async function publishCreatorProfile(creatorId: string) {
   if (!draft.name.trim() || !draft.about.trim() || !draft.helpItems.trim() || !draft.profileImageUrl) {
     return { status: "error", detail: "Add your name, profile picture, about text, and conversation topics in Your profile." };
   }
-  const calls = [
+  const calls = draft.sessionOfferings ? parseOfferings(draft.sessionOfferings).map((item) => ({ enabled: item.active && !item.archived, price: item.unitAmount })) : [
     { enabled: draft.seat15Enabled, price: draft.seat15PriceAmount },
     { enabled: draft.seat30Enabled, price: draft.seat30PriceAmount },
   ];
@@ -515,6 +531,10 @@ export async function publishCreatorProfile(creatorId: string) {
   if (!rules.length || !profile.calendarConnectedAt || !profile.stripeConnectedAt) {
     return { status: "error", detail: "Save your availability, connect Google Calendar, and finish Stripe payouts before going live." };
   }
+  const { getCreatorStripeConnection, getConnectedAccountTransferStatus, getStripeSecretKey } = await import("./stripe-connect");
+  const connection = await getCreatorStripeConnection(creatorId);
+  const secretKey = getStripeSecretKey();
+  if (!connection || !secretKey || await getConnectedAccountTransferStatus({accountId:connection.stripeAccountId,secretKey}) !== "active") return { status: "error", detail: "Connect Stripe and resolve its requirements before publishing." };
   const now = new Date().toISOString();
   // Compare the draft too: a concurrent save must not be silently published or lost.
   const updated = await db.update(creatorOnboardingProfiles).set({
@@ -678,7 +698,7 @@ export async function acceptCreatorApplication(
   if (publicId !== profile.id) {
     const existing = await getCreatorApplication(publicId);
 
-    if (existing) {
+    if (existing && existing.id !== profile.id) {
       throw new CreatorPublishError("public-id-taken");
     }
 
@@ -915,7 +935,9 @@ export async function getBookableCreatorById(creatorId: string) {
   }
 
   try {
-    const publishedCreator = await getPublishedCreatorBySlug(creatorId);
+    const profile = await getCreatorApplication(creatorId);
+    const publishedCreator = profile?.applicationStatus === "accepted" && profile.publishedAt && profile.profileSavedAt
+      ? createPublishedCreator(profile, await listCreatorAvailabilityRules(profile.id)) : null;
 
     if (publishedCreator?.seats.length) {
       return publishedCreator;
@@ -1234,6 +1256,7 @@ export function createPublishedCreator(
 }
 
 function createPublishedSeats(profile: CreatorOnboardingProfile): Seat[] {
+  if (profile.sessionOfferings) return offeringSeats(parseOfferings(profile.sessionOfferings), profile.name, profile.currency ?? "USD");
   return [
     createPublishedSeat(profile, 15),
     createPublishedSeat(profile, 30),
@@ -1384,7 +1407,9 @@ export async function saveCreatorAvailability(input: CreatorAvailabilityInput) {
     inserts.push(db.insert(creatorAvailabilityRules).values(values.slice(index, index + 6)));
   }
   // D1 batches are atomic: a failed insert must not erase the previous schedule.
-  await db.batch([db.delete(creatorAvailabilityRules).where(scope), ...inserts]);
+  await db.batch([db.delete(creatorAvailabilityRules).where(scope), ...inserts,
+    db.update(creatorOnboardingProfiles).set({ timezone: input.timezone, updatedAt: now }).where(eq(creatorOnboardingProfiles.id, input.creatorId)),
+  ]);
 }
 
 export async function listCreatorAvailabilityRules(creatorId: string) {

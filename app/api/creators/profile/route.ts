@@ -68,7 +68,9 @@ export async function POST(request: Request) {
   const formData = await request.formData();
   const requestedCreatorId = getCreatorSettingsId(formData);
   const creatorId = requestedCreatorId ?? `onboard_${crypto.randomUUID()}`;
-  const input = await getCreatorProfileSettingsInput(formData);
+  let input;
+  try { input = await getCreatorProfileSettingsInput(formData); }
+  catch (error) { return profileStatusResponse(request, "error", error instanceof Error ? error.message : "Check your profile fields."); }
   const returnTo = formData.get("returnTo");
 
   if (!input || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.email)) {

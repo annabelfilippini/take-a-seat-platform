@@ -135,3 +135,37 @@
 .editable-profile-page [hidden] { display: none !important; }
 .creator-draft-preview .creator-preview-name { font: 300 54px/1.1 var(--serif); margin: 0; }
 @media (max-width: 640px) { .creator-draft-preview .creator-preview-name { font-size: 38px; } }
+
+/* Creator workspace additions; customer booking styles remain untouched. */
+.editable-profile-page .profile-topbar { background: #faf8f4; z-index: 30; }
+.editable-profile-page .profile-nav { gap: 18px; }
+.editable-profile-page .profile-nav-tab { font-size: 14px; white-space: nowrap; }
+.creator-storefront-bar { display:flex; justify-content:space-between; align-items:center; padding:14px 5%; border-bottom:1px solid #ded9d1; font-size:13px; }
+.creator-workspace-panel { max-width:1000px; margin:24px auto; }
+.creator-panel-heading { display:flex; align-items:center; justify-content:space-between; gap:20px; flex-wrap:wrap; }
+.creator-panel-heading h1 { font-size:36px; margin:8px 0 20px; }
+.creator-panel-heading h2 { font-size:23px; }
+.creator-request-list { display:grid; gap:18px; }
+.creator-request-card { background:#fff; border:1px solid #ddd8cf; border-radius:16px; padding:24px; margin:18px 0; }
+.creator-request-note { white-space:pre-wrap; overflow-wrap:anywhere; }
+.creator-request-actions { display:flex; align-items:center; flex-wrap:wrap; gap:12px; margin:16px 0; }
+.creator-balance-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+.creator-notification-settings { margin:28px auto; max-width:1000px; }
+.creator-offering-card { border:1px solid #d8d2c8; border-radius:12px; padding:16px; margin:18px 0; min-width:0; }
+.creator-offering-card label { display:grid; gap:6px; margin:10px 0; font-size:14px; }
+.creator-offering-card input:not([type=checkbox]), .creator-offering-card textarea, .creator-offering-card select { width:100%; min-width:0; box-sizing:border-box; background:#fff; padding:10px; border:1px solid #c9c2b7; border-radius:6px; color:#292622; font:inherit; }
+.creator-offering-card label:has(input[type=checkbox]) { display:flex; align-items:center; }
+.creator-offering-numbers { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+@media(max-width:700px) {
+ .editable-profile-page .profile-topbar { flex-direction:column; align-items:stretch; gap:10px; padding:12px 16px; }
+ .editable-profile-page .profile-nav { display:flex; overflow-x:auto; gap:20px; width:100%; padding-bottom:8px; }
+ .editable-profile-page .profile-nav-tab { flex-shrink:0; font-size:13px; }
+ .creator-workspace-panel { margin:12px 0; }
+ .creator-panel-heading h1 { font-size:28px; }
+ .creator-request-card { padding:18px; }
+ .creator-balance-grid { grid-template-columns:1fr; gap:0; }
+ .creator-storefront-bar { gap:12px; }
+}
+.creator-full-preview iframe { display:block; border:0; width:100%; height:calc(90vh - 64px); background:#f7f2e9; }
+
+.creator-upload-status { margin: 18px 5%; font-size: 14px; }

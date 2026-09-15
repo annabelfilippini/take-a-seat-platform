@@ -37,20 +37,18 @@ Creator backend:
 
 - Invite-only for accepted creators.
 - Lets creators edit profile content that affects buyer confidence.
-- Profile save repair is deployed and verified on the affected live account:
-  resize uploaded photos, enforce D1 row budgets, and let tabs open independently
-  of save success. Photos and text survived a production reload. See
-  [save repair](profile-save-repair.md).
-- Lets creators set 15 minute and 30 minute seat pricing.
-- Lets creators set different availability for each dated week through six months
-  ahead, with week arrows, a week dropdown, and a separate save for each week. New
-  creators start empty; existing recurring hours remain on untouched weeks.
-  Saving an empty week closes it. Customer slots and server validation follow
-  these dated weeks and retain notice, buffers, and booking caps. See
-  [dated availability](dated-creator-availability.md) for migration and release notes.
-- Lets creators connect Google Calendar.
-- Lets creators connect Stripe payouts.
-- Shows request, booking, and setup notifications.
+- Canonical editor: `/creator/profile`; `/creators/dashboard` remains a compatible entry.
+- Persistent Profile, Availability, Requests, Payments, and Preview & Publish tabs.
+- Profile/media/offerings save privately; explicit publication atomically updates
+  public fields. Authenticated draft preview reuses the customer profile renderer.
+- Original media is stored in bounded D1 chunks; profiles retain URLs and crop settings.
+- Up to 12 ordered offerings with explicit durations, prices, descriptions, and archival.
+- Default weekly hours plus dated overrides through one year, with IANA timezones.
+  Saved availability affects live bookings immediately; empty overrides close that week.
+- Requests support authorized acceptance/capture and decline/cancellation, with retries.
+- Payments reads current Stripe transfer readiness, balances, and historical sessions.
+- New storefront implementation is verified locally and awaits deployment approval.
+  See [verification and migrations](creator-storefront-verification.md).
 
 Admin:
 
@@ -114,7 +112,7 @@ Auth:
   signed-in account requires an explicit switch. Phone-code requires a paid Clerk feature and
   is hidden unless `TAKE_A_SEAT_PHONE_SIGN_IN_ENABLED=true` and Clerk supports it.
 - Clerk identities must have a verified primary email or phone before they can
-  claim an accepted D1 profile. Later sign-ins return to `/creators/dashboard`.
+  claim an accepted D1 profile. Later sign-ins return to `/creator/profile`.
 - Clerk and admin configuration read Cloudflare Worker bindings directly.
 - The Worker forwards Clerk handshake redirects and refreshed cookies on auth
   document requests; the first returned render receives the verified token.
@@ -183,7 +181,8 @@ Calendar:
   with the saved booking buffer.
 - Conditional D1 reservations prevent simultaneous requests sharing a slot or
   exceeding a creator limit. Attached Checkout sessions hold until a verified
-  terminal webhook; session-less failed requests release after 30 minutes.
+  terminal webhook or server reconciliation with Stripe-confirmed expiry;
+  session-less failed requests release after 30 minutes.
 - Calendar retries reuse a deterministic event ID. A booking stays paid until
   Google provides its Meet link, then becomes approved.
 - Local integration and desktop/mobile verification are recorded in
@@ -236,7 +235,8 @@ D1 should own operational marketplace state:
 - Creator Google Calendar connections.
 - Creator Stripe connections.
 - Creator availability rules.
-- Customer bookings.
+- Customer bookings with immutable purchased offering snapshots and persisted decisions.
+- Creator media metadata and original file chunks.
 - Creator request, booking, and setup notification preferences and history.
 
 Checked-in static data should only own:
@@ -266,7 +266,9 @@ Auth:
 Creator:
 
 - `/creators/onboard`
-- `/creators/dashboard`
+- `/creator/profile` (canonical storefront editor)
+- `/creator/preview` (authenticated saved draft, checkout disabled)
+- `/creators/dashboard` (compatible legacy entry)
 
 Admin:
 
@@ -286,12 +288,13 @@ API:
 
 The creator backend is not cleanly separated yet:
 
-- `/creators/dashboard` now owns the accepted-creator profile editor URL and no
-  longer redirects through `/admin/creator-profile-editor-preview`.
+- `/creator/profile` owns the accepted creator editor; the legacy dashboard
+  uses the same page without redirecting through admin.
 - `/admin/creator-profile-editor-preview` is admin-only and uses the same editor
   component only as an internal preview.
 - The shared editor component still needs a cleaner package boundary over time;
-  creator self-service should continue to live under `/creators`.
+  shared editor remains in its historical admin folder; creator routes and
+  authorization are separate. The requested `/creator/*` routes are intentional.
 
 The public creator model is split:
 

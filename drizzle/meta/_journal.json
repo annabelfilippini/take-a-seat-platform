@@ -120,6 +120,27 @@
       "when": 1789363425442,
       "tag": "0017_special_falcon",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "6",
+      "when": 1789432904129,
+      "tag": "0018_classy_wasp",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "6",
+      "when": 1789432982285,
+      "tag": "0019_furry_mantis",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "6",
+      "when": 1789433055183,
+      "tag": "0020_magenta_hellfire_club",
+      "breakpoints": true
     }
   ]
 }

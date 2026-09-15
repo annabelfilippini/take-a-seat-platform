@@ -1,6 +1,7 @@
 export type CreatorStatus = "booking" | "soon";
 
 export type Seat = {
+  durationMinutes?: number;
   currency?: string;
   id: string;
   name: string;

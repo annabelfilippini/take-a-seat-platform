@@ -172,9 +172,9 @@ export async function sendCreatorAcceptedEmail({
   const text = [
     "Hi!",
     "",
-    "Congratulations! You've been accepted into Take a Seat. Click this link to start working on your profile.",
+    "Congratulations — your Take a Seat application has been accepted! You can now create your profile, set your availability, and choose what you’d like to offer.",
     "",
-    `Start working on your profile: ${setupUrl}`,
+    `Build your profile: ${setupUrl}`,
     "Sign in with the email address from your accepted application.",
     "",
     "Save your profile when you are ready for your card to appear on the website.",
@@ -185,8 +185,8 @@ export async function sendCreatorAcceptedEmail({
   ].join("\n");
   const html = [
     "<p>Hi!</p>",
-    "<p>Congratulations! You've been accepted into Take a Seat. Click this link to start working on your profile.</p>",
-    `<p><a href="${escapeHtml(setupUrl)}">Start working on your profile</a></p>`,
+    "<p>Congratulations — your Take a Seat application has been accepted! You can now create your profile, set your availability, and choose what you’d like to offer.</p>",
+    `<p><a href="${escapeHtml(setupUrl)}">Build your profile</a></p>`,
     "<p>Sign in with the email address from your accepted application.</p>",
     "<p>Save your profile when you are ready for your card to appear on the website.</p>",
     "<p>We can’t wait for you to begin inspiring!!!</p>",
@@ -400,7 +400,7 @@ async function sendSms({
   return { status: "sent" };
 }
 
-async function sendEmail({
+export async function sendEmail({
   html,
   idempotencyKey,
   replyTo,

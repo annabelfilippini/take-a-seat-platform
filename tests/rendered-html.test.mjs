@@ -241,7 +241,7 @@ test("phone sign-in sends codes before routing creators and customers by account
   ]);
 
   assert.match(creatorDashboardPage, /allowSignUpIfMissing/);
-  assert.match(creatorDashboardPage, /routeByAccount=\{!inviteToken\}/);
+  assert.match(creatorDashboardPage, /routeByAccount=\{false\}/);
   assert.match(signInPage, /const allowSignUpIfMissing = true/);
   assert.match(signInPage, /isCreatorDashboardRedirect\(redirectUrl\)/);
   assert.match(signInPage, /routeByAccount=\{routeByAccount\}/);
@@ -308,7 +308,7 @@ test("legacy creator auth paths redirect into current auth and creator dashboard
   assert.equal(retiredSetupResponse.status, 307);
   assert.match(
     retiredSetupResponse.headers.get("location") ?? "",
-    /\/creators\/dashboard$/,
+    /\/creator\/profile$/,
   );
 });
 
@@ -322,7 +322,7 @@ test("server-renders the admin creator profile editor preview", async () => {
 
   const html = await response.text();
   assert.match(html, /Creator Profile Editor Preview \| Take a Seat/);
-  assert.match(html, /Your creator profile/);
+  assert.match(html, /Your storefront/);
   assert.match(html, /editable-profile-photo-frame/);
   assert.match(html, /aria-label="Drag profile picture to reposition it"/);
   assert.match(html, /aria-label="Profile picture zoom controls"/);
@@ -331,16 +331,16 @@ test("server-renders the admin creator profile editor preview", async () => {
   assert.doesNotMatch(html, /aria-label="Move profile picture side to side"/);
   assert.doesNotMatch(html, /aria-label="Move profile picture up and down"/);
   assert.doesNotMatch(html, />Center photo<\/button>/);
-  assert.match(html, /Editable profile preview tabs/);
+  assert.match(html, /Your storefront/);
   assert.match(html, /aria-selected="true"/);
   assert.match(html, />Profile<\/button>/);
   assert.match(html, /Availability<\/button>/);
   assert.match(html, /Payments<\/button>/);
   assert.match(
     html,
-    /aria-label="Settings"[^>]*class="profile-nav-tab settings-tab-button"/,
+    /aria-label="Requests"[^>]*class="profile-nav-tab"/,
   );
-  assert.match(html, /class="settings-tab-icon"/);
+  assert.match(html, /Notification preferences/);
   assert.doesNotMatch(html, /editable-creator-tabs-shell/);
   assert.match(html, /src="\/amber-headshot\.jpg"/);
   assert.match(html, /Upload profile picture/);
@@ -349,17 +349,17 @@ test("server-renders the admin creator profile editor preview", async () => {
   assert.match(html, /Preview your page/);
   assert.match(html, /aria-label="Save profile changes"/);
   assert.match(html, />Weekly availability<\/h2>/);
-  assert.match(html, /Choose any week up to six months ahead/);
+  assert.match(html, /choose any week up to one year ahead/);
   assert.match(html, /aria-label="Choose availability week"/);
   assert.match(html, /aria-label="Previous availability week"/);
   assert.match(html, /aria-label="Next availability week"/);
   assert.doesNotMatch(html, /Select date|Visible month/);
-  assert.match(html, /Go live/);
-  assert.match(html, /Stripe payouts/);
-  assert.match(html, /Connect Stripe/);
+  assert.match(html, /Preview &amp; Publish/);
+  assert.match(html, /Checking Stripe/);
+  assert.match(html, /Refresh Stripe status/);
   assert.match(
     html,
-    /href="\/api\/stripe\/connect\/start\?creatorId=onboard_annabel_mock_profile&amp;returnTo=%2Fcreators%2Fdashboard"/,
+    /Past paid sessions/,
   );
   assert.match(html, /Request notifications/);
   assert.match(html, /name="booking-email-notifications"[^>]*checked/);
@@ -385,14 +385,14 @@ test("server-renders the admin creator profile editor preview", async () => {
   assert.match(html, /can help with/);
   assert.match(html, /Choose a call/);
   assert.match(html, /Why a 1:1 call\?/);
-  assert.match(html, /aria-label="15 minutes duration in minutes"/);
-  assert.match(html, /aria-label="30 minutes duration in minutes"/);
-  assert.match(html, /aria-label="15 minutes description"/);
-  assert.match(html, /aria-label="30 minutes description"/);
+  assert.match(html, /aria-label="Offering 1 duration"/);
+  assert.match(html, /aria-label="Offering 2 duration"/);
+  assert.match(html, /aria-label="Offering 1 description"/);
+  assert.match(html, /aria-label="Offering 2 description"/);
   assert.match(html, /value="15"/);
   assert.match(html, /value="30"/);
-  assert.match(html, /type="number" value="45"/);
-  assert.match(html, /type="number" value="80"/);
+  assert.match(html, /value="45"/);
+  assert.match(html, /value="80"/);
   assert.match(html, /Find availability/);
 });
 
@@ -834,8 +834,8 @@ test("notifies accepted creators in email, text, and profile", async () => {
   assert.match(inviteRoute, /applicationStatus !== "accepted"/);
   assert.match(inviteRoute, /inviteEmail: email\.status/);
   assert.match(email, /Congratulations! You've been accepted into Take a Seat/);
-  assert.match(email, /Click this link to start working on your profile/);
-  assert.match(email, /Start working on your profile/);
+  assert.match(email, /You can now create your profile, set your availability/);
+  assert.match(email, /Build your profile/);
   assert.match(email, /email address from your accepted application/);
   assert.match(email, /We can’t wait for you to begin inspiring!!!/);
   assert.match(email, /globalThis/);
