@@ -1,5 +1,5 @@
+/* eslint-disable @next/next/no-html-link-for-pages */
 import type { Metadata } from "next";
-import Link from "next/link";
 import {
   DEFAULT_ADMIN_EMAIL,
   getAdminSignInHref,
@@ -40,12 +40,12 @@ export default async function AdminApplicationsPage({
   return (
     <main className="admin-page">
       <header className="admin-topbar">
-        <Link href="/" className="admin-brand">
+        <a href="/" className="admin-brand">
           Take a Seat
-        </Link>
+        </a>
         <nav aria-label="Admin navigation">
-          <Link href="/take-a-seat">Directory</Link>
-          <Link href="/creators/onboard">Application</Link>
+          <a href="/take-a-seat">Directory</a>
+          <a href="/creators/onboard">Application</a>
         </nav>
       </header>
 

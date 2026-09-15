@@ -1,5 +1,5 @@
+/* eslint-disable @next/next/no-html-link-for-pages */
 import type { Metadata } from "next";
-import Link from "next/link";
 import { PageHeader } from "../_components/PageHeader";
 
 export const metadata: Metadata = {
@@ -64,8 +64,8 @@ export default function AboutPage() {
       <section className="about-final-cta" aria-label="Start with Take a Seat">
         <h2>Meet your committee.</h2>
         <div className="about-cta-actions">
-          <Link href="/#browse">Find a Seat</Link>
-          <Link href="/creators/onboard">Apply to Inspire</Link>
+          <a href="/#browse">Find a Seat</a>
+          <a href="/creators/onboard">Apply to Inspire</a>
         </div>
       </section>
     </main>

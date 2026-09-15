@@ -1,7 +1,6 @@
 "use client";
 
 /* eslint-disable @next/next/no-html-link-for-pages, @next/next/no-img-element */
-import Link from "next/link";
 import { useRef } from "react";
 import type {
   EditableCreatorMediaItem,
@@ -59,7 +58,7 @@ export function PublicCreatorProfile({
           Take a Seat
         </a>
         <nav className="profile-nav" aria-label={`${profile.name} profile navigation`}>
-          <Link href="/creators/onboard">Apply</Link>
+          <a href="/creators/onboard">Apply</a>
           <form action="/sign-in" className="nav-action-form" method="get">
             <button className="profile-sign-in-link" type="submit">
               Sign In

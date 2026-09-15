@@ -1,6 +1,5 @@
 /* eslint-disable @next/next/no-html-link-for-pages */
 import type { Metadata } from "next";
-import Link from "next/link";
 import { BookingRequestFields } from "../../_components/BookingRequestForm";
 import { getCreatorById } from "../../_lib/creators";
 
@@ -34,7 +33,7 @@ export default function AnnabelProfile() {
           Take a Seat
         </a>
         <nav className="profile-nav" aria-label="Annabel profile navigation">
-          <Link href="/creators/onboard">Sign up</Link>
+          <a href="/creators/onboard">Sign up</a>
           <a className="reserve-nav-button" href="#reserve">
             Test booking
           </a>

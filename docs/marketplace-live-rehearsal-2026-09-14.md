@@ -12,6 +12,9 @@ deployment and live integration testing. Payments remain in Stripe sandbox mode.
 - Required Clerk, Google, Resend and Stripe secret names verified; no values exported.
 - D1 reports no pending migrations. Dry run and deploy succeeded from a clean tree.
 
+- Decline-copy PR #32 merged as `e69f43d`, deployed as Worker
+  `95b31b4d-5758-48e5-acf5-2a26a9ff4792`. Fresh browser confirmed corrected text.
+
 ## Provider evidence
 
 | Journey | Result |
@@ -58,14 +61,22 @@ stored in this report.
    creator approval panel for declined requests. The existing full booking
    journey now checks the customer result, refresh and creator controls.
 
+4. The production confirmation's Creator link failed through vinext client
+   navigation and logged a prefetch TypeError. All remaining next/link uses now
+   use native anchors. The new regression also requires returning to the public
+   slug when a booking stores a different internal creator ID. Final production
+   navigation and console checks follow.
+
 Root causes and regression coverage are in [BUG_LOG.md](BUG_LOG.md).
 Customer booking component and CSS remain unchanged.
 
 ## Scope and outstanding checks
 
 - Local release checks: 20 Playwright journeys, 80 Node tests, lint and TypeScript
-  passed again with the final decline-copy repair (20 browser journeys in 50.7s,
-  no retries or skips). Production confirmation follows the committed deployment.
+  passed again after the final navigation/slug repair (20 browser journeys in
+  49.6s, no retries or skips). The new regression first reproduced an internal-ID
+  404, then passed after published-slug resolution. Production navigation smoke
+  follows the committed deployment.
 - Sandbox proves authorization/capture/webhook/fee logic, not live-bank payouts,
   legal onboarding, settlement or real-card readiness. Live webhook remains disabled.
 - The existing picker displays scheduled hours; final submission checks current
