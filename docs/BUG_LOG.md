@@ -15,6 +15,22 @@ Follow the [engineering release gate](engineering-release-gate.md).
 Historical checks in these records are evidence only for what they explicitly
 tested. They do not establish that the new Playwright release gate has passed.
 
+## 2026-09-14: Declined customer confirmation still asked for payment
+
+- **Reproduction:** Authorize a sandbox booking, decline it in creator Requests,
+  then refresh the customer's booking page. Status read declined, but the heading
+  and explanation still said payment authorization was required.
+- **Root cause:** The booking page's status-to-copy helpers omitted declined,
+  falling through to the initial request text. The creator approval panel also
+  remained visible for this terminal state.
+- **Fix:** Explicit declined heading and explanation that authorization was
+  canceled with no captured payment. Hide creator approval for declined requests.
+- **Protection:** Extend the full Playwright booking journey through decline,
+  customer confirmation, hard refresh and absence of creator acceptance controls.
+  Live Stripe and D1 independently confirmed cancellation before the copy repair.
+- **Files:** `app/bookings/[bookingId]/page.tsx`,
+  `tests/e2e/creator-journeys.spec.ts`.
+
 ## 2026-09-14: Setup instructions described saving as publication
 
 - **Reproduction:** The live admin acceptance panel and newly delivered setup
@@ -26,7 +42,7 @@ tested. They do not establish that the new Playwright release gate has passed.
 - **Fix:** Admin and both email formats now direct creators to Preview & Publish;
   draft saves are described as private preparation.
 - **Protection:** The acceptance-email test checks the draft/publication wording
-  in HTML and plain text. All 80 Node tests, lint and 19 Playwright journeys pass.
+  in HTML and plain text. All 80 Node tests, lint and 20 Playwright journeys pass.
   Live rehearsal verified a new creator's saved draft survives refresh and
   returning email-code login while D1's publication timestamp stays null.
 - **Files:** `app/_lib/email.ts`, `app/admin/applications/[creatorId]/page.tsx`,
@@ -50,7 +66,9 @@ tested. They do not establish that the new Playwright release gate has passed.
   with a test-only Clerk transition boundary, then reaches the real D1-backed
   saved profile. It checks one redemption, retained invitation, removed ticket,
   refresh persistence and continued private status. The old same-document
-  transition failed; explicit reload passes. Live re-verification follows deploy.
+  transition failed; explicit reload passes. Two production account switches
+  passed after deployment without manual reload; the saved draft and original
+  admin account were both recovered through their exact email entry links.
 - **Files:** `app/_components/CreatorEmailSignIn.tsx`,
   `tests/e2e/clerk-email-client.ts`, `tests/e2e/vite-plugin.ts`,
   `tests/e2e/creator-journeys.spec.ts`.
