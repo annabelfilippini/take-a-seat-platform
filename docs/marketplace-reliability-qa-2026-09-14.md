@@ -4,8 +4,10 @@ September 14, 2026. Branch: `codex/marketplace-reliability-qa`.
 
 ## Verdict
 
-**Local application QA: PASS. Overall production release: BLOCKED pending live-provider
-rehearsal and an approved deployment.** All 19 Playwright journeys pass with zero retries
+**Initial local application QA: PASS.** The repairs were subsequently approved,
+merged and deployed as `43b586c`. Follow the
+[live rehearsal report](marketplace-live-rehearsal-2026-09-14.md) for the current
+provider evidence, additional repairs and final release status. All 19 initial Playwright journeys pass with zero retries
 and zero unexpected browser/network errors. No known critical/high-priority bug remains
 in the tested local scope. No production data was changed by this audit.
 
@@ -91,5 +93,5 @@ positions remain. Repairs feed data and reliability into that experience.
 - Chrome desktop/narrow views were exercised; this is not Safari/Firefox certification.
 - Dated overrides can be edited or closed with the existing controls. There is no
   dedicated remove-override-to-inherit-defaults control in the current product.
-- Production still serves the earlier code until a reviewed, committed deployment is
-  explicitly approved. Existing live rehearsal gates in the control map remain.
+- The initial repairs are deployed. Live-provider follow-up and later repairs are
+  recorded in the linked live rehearsal report.

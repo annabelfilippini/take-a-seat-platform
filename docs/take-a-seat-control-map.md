@@ -42,8 +42,10 @@ Creator backend:
 - Profile/media/offerings save privately; explicit publication atomically updates
   public fields. Authenticated draft preview reuses the customer profile renderer.
 - Original media is stored in bounded D1 chunks; profiles retain URLs and crop settings.
-- Pending QA branch protects draft saves against stale tabs and repairs timezone,
-  upload retry and hydration regressions. See [reliability audit](marketplace-reliability-qa-2026-09-14.md); this is not deployed.
+- Reliability repairs deployed from PR #30 (`43b586c`): stale-draft protection,
+  timezone inheritance, upload retries and hydration. See the
+  [reliability audit](marketplace-reliability-qa-2026-09-14.md) and
+  [live rehearsal](marketplace-live-rehearsal-2026-09-14.md).
 - Up to 12 ordered offerings with explicit durations, prices, descriptions, and archival.
 - Default weekly hours plus dated overrides through one year, with IANA timezones.
   Saved availability affects live bookings immediately; empty overrides close that week.

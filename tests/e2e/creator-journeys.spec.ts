@@ -62,6 +62,20 @@ test.beforeEach(async({request,page,context})=>{
 });
 test.afterEach(()=>expect([...observedPages.values()].flat(),'Unexpected browser errors or HTTP failures').toEqual([]));
 
+test('email account switch reloads Clerk before one-use redemption and preserves the saved profile',async({page,request})=>{
+  await seedDraft(request);
+  await page.goto('/creators/email-sign-in?invite=e2e-original-invite#ticket=e2e-email-ticket&email=creator%40example.com');
+  await expect(page.getByRole('button',{name:'Switch to my creator account'})).toBeVisible();
+  await page.getByRole('button',{name:'Switch to my creator account'}).click();
+  await expect(page).toHaveURL(/\/creator\/profile\?invite=e2e-original-invite$/);
+  await expect(page.getByLabel('Creator hero name')).toHaveValue('Published Creator');
+  expect(await page.evaluate(()=>sessionStorage.getItem('tas_email_ticket_uses'))).toBe('1');
+  await page.reload();
+  await expect(page.getByLabel('About section')).toHaveValue('Thoughtful styling advice.');
+  expect(await page.evaluate(()=>sessionStorage.getItem('tas_email_ticket_uses'))).toBe('1');
+  expect((await sql(request,'SELECT published_at FROM creator_onboarding_profiles WHERE id=?',[creatorId]))[0].published_at).toBeNull();
+});
+
 test('acceptance destination, complete profile persistence, original media, draft/publish isolation and fresh login',async({page,request,browser})=>{
   const errors=observe(page);
   await sql(request,"UPDATE creator_onboarding_profiles SET application_status='in_review' WHERE id=?",[creatorId]);

@@ -469,6 +469,8 @@ test("acceptance email keeps the one-use credential in the fragment and preserve
     assert.match(payload.text, /^Hi!\n/);
     assert.match(payload.text, /We can’t wait for you to begin inspiring!!!/);
     assert.match(payload.html, /#ticket=synthetic-ticket&amp;email=/);
+    assert.match(payload.text, /Save your draft.*Preview & Publish/);
+    assert.match(payload.html, /Save your draft.*Preview &amp; Publish/);
   } finally { globalThis.fetch = originalFetch; delete process.env.RESEND_API_KEY; delete process.env.TAKE_A_SEAT_EMAIL_FROM; }
 });
 

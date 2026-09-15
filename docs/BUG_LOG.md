@@ -15,6 +15,46 @@ Follow the [engineering release gate](engineering-release-gate.md).
 Historical checks in these records are evidence only for what they explicitly
 tested. They do not establish that the new Playwright release gate has passed.
 
+## 2026-09-14: Setup instructions described saving as publication
+
+- **Reproduction:** The live admin acceptance panel and newly delivered setup
+  email said a creator card appears after saving the profile.
+- **Impact:** Creators could save a private draft and incorrectly believe it was
+  public, or avoid saving because they expected immediate publication.
+- **Root cause:** The explicit draft/publication split updated the editor but
+  left acceptance instructions describing the earlier save-to-publish behavior.
+- **Fix:** Admin and both email formats now direct creators to Preview & Publish;
+  draft saves are described as private preparation.
+- **Protection:** The acceptance-email test checks the draft/publication wording
+  in HTML and plain text. All 80 Node tests, lint and 19 Playwright journeys pass.
+  Live rehearsal verified a new creator's saved draft survives refresh and
+  returning email-code login while D1's publication timestamp stays null.
+- **Files:** `app/_lib/email.ts`, `app/admin/applications/[creatorId]/page.tsx`,
+  `tests/creator-lifecycle.test.mjs`.
+
+## 2026-09-14: Email invitation account switch stalled on the same document
+
+- **Reproduction:** Open a fresh setup email while signed into a different
+  account, then choose Switch to my creator account. Two live attempts stayed
+  on the sign-in status with the ticket fragment intact; reloading recovered.
+- **Root cause:** The sign-out redirect targeted the identical URL including
+  its fragment. Same-URL navigation can remain in the current document, leaving
+  the legacy Clerk sign-in hook in its signed-out transition instead of
+  initializing a fresh client. The redemption timeout never starts while the
+  hook has no sign-in resource. Merely calling location.replace with the same
+  URL reproduced the failure in the browser regression as well.
+- **Fix:** Use Clerk's post-sign-out callback to explicitly reload the document.
+  Suppress ticket redemption during sign-out. The original invitation and
+  fragment survive until the fresh client removes and redeems the credential.
+- **Protection:** A new Playwright journey runs the real email entry component
+  with a test-only Clerk transition boundary, then reaches the real D1-backed
+  saved profile. It checks one redemption, retained invitation, removed ticket,
+  refresh persistence and continued private status. The old same-document
+  transition failed; explicit reload passes. Live re-verification follows deploy.
+- **Files:** `app/_components/CreatorEmailSignIn.tsx`,
+  `tests/e2e/clerk-email-client.ts`, `tests/e2e/vite-plugin.ts`,
+  `tests/e2e/creator-journeys.spec.ts`.
+
 ## 2026-09-14: Profile media exceeded D1 limits
 
 ### Bug
