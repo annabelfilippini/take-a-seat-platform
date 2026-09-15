@@ -3,6 +3,14 @@
 September 14, 2026 Pacific (September 15 UTC). Annabel explicitly approved
 deployment and live integration testing. Payments remain in Stripe sandbox mode.
 
+## Verdict
+
+**PASS for the tested application and Stripe sandbox journeys.** Final production
+return navigation, declined confirmation and admin queue navigation passed. No
+unexpected errors were captured in the fresh final customer browser document.
+Real-money launch remains gated by live Stripe setup, webhook activation and
+settlement verification below.
+
 ## Deployment
 
 - PR #30 merged as `43b586c`; its tree matches the locally verified QA changes.
@@ -14,6 +22,10 @@ deployment and live integration testing. Payments remain in Stripe sandbox mode.
 
 - Decline-copy PR #32 merged as `e69f43d`, deployed as Worker
   `95b31b4d-5758-48e5-acf5-2a26a9ff4792`. Fresh browser confirmed corrected text.
+
+- Final code: PR #33, main `d8cec92`, Worker
+  `8a10f655-921a-43c0-a825-361a9f6fb270`. The deployed committed tree matched
+  GitHub main; the later evidence-only documentation commit needs no redeploy.
 
 ## Provider evidence
 
@@ -30,6 +42,7 @@ deployment and live integration testing. Payments remain in Stripe sandbox mode.
 | Calendar/Meet | One deterministic Google event per accepted booking, with a real Meet URL; separate customer inbox received the second event invitation with correct timezone conversion |
 | Real busy-time rejection | Temporarily moved the first disposable event to a free slot; booking submission rejected it before Checkout. Restored the event to its original time afterward |
 | Decline and authorization release | Third $45 hosted sandbox authorization declined in creator UI; Stripe cancel API returned 200, payment is Canceled with $0 net, D1 is declined with no calendar event, and customer cancellation email arrived in Inbox |
+| Final customer confirmation and navigation | Declined page explains canceled authorization and no capture; native Creator link reaches the public profile; fresh production document has no captured errors; admin detail/back-to-queue links also work |
 | Acceptance copy | Fresh post-deploy branded email and admin panel correctly distinguish Save draft from Preview & Publish |
 | Creator inbox | Request and paid-booking emails arrived in the creator's Inbox |
 
@@ -65,7 +78,7 @@ stored in this report.
    navigation and logged a prefetch TypeError. All remaining next/link uses now
    use native anchors. The new regression also requires returning to the public
    slug when a booking stores a different internal creator ID. Final production
-   navigation and console checks follow.
+   navigation and console checks passed after deployment.
 
 Root causes and regression coverage are in [BUG_LOG.md](BUG_LOG.md).
 Customer booking component and CSS remain unchanged.
@@ -76,7 +89,7 @@ Customer booking component and CSS remain unchanged.
   passed again after the final navigation/slug repair (20 browser journeys in
   49.6s, no retries or skips). The new regression first reproduced an internal-ID
   404, then passed after published-slug resolution. Production navigation smoke
-  follows the committed deployment.
+  passed on the committed deployment.
 - Sandbox proves authorization/capture/webhook/fee logic, not live-bank payouts,
   legal onboarding, settlement or real-card readiness. Live webhook remains disabled.
 - The existing picker displays scheduled hours; final submission checks current
