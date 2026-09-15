@@ -1,6 +1,25 @@
 # Creator storefront implementation and verification
 
-September 14, 2026. Local implementation; not deployed to production.
+September 14, 2026. Deployed to production after Annabel's explicit approval.
+
+## Production release
+
+- PR #28 merged; deployed source commit `a5259fde35cada529a906f5a61d3d0345c0c76d2`.
+- Cloudflare version `b3a9293e-2e77-4994-8beb-b315888f8d0e` serves the custom domains.
+- Required Worker secrets confirmed by name; migrations 0018–0020 applied successfully.
+  Post-deploy check confirms no pending migrations.
+- Production package dry run and build passed before deployment.
+- Isolated, unauthenticated Chrome smoke checks returned HTTP 200 for `/`,
+  `/take-a-seat`, `/creator/profile`, and `/creators/dashboard`. Both creator entry
+  routes showed the expected secure sign-in screen.
+- `/with/ella` opened the approved booking dialog at desktop 1280 × 900 and mobile
+  390 × 844, with no horizontal overflow, browser errors or failed HTTP responses.
+  No booking was submitted and no existing signed-in browser session was altered.
+- Cloudflare's initial D1 check returned transient error 7403; retry succeeded with
+  the same OAuth account and permissions. No credentials or access settings changed.
+- Previous Worker version: `d386cbee-4be0-48bc-8c71-15f58ec0fa7b`. Retain additive
+  D1 migrations if a Worker rollback becomes necessary.
+
 
 ## Implemented
 
@@ -106,7 +125,7 @@ The combined journeys run as eight Playwright tests. HTML report:
 
 ## Deployment prerequisites and limits
 
-Three additive migrations must precede an approved deployment:
+The production release applied these three additive migrations:
 
 1. `0018_classy_wasp.sql`: published offering JSON and historical booking snapshots.
 2. `0019_furry_mantis.sql`: persisted creator decision and decline-notification marker.
@@ -121,5 +140,5 @@ migrations by deleting original files or historical booking data.
 Local fixture results prove application behavior and D1 persistence, not live Clerk
 code delivery, Stripe settlement/Express account behavior, Resend inbox delivery or
 Google Calendar invitations. Those require the separately authorized live integration
-rehearsal already listed in the launch gate. No production deployment or live payment
-rehearsal was performed for this implementation.
+rehearsal already listed in the launch gate. The production deployment and read-only smoke checks are recorded above; no live
+payment, authenticated creator mutation or provider-delivery rehearsal was performed.
