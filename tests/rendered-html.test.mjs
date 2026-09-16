@@ -365,7 +365,7 @@ test("server-renders the admin creator profile editor preview", async () => {
   assert.match(html, /Preview your page/);
   assert.match(html, /aria-label="Save profile changes"/);
   assert.match(html, />Weekly availability<\/h2>/);
-  assert.match(html, /choose any week up to one year ahead/);
+  assert.doesNotMatch(html, /choose any week up to one year ahead|Only your primary calendar|Jump to a date|Create up to 12 offerings|>Archive<\/button>/);
   assert.match(html, /aria-label="Choose availability week"/);
   assert.match(html, /aria-label="Previous availability week"/);
   assert.match(html, /aria-label="Next availability week"/);
