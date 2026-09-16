@@ -4,7 +4,7 @@ import { localDateTimeToUtc } from './availability';
 import { getCustomerBooking, type CustomerBooking } from './bookings';
 import { getRuntimeEnv } from './runtime-env';
 
-type ZoomMeeting = { id: number | string; host_id: string; topic: string; join_url?: string; start_time?: string; duration?: number; settings?: { join_before_host?: boolean; waiting_room?: boolean; meeting_authentication?: boolean } };
+type ZoomMeeting = { id: number | string; host_id: string; topic: string; join_url?: string; start_time?: string; duration?: number; settings?: { join_before_host?: boolean; jbh_time?: number; waiting_room?: boolean; meeting_authentication?: boolean } };
 const API = 'https://api.zoom.us/v2';
 const HOST_PADDING = 15 * 60_000;
 function hosts(): string[] {
@@ -122,6 +122,7 @@ export async function ensureBookingZoom(id: string, guard: () => Promise<void>) 
     meeting = await verifiedMeeting(String(created.id), booking.zoomHostId, marker, access);
   }
   if (booking.status !== 'cancelled' && (!meeting.settings?.join_before_host || meeting.settings.waiting_room || meeting.settings.meeting_authentication)) throw new Error('Zoom host settings prevent participants from joining unattended. Correct the account settings; recovery will reuse this meeting.');
+  if (booking.status !== 'cancelled' && meeting.settings?.jbh_time !== 5) throw new Error('Zoom must limit early joining to five minutes. Correct the host and meeting settings; recovery will reuse this meeting.');
   const expected = zoomInterval(booking);
   if (booking.status !== 'cancelled' && (Date.parse(meeting.start_time ?? '') !== expected.start || meeting.duration !== (expected.end - expected.start) / 60000)) throw new Error('Zoom meeting time does not match this booking. Operator review is required.');
   await guard();

@@ -5,6 +5,28 @@ This is the central index for meaningful bugs. Existing feature notes retain
 their detailed historical evidence; link to them instead of duplicating it.
 Follow the [engineering release gate](engineering-release-gate.md).
 
+## 2026-09-16: Zoom silently allowed joining earlier than the reserved host window
+
+- **Bug / impact:** Real Zoom returned `jbh_time=0` (join anytime) although the
+  backend requested five minutes. A participant could occupy the single host before
+  the booking's reserved interval, blocking another creator's session.
+- **Root cause:** The host's custom early-join-limit checkbox was unchecked in Zoom.
+  The backend verified `join_before_host` but never checked the returned `jbh_time`.
+- **Fix:** Enabled the host's five-minute limit in Zoom and reject any returned
+  meeting whose early-join limit is not five minutes. Preserve the create-attempt
+  marker so correcting settings recovers the existing meeting rather than duplicating it.
+- **Regression protection:** Domain test simulates Zoom ignoring the requested limit,
+  verifies no participant link is published, then corrects settings and verifies
+  recovery/retry use the same meeting with exactly one create request.
+- **Verification:** Initial real-provider test proved the mismatch and safely deleted
+  its disposable meeting. Corrected real-provider rehearsal returned five minutes,
+  recovered one meeting after a lost create response, rescheduled it once and deleted
+  it once. Lint, TypeScript, production build, 87 Node tests and all 35 Playwright
+  journeys passed. Two-participant joining is separately blocked by an existing
+  owner meeting occupying the one licensed host; this does not invalidate API proof.
+- **Related files:** app/_lib/zoom.ts, tests/stripe-lifecycle.test.mjs,
+  docs/zoom-production-setup.md.
+
 ## Existing incident records
 
 - [Creator onboarding lessons](creator-onboarding-lessons.md): original invite

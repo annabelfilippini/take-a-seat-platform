@@ -78,6 +78,41 @@ function session(id, status = "complete", intentStatus = "requires_capture") {
     metadata: { booking_id: `booking_${id}` },
     payment_intent: { id: `pi_${id}`, status: intentStatus, amount_received:intentStatus === "succeeded" ? 5000 : 0, capture_method: "manual", amount:5000,currency:"usd",latest_charge:{payment_method_details:{type:"card",card:{capture_before:Math.floor(Date.now()/1000)+5*86400}}}, amount_capturable: intentStatus === "requires_capture" ? 5000 : 0, metadata: { booking_id: `booking_${id}` } } };
 }
+test('Zoom rejects ignored early-join limits and recovers the same meeting after correction', async () => {
+  const id=seed('zoom-join-limit');
+  sqlite.prepare("UPDATE customer_bookings SET status='paid',zoom_host_id='host_test' WHERE id=?").run(id);
+  const {ensureBookingZoom}=await import('../app/_lib/zoom.ts');
+  const {withBookingLock}=await import('../app/_lib/booking-lock.ts');
+  const original=globalThis.fetch;
+  let meeting, creates=0;
+  globalThis.fetch=async(url,options={})=>{
+    if(String(url)==='https://zoom.us/oauth/token')return Response.json({access_token:'fixture-token'});
+    assert.ok(String(url).startsWith('https://api.zoom.us/v2/'));
+    if(options.method==='POST'){
+      creates++;
+      const requested=JSON.parse(options.body);
+      assert.equal(requested.settings.jbh_time,5);
+      meeting={...requested,id:987654321,host_id:'host_test',join_url:'https://zoom.us/j/987654321?pwd=fixture',settings:{...requested.settings,jbh_time:0}};
+      return Response.json(meeting,{status:201});
+    }
+    if(String(url).includes('/users/'))return Response.json({meetings:[meeting]});
+    return Response.json(meeting);
+  };
+  try{
+    await assert.rejects(()=>withBookingLock(id,guard=>ensureBookingZoom(id,guard)),/limit early joining to five minutes/);
+    const blocked=await getCustomerBooking(id);
+    assert.ok(blocked.zoomCreateAttemptAt);
+    assert.equal(blocked.meetingUrl,null);
+    meeting.settings.jbh_time=5;
+    await withBookingLock(id,guard=>ensureBookingZoom(id,guard));
+    await withBookingLock(id,guard=>ensureBookingZoom(id,guard));
+    const recovered=await getCustomerBooking(id);
+    assert.equal(recovered.zoomMeetingId,'987654321');
+    assert.equal(recovered.meetingUrl,meeting.join_url);
+    assert.equal(creates,1);
+  }finally{globalThis.fetch=original}
+});
+
 async function event(type, object, timestamp = Math.floor(Date.now() / 1000)) {
   const body = JSON.stringify({ id: "evt_lifecycle", type, data: { object } });
   const signature = createHmac("sha256", process.env.STRIPE_WEBHOOK_SECRET).update(`${timestamp}.${body}`).digest("hex");
