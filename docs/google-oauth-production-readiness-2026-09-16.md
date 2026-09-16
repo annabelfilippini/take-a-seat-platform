@@ -2,8 +2,10 @@
 
 Prepared September 16, 2026. This is the setup/submission pack for the implementation
 in [the architecture and release report](google-calendar-implementation.md).
-**No production deployment, Google Console configuration, domain verification, or
-Google verification approval is claimed by this change.** Earlier account observations
+**The application was deployed with Annabel's approval on September 16 from main
+`dca3b8b`; migrations 0021–0024 and live desktop/mobile smoke checks passed. Google
+Console configuration, domain verification and Google verification approval remain
+unconfirmed.** Earlier account observations
 are historical: project `take-a-seat-platform` had an External/Testing audience,
 blank homepage/privacy URLs and undeclared Data Access scopes. Recheck the Console.
 
@@ -246,8 +248,9 @@ and describe backend synchronization honestly if Google asks about update/delete
 - Apply the new generated D1 migrations before the approved Worker deployment.
 - Confirm Google, Clerk, Stripe and notification secret names for the intended
   Worker. Do not rotate the existing encryption key during this release.
-- Production deployment still needs Annabel's explicit approval from a clean,
-  committed worktree. Local tests do not authorize or prove a deployment.
+- September 16 production deployment was explicitly approved and completed from
+  clean, committed main `dca3b8b`; see the implementation report for version and
+  live smoke evidence. Future deployments still require Annabel's approval.
 - Complete the Console, API, domain and verification steps above; then have the
   actual creator complete real Google sign-in/consent and verify the fresh connection.
 - Rehearse real provider conflict detection, a confirmed Stripe test booking,
