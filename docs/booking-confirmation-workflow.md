@@ -3,6 +3,11 @@
 September 16, 2026. Implementation on `codex/booking-confirmation`; not deployed.
 Production setup and real provider delivery are still release gates.
 
+The [first creator release audit](first-creator-release-audit-2026-09-16.md) records
+the applied production migration and current provider state. Full creator refunds
+were approved during implementation; the latest request reopens final launch-policy
+review. This document describes the implemented capability, not settled customer terms.
+
 ## Architecture and state
 
 Existing Checkout destination charges, booking snapshots, D1 reservations, Google

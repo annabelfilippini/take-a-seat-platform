@@ -2,6 +2,13 @@
 
 Last updated: 2026-09-16
 
+**First creator release remains blocked.** Production migration 0025 is applied;
+PR #37 is still draft and undeployed. Fresh provider audit confirms Google
+External/Testing, verified Resend domain, disabled live Stripe webhook, missing
+Zoom settings and no deployed recovery cron. A dedicated live card-only Stripe
+configuration is prepared. See the [current release audit](first-creator-release-audit-2026-09-16.md)
+for verified state, secrets inventory, policy review and the next manual step.
+
 This is the working source of truth for Take a Seat while the product is being
 organized. It should stay short, current, and operational.
 

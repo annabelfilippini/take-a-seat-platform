@@ -4,6 +4,13 @@ September 16, 2026. Annabel confirmed Zoom is **not set up**. No Zoom account,
 license, capacity or live meeting has been inspected or verified. No plan was
 purchased and no production deployment was performed.
 
+Follow-up audit: production migration 0025 is now applied, Google public branding
+URLs saved and a separate live card-only Stripe configuration prepared. Zoom is
+still unconfigured. See [current release audit](first-creator-release-audit-2026-09-16.md)
+for observed provider settings and the single next manual step. The cancellation
+implementation is a technical capability; the latest request reopens final
+launch-policy review and no new business policy is established by this guide.
+
 ## Recommended initial account
 
 Use a Take a Seat-owned paid Zoom Workplace account and its licensed account owner

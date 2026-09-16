@@ -147,3 +147,6 @@ See [booking workflow](docs/booking-confirmation-workflow.md) and
 [Zoom setup and verification](docs/zoom-production-setup.md) before deployment.
 New runtime requirements include a dedicated card-only Stripe payment configuration,
 central Zoom S2S credentials/licensed host pool, migration 0025 and the Worker cron.
+Migration 0025 is now applied to production; the application release remains blocked.
+See the [first creator release audit](docs/first-creator-release-audit-2026-09-16.md)
+for actual provider state and remaining launch steps.
