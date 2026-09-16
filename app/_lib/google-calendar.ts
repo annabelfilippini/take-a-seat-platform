@@ -1,8 +1,9 @@
+import { bookingAvailabilityRevision, readBookingAvailabilityRevision } from "./booking-revalidation";
 import { encryptToken, decryptToken } from "./token-encryption";
 import { getRuntimeEnv } from "./runtime-env";
 import { localDateTimeToUtc } from "./availability";
-import { eq } from "drizzle-orm";
-import { creatorCalendarConnections } from "../../db/schema";
+import { and, eq, or, isNull, lt } from "drizzle-orm";
+import { creatorCalendarConnections, creatorOnboardingProfiles, googleOAuthAttempts, customerBookings } from "../../db/schema";
 import {
   getCustomerBooking,
   markBookingApprovedWithCalendar,
@@ -18,12 +19,20 @@ type GoogleTokenResponse = {
   expires_in?: number;
   refresh_token?: string;
   token_type?: string;
+  scope?: string;
 };
 
 type GoogleCalendarEvent = {
   htmlLink?: string;
   id: string;
   status?: string;
+  etag?: string;
+  organizer?: { email?: string };
+  start?: { dateTime?: string; timeZone?: string };
+  end?: { dateTime?: string; timeZone?: string };
+  summary?: string;
+  description?: string;
+  location?: string;
   conferenceData?: {
     createRequest?: { status?: { statusCode?: string } };
     entryPoints?: { entryPointType?: string; uri?: string }[];
@@ -34,7 +43,7 @@ type GoogleCalendarEvent = {
 type CreatorCalendarConnection = typeof creatorCalendarConnections.$inferSelect;
 
 export async function approveBookingAndSendGoogleInvite(bookingId: string) {
-  const booking = await getCustomerBooking(bookingId);
+  let booking = await getCustomerBooking(bookingId);
 
   if (!booking || booking.status === "approved") {
     return booking;
@@ -50,16 +59,40 @@ export async function approveBookingAndSendGoogleInvite(bookingId: string) {
     throw new Error("Creator Google Calendar is not connected.");
   }
 
-  let event = await insertGoogleCalendarEvent({
-    accessToken: access.accessToken,
-    booking,
-    calendarId: access.calendarId,
-  });
+  const { getDb } = await import("../../db");
+  // Bind the attempt before the external write. After an account reconnect, an
+  // uncertain previous insertion may be recovered, but never recreated elsewhere.
+  if (!booking.googleCalendarEventId) {
+    await getDb().update(customerBookings).set({
+      googleCalendarEventId: await getBookingEventId(booking.id), googleCalendarId: access.calendarId,
+      googleCalendarConnectionId: access.connectionKey,
+    }).where(and(eq(customerBookings.id, booking.id), isNull(customerBookings.googleCalendarEventId)));
+    booking = (await getCustomerBooking(booking.id))!;
+  }
+  if (booking.googleCalendarEventId !== await getBookingEventId(booking.id)) throw new Error("Invalid booking calendar association.");
+  let event: GoogleCalendarEvent;
+  if (booking.googleCalendarConnectionId !== access.connectionKey && booking.googleCalendarId === "primary") {
+    const existing = await googleFetch(`${GOOGLE_CALENDAR_API_BASE}/calendars/primary/events/${booking.googleCalendarEventId}`, {
+      headers: { authorization: `Bearer ${access.accessToken}` },
+    });
+    if (!existing.ok) throw new Error("Reconnect the original Google account to recover this booking event.");
+    event = await existing.json() as GoogleCalendarEvent;
+    if (event.id !== booking.googleCalendarEventId || event.status === "cancelled" || event.extendedProperties?.private?.bookingId !== booking.id) throw new Error("Calendar event does not match the booking.");
+  } else {
+    event = await insertGoogleCalendarEvent({ accessToken: access.accessToken, booking, calendarId: booking.googleCalendarId ?? access.calendarId });
+  }
+
+  // Persist the association before waiting for asynchronous meeting creation.
+  // The organizer's real calendar ID avoids targeting a different primary on reconnect.
+  await getDb().update(customerBookings).set({ googleCalendarEventId: event.id,
+    googleCalendarId: event.organizer?.email ?? booking.googleCalendarId ?? access.calendarId,
+    googleCalendarHtmlLink: event.htmlLink ?? null,
+  }).where(and(eq(customerBookings.id, booking.id), eq(customerBookings.status, "paid")));
 
   // Google creates Meet details asynchronously. Keep a paid booking recoverable
   // until the event has a video link; retries retrieve the same event ID.
-  if (!hasVideoConference(event)) {
-    const response = await fetch(`${GOOGLE_CALENDAR_API_BASE}/calendars/${encodeURIComponent(access.calendarId)}/events/${event.id}`, {
+  if (!safeMeetingUrl(booking.meetingUrl) && !hasVideoConference(event)) {
+    const response = await googleFetch(`${GOOGLE_CALENDAR_API_BASE}/calendars/${encodeURIComponent(booking.googleCalendarId ?? access.calendarId)}/events/${event.id}`, {
       headers: { authorization: `Bearer ${access.accessToken}` },
     });
     if (!response.ok) throw new Error("Calendar conference lookup failed.");
@@ -69,7 +102,7 @@ export async function approveBookingAndSendGoogleInvite(bookingId: string) {
     }
     event = confirmed;
   }
-  if (!hasVideoConference(event)) throw new Error("Google Meet is not ready. Retry calendar confirmation.");
+  if (!safeMeetingUrl(booking.meetingUrl) && !hasVideoConference(event)) throw new Error("Google Meet is not ready. Retry calendar confirmation.");
 
   await markBookingApprovedWithCalendar({
     bookingId: booking.id,
@@ -100,6 +133,7 @@ async function getCreatorCalendarAccessToken(creatorId: string) {
     return {
       accessToken: await decryptToken(connection.accessTokenEncrypted, secret),
       calendarId: connection.calendarId,
+      connectionKey: `${connection.id}:${connection.connectedAt}`,
     };
   }
 
@@ -111,6 +145,7 @@ async function getCreatorCalendarAccessToken(creatorId: string) {
     refreshToken: await decryptToken(connection.refreshTokenEncrypted, secret),
   });
 
+  if (refreshed.scope && !["https://www.googleapis.com/auth/calendar.freebusy", "https://www.googleapis.com/auth/calendar.events.owned"].every(scope => refreshed.scope!.split(" ").includes(scope))) throw new Error("Reconnect Google Calendar with both permissions.");
   if (!refreshed.access_token || !refreshed.expires_in) {
     return null;
   }
@@ -118,7 +153,7 @@ async function getCreatorCalendarAccessToken(creatorId: string) {
   const now = new Date().toISOString();
   const expiresAtNext = new Date(Date.now() + refreshed.expires_in * 1000);
 
-  await db
+  const updated = await db
     .update(creatorCalendarConnections)
     .set({
       accessTokenEncrypted: await encryptToken(refreshed.access_token, secret),
@@ -129,11 +164,15 @@ async function getCreatorCalendarAccessToken(creatorId: string) {
       tokenType: refreshed.token_type ?? connection.tokenType,
       updatedAt: now,
     })
-    .where(eq(creatorCalendarConnections.id, connection.id));
+    .where(and(eq(creatorCalendarConnections.id, connection.id), eq(creatorCalendarConnections.updatedAt, connection.updatedAt), eq(creatorCalendarConnections.accessTokenEncrypted, connection.accessTokenEncrypted)))
+    .returning({ id: creatorCalendarConnections.id });
 
+  const [current] = await db.select().from(creatorCalendarConnections).where(eq(creatorCalendarConnections.id, connection.id));
+  if (!updated.length || !current || current.updatedAt !== now) throw new Error("Calendar connection changed. Please retry.");
   return {
     accessToken: refreshed.access_token,
     calendarId: connection.calendarId,
+    connectionKey: `${connection.id}:${connection.connectedAt}`,
   };
 }
 
@@ -153,7 +192,7 @@ async function insertGoogleCalendarEvent({
   url.searchParams.set("sendUpdates", "all");
 
   const eventId = await getBookingEventId(booking.id);
-  const response = await fetch(url, {
+  const response = await googleFetch(url, {
     body: JSON.stringify({
       id: eventId,
       extendedProperties: { private: { bookingId: booking.id } },
@@ -163,11 +202,8 @@ async function insertGoogleCalendarEvent({
           email: booking.customerEmail,
         },
       ],
-      conferenceData: {
-        createRequest: {
-          requestId: booking.id,
-        },
-      },
+      conferenceData: safeMeetingUrl(booking.meetingUrl) ? undefined : { createRequest: { requestId: booking.id } },
+      location: safeMeetingUrl(booking.meetingUrl),
       description: buildEventDescription(booking),
       end: {
         dateTime: booking.appointmentEndAt,
@@ -192,7 +228,7 @@ async function insertGoogleCalendarEvent({
   // A retry after Google succeeded but persistence/network failed reuses the
   // same event. Never send a second invitation for the same booking.
   if (response.status === 409) {
-    const existing = await fetch(`${GOOGLE_CALENDAR_API_BASE}/calendars/${encodeURIComponent(calendarId)}/events/${eventId}`, {
+    const existing = await googleFetch(`${GOOGLE_CALENDAR_API_BASE}/calendars/${encodeURIComponent(calendarId)}/events/${eventId}`, {
       headers: { authorization: `Bearer ${accessToken}` },
     });
     if (!existing.ok) throw new Error("Calendar event recovery failed.");
@@ -226,7 +262,7 @@ async function refreshAccessToken({
     grant_type: "refresh_token",
     refresh_token: refreshToken,
   });
-  const response = await fetch(GOOGLE_TOKEN_URL, {
+  const response = await googleFetch(GOOGLE_TOKEN_URL, {
     body,
     headers: { "content-type": "application/x-www-form-urlencoded" },
     method: "POST",
@@ -242,6 +278,7 @@ async function refreshAccessToken({
 function buildEventDescription(booking: CustomerBooking) {
   return [
     "Take a Seat booking.",
+    safeMeetingUrl(booking.meetingUrl) ? `Join your session: ${booking.meetingUrl}` : null,
     booking.customerNote ? `Customer note: ${booking.customerNote}` : null,
   ]
     .filter(Boolean)
@@ -270,10 +307,28 @@ export async function getBookingEventId(bookingId: string) {
   return `tas${Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("")}`;
 }
 
-export async function isCreatorCalendarFree(creatorId: string, start: Date, end: Date) {
-  const access = await getCreatorCalendarAccessToken(creatorId);
-  if (!access) throw new Error("Connect Google Calendar before accepting bookings.");
-  const response = await fetch(`${GOOGLE_CALENDAR_API_BASE}/freeBusy`, {
+export type CalendarState = "connected" | "needs-attention" | "not-connected";
+type CalendarAccess = { accessToken: string; calendarId: string };
+
+export async function getCreatorCalendarState(creatorId: string): Promise<CalendarState> {
+  const { getDb } = await import("../../db");
+  const [connection] = await getDb().select().from(creatorCalendarConnections).where(eq(creatorCalendarConnections.creatorId, creatorId));
+  if (!connection) return "not-connected";
+  if (!connection.refreshTokenEncrypted || ![
+    "https://www.googleapis.com/auth/calendar.freebusy",
+    "https://www.googleapis.com/auth/calendar.events.owned",
+  ].every(scope => connection.scopes.split(" ").includes(scope))) return "needs-attention";
+  try {
+    const access = await getCreatorCalendarAccessToken(creatorId);
+    if (!access) return "needs-attention";
+    await readGoogleBusyPeriods(access, new Date(), new Date(Date.now() + 60_000));
+    return "connected";
+  } catch { return "needs-attention"; }
+}
+
+// Only intervals leave this boundary. Never list or return private event content.
+export async function readGoogleBusyPeriods(access: CalendarAccess, start: Date, end: Date) {
+  const response = await googleFetch(`${GOOGLE_CALENDAR_API_BASE}/freeBusy`, {
     method: "POST",
     headers: { authorization: `Bearer ${access.accessToken}`, "content-type": "application/json" },
     body: JSON.stringify({ timeMin: start.toISOString(), timeMax: end.toISOString(), items: [{ id: access.calendarId }] }),
@@ -282,24 +337,185 @@ export async function isCreatorCalendarFree(creatorId: string, start: Date, end:
   const payload = await response.json() as { calendars?: Record<string, { busy?: { start: string; end: string }[]; errors?: unknown[] }> };
   const calendar = payload.calendars?.[access.calendarId];
   if (!calendar || calendar.errors?.length || !Array.isArray(calendar.busy)) throw new Error("Calendar availability could not be verified.");
-  return !calendar.busy.some((busy) => {
-    const from = Date.parse(busy.start), to = Date.parse(busy.end);
-    if (!Number.isFinite(from) || !Number.isFinite(to) || from >= to) throw new Error("Invalid calendar availability response.");
-    return from < end.getTime() && to > start.getTime();
+  return calendar.busy.map((busy) => {
+    const start = Date.parse(busy.start), end = Date.parse(busy.end);
+    if (!Number.isFinite(start) || !Number.isFinite(end) || start >= end) throw new Error("Invalid calendar availability response.");
+    return { start, end };
   });
+}
+
+export async function getCreatorBusyPeriods(creatorId: string, start: Date, end: Date) {
+  const access = await getCreatorCalendarAccessToken(creatorId);
+  if (!access) throw new Error("Connect Google Calendar before accepting bookings.");
+  return readGoogleBusyPeriods(access, start, end);
+}
+
+export async function isCreatorCalendarFree(creatorId: string, start: Date, end: Date) {
+  return !(await getCreatorBusyPeriods(creatorId, start, end)).some(busy => busy.start < end.getTime() && busy.end > start.getTime());
+}
+
+export async function disconnectCreatorCalendar(creatorId: string) {
+  const { getDb } = await import("../../db");
+  const db = getDb();
+  const [connection] = await db.select().from(creatorCalendarConnections).where(eq(creatorCalendarConnections.creatorId, creatorId));
+  await db.batch([
+    db.delete(creatorCalendarConnections).where(eq(creatorCalendarConnections.creatorId, creatorId)),
+    db.delete(googleOAuthAttempts).where(eq(googleOAuthAttempts.creatorId, creatorId)),
+    db.update(creatorOnboardingProfiles).set({ calendarConnectedAt: null }).where(eq(creatorOnboardingProfiles.id, creatorId)),
+  ]);
+  if (!connection) return true;
+  try {
+    const token = await decryptToken(connection.refreshTokenEncrypted ?? connection.accessTokenEncrypted, getTokenEncryptionSecret());
+    const response = await googleFetch("https://oauth2.googleapis.com/revoke", {
+      method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ token }),
+    });
+    // Already invalid tokens are no longer usable either.
+    if (response.ok) return true;
+    const error = await response.json() as { error?: string };
+    return response.status === 400 && error.error === "invalid_token";
+  } catch { return false; }
 }
 
 export async function canConfirmBookingCalendar(booking: CustomerBooking) {
   const start = localDateTimeToUtc(booking.appointmentStartAt, booking.timezone);
   const end = localDateTimeToUtc(booking.appointmentEndAt, booking.timezone);
   if (!start || !end || start.getTime() <= Date.now()) return false;
-  const { listCreatorAvailabilityRules } = await import("./creator-onboarding");
-  const rules = await listCreatorAvailabilityRules(booking.creatorId);
-  const padding = Math.max(0, ...rules.map((rule) => rule.bufferMinutes)) * 60_000;
+  const { getBookableCreatorById } = await import("./creator-onboarding");
+  const { isBookingSlotAvailable, listCreatorBookings } = await import("./bookings");
+  const { getMatchedAvailabilitySlot } = await import("./availability");
+  const creator = await getBookableCreatorById(booking.creatorId);
+  if (!creator) return false;
+  // Historical duration is authoritative even if the creator renamed/edited it.
+  const seat = { id: booking.seatId, name: booking.seatName, price: "", description: "", unitAmount: booking.offeringUnitAmount ?? 0, format: "Video", host: booking.creatorName, stripePriceEnv: "", durationMinutes: booking.offeringDurationMinutes ?? Math.round((end.getTime() - start.getTime()) / 60_000) };
+  const input = { appointmentStartAt: booking.appointmentStartAt, timezone: booking.timezone, customerEmail: booking.customerEmail, customerName: booking.customerName, customerNote: booking.customerNote };
+  const bookings = (await listCreatorBookings(booking.creatorId)).filter(item => item.id !== booking.id);
+  if (!await isBookingSlotAvailable({ creator, input, seat, bookings })) return false;
+  const slot = getMatchedAvailabilitySlot({ ...input, creatorId: creator.id, availabilityRules: creator.availabilityRules ?? [], seat });
+  if (!slot) return false;
+  const padding = slot.bufferMinutes * 60_000;
   return isCreatorCalendarFree(booking.creatorId, new Date(start.getTime() - padding), new Date(end.getTime() + padding));
 }
 
 function hasVideoConference(event: GoogleCalendarEvent) {
   return event.conferenceData?.createRequest?.status?.statusCode !== "failure" &&
     Boolean(event.conferenceData?.entryPoints?.some((entry) => entry.entryPointType === "video" && entry.uri?.startsWith("https://meet.google.com/")));
+}
+
+async function googleFetch(url: string | URL, init: RequestInit = {}) {
+  let response = await fetch(url, { ...init, signal: AbortSignal.timeout(15000) });
+  if (init.method !== "PATCH" && init.method !== "DELETE" && (response.status === 429 || response.status >= 500)) {
+    const retryAfter = Number(response.headers.get("retry-after") ?? 0);
+    if (retryAfter > 1) return response;
+    await new Promise(resolve => setTimeout(resolve, 250));
+    response = await fetch(url, { ...init, signal: AbortSignal.timeout(15000) });
+  }
+  return response;
+}
+
+function safeMeetingUrl(value: string | null) {
+  if (!value) return undefined;
+  try { const url = new URL(value); return url.protocol === "https:" && !url.username && !url.password ? url.toString() : undefined; }
+  catch { return undefined; }
+}
+
+// Calendar is a destination for committed booking data. This boundary deliberately
+// does not make payment/refund decisions. A cancellation workflow must first commit
+// the authoritative cancelled state; a reschedule must validate and commit its time.
+export async function syncBookingCalendar(bookingId: string) {
+  return withCalendarSyncLock(bookingId, () => syncBookingCalendarUnlocked(bookingId));
+}
+
+async function syncBookingCalendarUnlocked(bookingId: string) {
+  const booking = await getCustomerBooking(bookingId);
+  if (!booking || !["approved", "cancelled"].includes(booking.status)) throw new Error("Booking is not ready for calendar synchronization.");
+  if (!booking.googleCalendarEventId || booking.googleCalendarEventId !== await getBookingEventId(booking.id)) throw new Error("Booking calendar association is missing or invalid.");
+  const revision = JSON.stringify([booking.status, booking.appointmentStartAt, booking.appointmentEndAt, booking.timezone, booking.meetingUrl, booking.seatName]);
+  if (booking.calendarSyncedRevision === revision) return;
+  const access = await getCreatorCalendarAccessToken(booking.creatorId);
+  if (!access) throw new Error("Reconnect Google Calendar to synchronize this booking.");
+  const url = `${GOOGLE_CALENDAR_API_BASE}/calendars/${encodeURIComponent(booking.googleCalendarId ?? access.calendarId)}/events/${encodeURIComponent(booking.googleCalendarEventId)}`;
+  const response = await googleFetch(url, { headers: { authorization: `Bearer ${access.accessToken}` } });
+  // A 404 after reconnect can mean the new account cannot access the original
+  // calendar, not that the old invitation was deleted. Never report that as synced.
+  if (response.status === 404 && booking.googleCalendarConnectionId !== access.connectionKey) throw new Error("The original booking calendar could not be verified.");
+  if (!(booking.status === "cancelled" && [404, 410].includes(response.status))) {
+    if (!response.ok) throw new Error("Calendar event could not be verified.");
+    const event = await response.json() as GoogleCalendarEvent;
+    if (event.id !== booking.googleCalendarEventId || (event.status !== "cancelled" && event.extendedProperties?.private?.bookingId !== booking.id)) throw new Error("Calendar event does not match the booking.");
+    const matches = event.start?.dateTime && event.end?.dateTime &&
+      eventInstant(event.start) === localDateTimeToUtc(booking.appointmentStartAt, booking.timezone)?.getTime() &&
+      eventInstant(event.end) === localDateTimeToUtc(booking.appointmentEndAt, booking.timezone)?.getTime() &&
+      event.summary === `${booking.seatName} with ${booking.creatorName}` &&
+      (event.description ?? "") === buildEventDescription(booking) && (event.location ?? "") === (safeMeetingUrl(booking.meetingUrl) ?? "");
+    if (event.status !== "cancelled" && !(booking.status === "approved" && matches)) {
+      // ETag prevents concurrent sync calls from sending conflicting updates.
+      if (!event.etag) throw new Error("Calendar event revision is missing.");
+      const updated = await googleFetch(`${url}?sendUpdates=all`, {
+        method: booking.status === "cancelled" ? "DELETE" : "PATCH",
+        headers: { authorization: `Bearer ${access.accessToken}`, "content-type": "application/json", "if-match": event.etag },
+        body: booking.status === "cancelled" ? undefined : JSON.stringify({
+          start: { dateTime: booking.appointmentStartAt, timeZone: booking.timezone },
+          end: { dateTime: booking.appointmentEndAt, timeZone: booking.timezone },
+          summary: `${booking.seatName} with ${booking.creatorName}`,
+          description: buildEventDescription(booking), location: safeMeetingUrl(booking.meetingUrl),
+        }),
+      });
+      if (!updated.ok && !(booking.status === "cancelled" && [404, 410].includes(updated.status))) throw new Error("Calendar update needs a retry.");
+    } else if (event.status === "cancelled" && booking.status !== "cancelled") throw new Error("Booking event was removed from Google Calendar.");
+  }
+  const { getDb } = await import("../../db");
+  await getDb().update(customerBookings).set({ calendarSyncedRevision: revision }).where(and(
+    eq(customerBookings.id, booking.id), eq(customerBookings.updatedAt, booking.updatedAt), eq(customerBookings.status, booking.status),
+  ));
+}
+
+// Prepared service boundary for a future reschedule UI. It preserves the booking
+// and event IDs and commits D1 first. A failed sync can be retried via the creator
+// calendar endpoint without repeating the reschedule or creating another event.
+export async function rescheduleConfirmedBooking(bookingId: string, appointmentStartAt: string, timezone: string) {
+  return withCalendarSyncLock(bookingId, () => rescheduleConfirmedBookingUnlocked(bookingId, appointmentStartAt, timezone));
+}
+
+async function rescheduleConfirmedBookingUnlocked(bookingId: string, appointmentStartAt: string, timezone: string) {
+  const booking = await getCustomerBooking(bookingId);
+  if (!booking || booking.status !== "approved") throw new Error("Only confirmed bookings can be rescheduled.");
+  const start = localDateTimeToUtc(appointmentStartAt, timezone);
+  const oldStart = localDateTimeToUtc(booking.appointmentStartAt, booking.timezone);
+  const oldEnd = localDateTimeToUtc(booking.appointmentEndAt, booking.timezone);
+  if (!start || !oldStart || !oldEnd) throw new Error("Invalid appointment time.");
+  const duration = booking.offeringDurationMinutes ?? (oldEnd.getTime() - oldStart.getTime()) / 60000;
+  // Store wall-clock time in the supplied IANA timezone, preserving the real duration.
+  const end = new Date(start.getTime() + duration * 60000);
+  const parts = new Intl.DateTimeFormat("sv-SE", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" }).format(end).replace(" ", "T");
+  const candidate = { ...booking, appointmentStartAt, appointmentEndAt: parts, timezone };
+  const { getDb } = await import("../../db");
+  const db = getDb();
+  const { sql } = await import("drizzle-orm");
+  const snapshot = bookingAvailabilityRevision(booking.creatorId);
+  const version = await readBookingAvailabilityRevision(booking.creatorId);
+  if (!await canConfirmBookingCalendar(candidate)) throw new Error("That time is no longer available. Please choose another time.");
+  const updated = await db.update(customerBookings).set({ appointmentStartAt, appointmentEndAt: parts, timezone, calendarSyncedRevision: null, updatedAt: new Date().toISOString() }).where(and(
+    eq(customerBookings.id, booking.id), eq(customerBookings.status, "approved"), sql`${version} = (${snapshot})`,
+  )).returning({ id: customerBookings.id });
+  if (!updated.length) throw new Error("That time is no longer available. Please choose another time.");
+  await syncBookingCalendarUnlocked(booking.id);
+}
+
+// Serializes this booking's committed reschedules and outgoing sync operations.
+// An abandoned request recovers after two minutes; all provider calls are bounded.
+async function withCalendarSyncLock<T>(bookingId: string, operation: () => Promise<T>) {
+  const { getDb } = await import("../../db");
+  const db = getDb(), lock = crypto.randomUUID();
+  const acquired = await db.update(customerBookings).set({ calendarSyncLock: lock, calendarSyncLockExpiresAt: Date.now() + 120_000 }).where(and(
+    eq(customerBookings.id, bookingId), or(isNull(customerBookings.calendarSyncLock), lt(customerBookings.calendarSyncLockExpiresAt, Date.now())),
+  )).returning({ id: customerBookings.id });
+  if (!acquired.length) throw new Error("Calendar synchronization is already in progress. Please retry shortly.");
+  try { return await operation(); }
+  finally { await db.update(customerBookings).set({ calendarSyncLock: null, calendarSyncLockExpiresAt: null }).where(and(eq(customerBookings.id, bookingId), eq(customerBookings.calendarSyncLock, lock))); }
+}
+
+function eventInstant(value: { dateTime?: string; timeZone?: string }) {
+  if (!value.dateTime) return NaN;
+  return /(?:Z|[+-]\d{2}:\d{2})$/.test(value.dateTime) ? Date.parse(value.dateTime)
+    : localDateTimeToUtc(value.dateTime, value.timeZone ?? "UTC")?.getTime();
 }

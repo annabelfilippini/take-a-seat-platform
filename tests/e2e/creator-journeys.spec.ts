@@ -16,14 +16,14 @@ async function reset(request:APIRequestContext) {
     for(const statement of readFileSync(resolve('drizzle',file),'utf8').split('--> statement-breakpoint').flatMap((part)=>part.split(';')).filter((part)=>part.trim())) await sql(request,statement);
   }
   await sql(request,'CREATE TABLE IF NOT EXISTS e2e_provider_events (id TEXT PRIMARY KEY, kind TEXT, payload TEXT)');
-  for(const table of ['creator_media_chunks','creator_media','customer_bookings','creator_notifications','creator_notification_preferences','creator_accounts','creator_invites','creator_availability_rules','creator_stripe_connections','creator_calendar_connections','creator_onboarding_profiles','e2e_provider_events','e2e_state']) await sql(request,`DELETE FROM ${table}`);
+  for(const table of ['google_oauth_attempts','creator_media_chunks','creator_media','customer_bookings','creator_notifications','creator_notification_preferences','creator_accounts','creator_invites','creator_availability_rules','creator_stripe_connections','creator_calendar_connections','creator_onboarding_profiles','e2e_provider_events','e2e_state']) await sql(request,`DELETE FROM ${table}`);
   await sql(request,"INSERT INTO e2e_state VALUES ('stripe','active')");
   await sql(request,"INSERT INTO creator_onboarding_profiles (id,name,email,instagram_platform,bio,application_status,public_slug) VALUES (?, 'Original Creator','creator@example.com','style','', 'accepted','e2e-creator')",[creatorId]);
   await sql(request,"INSERT INTO creator_accounts (creator_id,clerk_user_id,email) VALUES (?, 'user_e2e','creator@example.com')",[creatorId]);
   await sql(request,"INSERT INTO creator_stripe_connections (creator_id,stripe_account_id,account_country) VALUES (?, 'acct_e2e','US')",[creatorId]);
   await sql(request,"UPDATE creator_onboarding_profiles SET calendar_connected_at='2026-09-14',stripe_connected_at='2026-09-14' WHERE id=?",[creatorId]);
   const encrypted=await encryptToken('e2e_access','e2e_fixture');
-  await sql(request,"INSERT INTO creator_calendar_connections (creator_id,scopes,access_token_encrypted,expires_at) VALUES (?, ?, ?, ?)",[creatorId,'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.freebusy',encrypted,Date.now()+86400000]);
+  await sql(request,"INSERT INTO creator_calendar_connections (creator_id,scopes,access_token_encrypted,refresh_token_encrypted,expires_at) VALUES (?, ?, ?, ?, ?)",[creatorId,'https://www.googleapis.com/auth/calendar.events.owned https://www.googleapis.com/auth/calendar.freebusy',encrypted,await encryptToken('e2e_refresh','e2e_fixture'),Date.now()+86400000]);
   // Useful default hours in every day avoid dependence on the test-run date.
   for(let day=0;day<7;day++) await sql(request,"INSERT INTO creator_availability_rules (creator_id,timezone,day_of_week,start_time,end_time,min_notice_minutes,buffer_minutes) VALUES (?,'America/Los_Angeles',?,'09:00','12:00',0,0)",[creatorId,day]);
 }
@@ -576,4 +576,279 @@ test('native gallery disclosure cannot mutate server markup while hydration is d
   await expect(page.locator('.editable-gallery-controls')).not.toHaveAttribute('open','');
   release(); await expect(main).not.toHaveAttribute('inert','');
   await summary.click(); await expect(page.locator('.editable-gallery-controls')).toHaveAttribute('open','');
+});
+
+async function providerState(request:APIRequestContext, id:string, value:string) {
+  await sql(request,'INSERT OR REPLACE INTO e2e_state VALUES (?,?)',[id,value]);
+}
+async function beginOAuth(page:Page) {
+  const response=await page.request.get(`/api/google-calendar/oauth/start?creatorId=${creatorId}&returnTo=/creator/profile`,{maxRedirects:0});
+  const url=new URL(response.headers().location);
+  expect(url.origin).toBe('https://accounts.google.com');
+  expect(url.searchParams.get('redirect_uri')).toBe('http://127.0.0.1:4173/api/google-calendar/oauth/callback');
+  expect(url.searchParams.get('scope')?.split(' ')).toEqual(['https://www.googleapis.com/auth/calendar.freebusy','https://www.googleapis.com/auth/calendar.events.owned']);
+  expect(url.searchParams.get('access_type')).toBe('offline');
+  expect(url.searchParams.get('include_granted_scopes')).toBe('false');
+  const callback=new URL(url.searchParams.get('redirect_uri')!);
+  callback.searchParams.set('state',url.searchParams.get('state')!);
+  callback.searchParams.set('code','isolated-code');
+  return callback;
+}
+async function calendarPage(page:Page) {
+  await page.reload(); await page.getByRole('tab',{name:'Availability',exact:true}).click();
+}
+
+test('Calendar OAuth button, callback, persistent usable status, disconnect and safe reconnect',async({page,request,browser})=>{
+  await seedDraft(request); await sql(request,'DELETE FROM creator_calendar_connections'); await login(page);
+  await page.getByRole('tab',{name:'Availability',exact:true}).click();
+  await expect(page.locator('[data-calendar-state]')).toHaveAttribute('data-calendar-state','not-connected');
+  let googleUrl:URL|undefined;
+  // Only Google's consent UI is simulated; app routes, ownership, crypto and D1 are real.
+  await page.route('**/api/google-calendar/oauth/start?**',async route=>{
+    const started=await route.fetch({maxRedirects:0});
+    googleUrl=new URL(started.headers().location);
+    const callback=new URL(googleUrl.searchParams.get('redirect_uri')!);
+    callback.searchParams.set('state',googleUrl.searchParams.get('state')!); callback.searchParams.set('code','isolated-code');
+    await route.fulfill({status:200,headers:{'set-cookie':started.headers()['set-cookie']},contentType:'text/html',body:`<!doctype html><link rel="icon" href="data:,"><a href="${callback.toString().replaceAll('&','&amp;')}">Authorize isolated Google account</a>`});
+  });
+  await page.getByRole('link',{name:'Connect calendar',exact:true}).click();
+  await page.getByRole('link',{name:'Authorize isolated Google account'}).click();
+  await expect(page).toHaveURL(/\/creator\/profile\?calendar=connected$/);
+  expect(googleUrl?.searchParams.get('scope')).toBe('https://www.googleapis.com/auth/calendar.freebusy https://www.googleapis.com/auth/calendar.events.owned');
+  await expect(page.locator('[data-calendar-state]')).toHaveAttribute('data-calendar-state','connected');
+  await calendarPage(page); await expect(page.locator('[data-calendar-state]')).toHaveAttribute('data-calendar-state','connected');
+  const stored=await sql(request,'SELECT * FROM creator_calendar_connections'); expect(stored).toHaveLength(1);
+  expect(stored[0].access_token_encrypted).toMatch(/^v1\./); expect(stored[0].refresh_token_encrypted).toMatch(/^v1\./);
+  expect((await page.request.get(`/api/google-calendar/status?creatorId=${creatorId}`)).headers()['cache-control']).toBe('no-store');
+  expect(await page.content()).not.toContain('e2e_refresh');
+  const fresh=await browser.newContext(); const returning=await fresh.newPage(); observe(returning);
+  await login(returning); await returning.getByRole('tab',{name:'Availability',exact:true}).click();
+  await expect(returning.locator('[data-calendar-state]')).toHaveAttribute('data-calendar-state','connected'); await fresh.close();
+  const before=await sql(request,'SELECT * FROM creator_availability_rules');
+  await page.screenshot({path:'.wrangler/calendar-creator-desktop.png'});
+  await page.setViewportSize({width:390,height:844});
+  await expect(page.getByRole('button',{name:'Disconnect Google Calendar',exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'Disconnect Google Calendar',exact:true}).scrollIntoViewIfNeeded();
+  await page.screenshot({path:'.wrangler/calendar-mobile.png'});
+  await page.getByRole('button',{name:'Disconnect Google Calendar',exact:true}).click();
+  await expect(page.locator('[data-calendar-state]')).toHaveAttribute('data-calendar-state','not-connected');
+  expect(await sql(request,'SELECT * FROM creator_calendar_connections')).toHaveLength(0);
+  expect(await sql(request,'SELECT * FROM creator_availability_rules')).toEqual(before);
+  expect(await sql(request,"SELECT * FROM e2e_provider_events WHERE kind='revoke'")).toHaveLength(1);
+  const callback=await beginOAuth(page); await page.goto(callback.toString());
+  await expect(page.locator('[data-calendar-state]')).toHaveAttribute('data-calendar-state','connected');
+  expect(await sql(request,'SELECT * FROM creator_calendar_connections')).toHaveLength(1);
+});
+
+test('Calendar callbacks reject denial, missing code, forged/stale/replayed state and account switching',async({page,request})=>{
+  await seedDraft(request); await sql(request,'DELETE FROM creator_calendar_connections'); await login(page);
+  let callback=await beginOAuth(page); callback.searchParams.delete('code'); callback.searchParams.set('error','access_denied');
+  await page.goto(callback.toString()); await expect(page.getByText('Calendar connection was cancelled. You can connect again when you are ready.')).toBeVisible();
+  expect(await sql(request,'SELECT * FROM creator_calendar_connections')).toHaveLength(0);
+  callback=await beginOAuth(page); callback.searchParams.delete('code');
+  expect((await page.request.get(callback.toString(),{maxRedirects:0})).headers().location).toContain('missing-code');
+  callback=await beginOAuth(page); callback.searchParams.set('state',callback.searchParams.get('state')+'forged');
+  expect((await page.request.get(callback.toString(),{maxRedirects:0})).headers().location).toContain('invalid-state');
+  callback=await beginOAuth(page);
+  await sql(request,'UPDATE google_oauth_attempts SET expires_at=0');
+  expect((await page.request.get(callback.toString(),{maxRedirects:0})).headers().location).toContain('used-state');
+  callback=await beginOAuth(page);
+  const cookies=await page.context().cookies(); const nonce=cookies.find(cookie=>cookie.name==='tas_google_oauth_nonce')!;
+  const wrong=await page.request.get(callback.toString(),{headers:{cookie:'tas_e2e_creator=1; tas_google_oauth_nonce=wrong'},maxRedirects:0});
+  expect(wrong.headers().location).toContain('state-cookie');
+  await page.context().addCookies([nonce]);
+  await page.request.get('/e2e-control?logout=1');
+  expect((await page.request.get(callback.toString(),{headers:{cookie:`tas_google_oauth_nonce=${nonce.value}`},maxRedirects:0})).headers().location).toContain('creator-access');
+  await login(page); callback=await beginOAuth(page);
+  const replayCookie=(await page.context().cookies()).find(cookie=>cookie.name==='tas_google_oauth_nonce')!;
+  expect((await page.request.get(callback.toString(),{maxRedirects:0})).headers().location).toContain('calendar=connected');
+  expect((await page.request.get(callback.toString(),{headers:{cookie:`tas_e2e_creator=1; tas_google_oauth_nonce=${replayCookie.value}`},maxRedirects:0})).headers().location).toContain('used-state');
+  expect(await sql(request,'SELECT * FROM creator_calendar_connections')).toHaveLength(1);
+  const other='onboard_other';
+  await sql(request,"INSERT INTO creator_onboarding_profiles(id,name,email,instagram_platform,bio,application_status) VALUES (?,'Other','other@example.com','style','','accepted')",[other]);
+  for(const path of [`/api/google-calendar/status?creatorId=${other}`,`/api/google-calendar/oauth/start?creatorId=${other}`]) {
+    const response=await page.request.get(path,{maxRedirects:0});
+    expect(response.status()===403 || response.headers().location.includes('creator-access')).toBeTruthy();
+  }
+  expect((await page.request.post('/api/google-calendar/disconnect',{headers:{origin:'http://127.0.0.1:4173'},form:{creatorId:other}})).status()).toBe(403);
+  expect((await page.request.post('/api/google-calendar/disconnect',{headers:{origin:'https://attacker.example'},form:{creatorId}})).status()).toBe(403);
+  await page.request.get('/e2e-control?logout=1');
+  expect((await page.request.get(`/api/google-calendar/oauth/start?creatorId=${creatorId}`,{maxRedirects:0})).headers().location).toContain('creator-access');
+});
+
+test('Calendar refresh, revoked permissions, API failure and partial offline grants recover without false success',async({page,request})=>{
+  await seedDraft(request); await login(page);
+  await sql(request,'UPDATE creator_calendar_connections SET expires_at=0');
+  await calendarPage(page); await expect(page.locator('[data-calendar-state]')).toHaveAttribute('data-calendar-state','connected');
+  expect((await sql(request,'SELECT expires_at FROM creator_calendar_connections'))[0].expires_at).toBeGreaterThan(Date.now());
+  await sql(request,'UPDATE creator_calendar_connections SET expires_at=0'); await providerState(request,'token','revoked');
+  await calendarPage(page); await expect(page.locator('[data-calendar-state]')).toHaveAttribute('data-calendar-state','needs-attention');
+  await expect(page.getByRole('link',{name:'Reconnect calendar'})).toBeVisible();
+  await providerState(request,'token','active'); let callback=await beginOAuth(page); await page.goto(callback.toString());
+  await expect(page.locator('[data-calendar-state]')).toHaveAttribute('data-calendar-state','connected');
+  for(const mode of ['401','403','429','503','malformed']) {
+    await providerState(request,'google',mode); await calendarPage(page);
+    await expect(page.locator('[data-calendar-state]')).toHaveAttribute('data-calendar-state','needs-attention');
+  }
+  await providerState(request,'google','active'); await calendarPage(page);
+  await expect(page.locator('[data-calendar-state]')).toHaveAttribute('data-calendar-state','connected');
+  const before=await sql(request,'SELECT * FROM creator_calendar_connections');
+  for(const [mode,detail] of [['partial','calendar-permissions'],['no-refresh','offline-access'],['outage','google-token']]) {
+    await providerState(request,'token',mode); callback=await beginOAuth(page);
+    expect((await page.request.get(callback.toString(),{maxRedirects:0})).headers().location).toContain(detail);
+    expect(await sql(request,'SELECT * FROM creator_calendar_connections')).toEqual(before);
+  }
+});
+
+async function availableDays(request:APIRequestContext, month:string, timezone='America/New_York') {
+  const response=await request.get('/api/bookings/availability',{params:{creatorId,seatId:'offer_quick',month,timezone}});
+  expect(response.status(),await response.text()).toBe(200);
+  return (await response.json()).days as {date:string;slots:{id:string;startsAtUtc:number;sourceAppointmentStartAt:string;sourceTimezone:string;displayTime:string}[]}[];
+}
+
+test('Calendar conflicts filter server slots, stale requests fail before Checkout and disconnect preserves schedule',async({page,request})=>{
+  await seedDraft(request); await login(page); await publish(page);
+  const day=new Date(Date.now()+2*86400000).toISOString().slice(0,10), month=day.slice(0,7);
+  const original=(await availableDays(request,month)).find(item=>item.date===day)!;
+  const slot=original.slots[0];
+  await providerState(request,'busy',JSON.stringify([{start:new Date(slot.startsAtUtc).toISOString(),end:new Date(slot.startsAtUtc+3600000).toISOString()}]));
+  const filtered=(await availableDays(request,month)).find(item=>item.date===day)!;
+  expect(filtered.slots.some(item=>item.id===slot.id)).toBe(false);
+  expect(filtered.slots.some(item=>item.startsAtUtc>=slot.startsAtUtc+3600000)).toBe(true);
+  expect(JSON.stringify(filtered)).not.toMatch(/attendees|description|location|refresh_token|access_token/);
+  await providerState(request,'busy','[]');
+  await page.goto('/with/e2e-creator'); await page.getByRole('button',{name:'Find availability',exact:true}).click();
+  await expect(page.locator('.customer-time-options button').first()).toBeVisible();
+  await page.setViewportSize({width:1280,height:900}); await page.screenshot({path:'.wrangler/calendar-customer-desktop.png'});
+  await page.setViewportSize({width:390,height:844}); await page.screenshot({path:'.wrangler/calendar-customer-mobile.png'});
+  const footer=await page.locator('.customer-booking-footer').boundingBox(); expect(footer!.y+footer!.height).toBeLessThanOrEqual(844);
+  const modal=await page.locator('.customer-booking-modal').boundingBox(); expect(modal!.x).toBeGreaterThanOrEqual(0); expect(modal!.x+modal!.width).toBeLessThanOrEqual(390);
+  await page.getByRole('button',{name:'Close booking'}).click();
+  await providerState(request,'busy',JSON.stringify([{start:new Date(slot.startsAtUtc).toISOString(),end:new Date(slot.startsAtUtc+3600000).toISOString()}]));
+  const stale=await request.post('/api/bookings/request',{form:{creatorId,seatId:'offer_quick',appointmentStartAt:slot.sourceAppointmentStartAt,timezone:slot.sourceTimezone,customerEmail:'stale@example.com'},maxRedirects:0});
+  expect(stale.headers().location).toContain('availability');
+  expect(await sql(request,'SELECT * FROM customer_bookings')).toHaveLength(0);
+  const saved=await sql(request,'SELECT * FROM creator_availability_rules');
+  const disconnected=await page.request.post('/api/google-calendar/disconnect',{headers:{origin:'http://127.0.0.1:4173'},form:{creatorId}}); expect(disconnected.ok()).toBeTruthy();
+  expect((await availableDays(request,month)).find(item=>item.date===day)!.slots).toEqual(original.slots);
+  expect(await sql(request,'SELECT * FROM creator_availability_rules')).toEqual(saved);
+});
+
+test('Calendar final acceptance rechecks saved hours and Google before capture',async({page,request})=>{
+  await seedDraft(request); await login(page); await publish(page);
+  const day=new Date(Date.now()+2*86400000).toISOString().slice(0,10);
+  const response=await request.post('/api/bookings/request',{form:{creatorId,seatId:'offer_quick',appointmentStartAt:`${day}T09:00:00`,timezone:'America/Los_Angeles',customerEmail:'stale-approval@example.com'},maxRedirects:0});
+  await request.get(response.headers().location);
+  const [booking]=await sql(request,'SELECT * FROM customer_bookings');
+  await sql(request,'UPDATE creator_availability_rules SET enabled=0');
+  const approve=()=>page.request.post('/api/bookings/approve',{form:{bookingId:booking.id,returnTo:'/creator/profile'},maxRedirects:0});
+  expect((await approve()).headers().location).toContain('calendar-conflict');
+  expect(await sql(request,"SELECT * FROM e2e_provider_events WHERE kind='capture'")).toHaveLength(0);
+  await sql(request,'UPDATE creator_availability_rules SET enabled=1');
+  await providerState(request,'busy',JSON.stringify([{start:`${day}T16:00:00Z`,end:`${day}T18:00:00Z`}]));
+  expect((await approve()).headers().location).toContain('calendar-conflict');
+  expect(await sql(request,"SELECT * FROM e2e_provider_events WHERE kind='capture'")).toHaveLength(0);
+  await providerState(request,'busy','[]');
+  await providerState(request,'google','mutate-schedule');
+  expect((await approve()).headers().location).toContain('booking-status');
+  expect(await sql(request,"SELECT * FROM e2e_provider_events WHERE kind='capture'")).toHaveLength(0);
+  await sql(request,'UPDATE creator_availability_rules SET enabled=1');
+  expect((await approve()).headers().location).toContain('calendar=sent');
+  expect((await sql(request,'SELECT status FROM customer_bookings'))[0].status).toBe('approved');
+});
+
+test('Calendar event confirmation, validated reschedule, retry, invitation and cancellation boundaries keep one event',async({page,request})=>{
+  await seedDraft(request); await login(page); await publish(page);
+  const day=new Date(Date.now()+2*86400000).toISOString().slice(0,10);
+  const checkout=await request.post('/api/bookings/request',{form:{creatorId,seatId:'offer_quick',appointmentStartAt:`${day}T09:00:00`,timezone:'America/Los_Angeles',customerEmail:'invite@example.com'},maxRedirects:0});
+  await request.get(checkout.headers().location);
+  const [booking]=await sql(request,'SELECT * FROM customer_bookings');
+  const approve=()=>page.request.post('/api/bookings/approve',{form:{bookingId:booking.id,returnTo:'/creator/profile'},maxRedirects:0});
+  for(let n=0;n<2;n++) expect((await approve()).headers().location).toMatch(/calendar=(sent|accepted)/);
+  let events=await sql(request,"SELECT * FROM e2e_provider_events WHERE kind='calendar'"); expect(events).toHaveLength(1);
+  const event=JSON.parse(events[0].payload); expect(event.attendees[0].email).toBe('invite@example.com');
+  expect(event.guestsCanModify).toBe(false); expect(event.extendedProperties.private.bookingId).toBe(booking.id);
+  const headers={origin:'http://127.0.0.1:4173'};
+  const path=`/api/bookings/${booking.id}/calendar`;
+  const bad=await page.request.post(path,{headers,data:{appointmentStartAt:`${day}T03:00:00`,timezone:'America/Los_Angeles'}}); expect(bad.status()).toBe(503);
+  expect((await sql(request,'SELECT appointment_start_at FROM customer_bookings'))[0].appointment_start_at).toBe(`${day}T09:00:00`);
+  const rescheduled=await page.request.post(path,{headers,data:{appointmentStartAt:`${day}T10:00:00`,timezone:'America/Los_Angeles'}}); expect(rescheduled.status(),await rescheduled.text()).toBe(200);
+  expect((await sql(request,'SELECT appointment_start_at,google_calendar_event_id FROM customer_bookings'))[0]).toEqual({appointment_start_at:`${day}T10:00:00`,google_calendar_event_id:event.id});
+  const sync=()=>page.request.post(path,{headers});
+  await sql(request,'UPDATE customer_bookings SET calendar_synced_revision=NULL');
+  expect((await sync()).status()).toBe(200);
+  expect(await sql(request,"SELECT * FROM e2e_provider_events WHERE kind='PATCH'")).toHaveLength(1);
+  // Prepare future meeting URL input on the authoritative booking, then synchronize.
+  await sql(request,"UPDATE customer_bookings SET meeting_url='https://zoom.us/j/123456789', calendar_synced_revision=NULL, updated_at=?",[new Date().toISOString()]);
+  expect((await sync()).status()).toBe(200);
+  const current=JSON.parse((await sql(request,"SELECT payload FROM e2e_provider_events WHERE kind='calendar'"))[0].payload);
+  expect(current.location).toBe('https://zoom.us/j/123456789'); expect(current.attendees[0].email).toBe('invite@example.com');
+  // Cancellation workflow is outside this Calendar boundary: supply a committed
+  // cancelled booking, as the future refund/cancellation service will do.
+  await sql(request,"UPDATE customer_bookings SET status='cancelled',calendar_synced_revision=NULL,updated_at=?",[new Date().toISOString()]);
+  for(let n=0;n<2;n++) expect((await sync()).status()).toBe(200);
+  events=await sql(request,"SELECT * FROM e2e_provider_events WHERE kind='calendar'"); expect(events).toHaveLength(1);
+  expect(JSON.parse(events[0].payload).status).toBe('cancelled');
+  const deletes=await sql(request,"SELECT * FROM e2e_provider_events WHERE kind='DELETE'"); expect(deletes).toHaveLength(1);
+  expect(JSON.parse(deletes[0].payload)).toEqual({id:event.id,sendUpdates:'all'});
+  expect(await sql(request,'SELECT * FROM customer_bookings')).toHaveLength(1);
+  // A corrupted association must never delete an unrelated event.
+  const unrelated={...event,id:'unrelated',extendedProperties:{private:{bookingId:'somebody-else'}}};
+  await sql(request,"INSERT INTO e2e_provider_events VALUES ('unrelated','calendar',?)",[JSON.stringify(unrelated)]);
+  await sql(request,"UPDATE customer_bookings SET google_calendar_event_id='unrelated',calendar_synced_revision=NULL");
+  expect((await sync()).status()).toBe(503);
+  expect(JSON.parse((await sql(request,"SELECT payload FROM e2e_provider_events WHERE id='unrelated'"))[0].payload)).toEqual(unrelated);
+});
+
+test('Calendar slots use IANA creator and viewer timezones across both DST transitions',async({page,request})=>{
+  await seedDraft(request); await login(page); await publish(page);
+  await sql(request,"UPDATE creator_availability_rules SET start_time='01:00',end_time='04:00'");
+  const autumn=await availableDays(request,'2026-11','America/New_York');
+  const fall=autumn.find(day=>day.date==='2026-11-01')!.slots;
+  expect(new Set(fall.map(slot=>slot.startsAtUtc)).size).toBe(fall.length);
+  const after=fall.find(slot=>slot.sourceAppointmentStartAt==='2026-11-01T03:00:00')!;
+  expect(new Date(after.startsAtUtc).toISOString()).toBe('2026-11-01T11:00:00.000Z');
+  expect(after.displayTime).toBe('6:00 AM');
+  const spring=await availableDays(request,'2027-03','America/New_York');
+  const forward=spring.find(day=>day.date==='2027-03-14')!.slots;
+  expect(forward.some(slot=>slot.sourceAppointmentStartAt.includes('T02:'))).toBe(false);
+  expect(new Date(forward.find(slot=>slot.sourceAppointmentStartAt==='2027-03-14T03:00:00')!.startsAtUtc).toISOString()).toBe('2027-03-14T10:00:00.000Z');
+});
+
+test('Calendar rejects a session whose stored wall-clock end would cross a DST jump',async({page,request})=>{
+  await seedDraft(request); await login(page); await publish(page);
+  await sql(request,"UPDATE creator_availability_rules SET start_time='01:00',end_time='04:00'");
+  const forward=(await availableDays(request,'2027-03','America/Los_Angeles')).find(day=>day.date==='2027-03-14')!.slots;
+  expect(forward.some(slot=>slot.sourceAppointmentStartAt==='2027-03-14T01:45:00')).toBe(false);
+  const back=(await availableDays(request,'2026-11','America/Los_Angeles')).find(day=>day.date==='2026-11-01')!.slots;
+  expect(back.some(slot=>slot.sourceAppointmentStartAt==='2026-11-01T01:45:00')).toBe(false);
+});
+
+
+test('Calendar interrupted event insertion never duplicates onto a reconnected account',async({page,request})=>{
+  await seedDraft(request); await login(page); await publish(page);
+  const day=new Date(Date.now()+2*86400000).toISOString().slice(0,10);
+  const checkout=await request.post('/api/bookings/request',{form:{creatorId,seatId:'offer_quick',appointmentStartAt:`${day}T09:00:00`,timezone:'America/Los_Angeles',customerEmail:'recovery@example.com'},maxRedirects:0});
+  await request.get(checkout.headers().location);
+  const [booking]=await sql(request,'SELECT * FROM customer_bookings');
+  const approve=()=>page.request.post('/api/bookings/approve',{form:{bookingId:booking.id,returnTo:'/creator/profile'},maxRedirects:0});
+  await providerState(request,'calendar-insert','lost-response');
+  expect((await approve()).headers().location).toContain('google-calendar');
+  expect((await sql(request,'SELECT status FROM customer_bookings'))[0].status).toBe('paid');
+  expect(await sql(request,"SELECT * FROM e2e_provider_events WHERE kind='calendar'")).toHaveLength(1);
+  const callback=await beginOAuth(page); await page.goto(callback.toString());
+  await providerState(request,'calendar-account','different');
+  expect((await approve()).headers().location).toContain('google-calendar');
+  expect(await sql(request,"SELECT * FROM e2e_provider_events WHERE kind='calendar'")).toHaveLength(1);
+  await providerState(request,'calendar-account','original');
+  expect((await approve()).headers().location).toContain('calendar=sent');
+  expect(await sql(request,"SELECT * FROM e2e_provider_events WHERE kind='calendar'")).toHaveLength(1);
+  expect(await sql(request,"SELECT * FROM e2e_provider_events WHERE kind='capture'")).toHaveLength(1);
+  await sql(request,"UPDATE customer_bookings SET status='cancelled',calendar_synced_revision=NULL");
+  await providerState(request,'calendar-account','different');
+  expect((await page.request.post(`/api/bookings/${booking.id}/calendar`,{headers:{origin:'http://127.0.0.1:4173'}})).status()).toBe(503);
+  expect((await sql(request,'SELECT calendar_synced_revision FROM customer_bookings'))[0].calendar_synced_revision).toBeNull();
+  const before=await sql(request,'SELECT * FROM customer_bookings');
+  expect((await page.request.post('/api/google-calendar/disconnect',{headers:{origin:'http://127.0.0.1:4173'},form:{creatorId}})).status()).toBe(200);
+  expect(await sql(request,'SELECT * FROM customer_bookings')).toEqual(before);
 });

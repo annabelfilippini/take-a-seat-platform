@@ -63,8 +63,13 @@ sqlite.prepare("INSERT INTO creator_calendar_connections(creator_id,scopes,acces
 
 
 function seed(id) {
+  const creatorId = `test-creator-${id}`;
+  sqlite.prepare("INSERT INTO creator_onboarding_profiles(id,name,email,instagram_platform,bio,application_status,published_at,profile_saved_at,public_slug) VALUES (?,'Test','test@example.com','style','','accepted','2026-09-01','2026-09-01',?)").run(creatorId,creatorId);
+  sqlite.prepare("UPDATE creator_onboarding_profiles SET seat_15_enabled=1,seat_15_price_amount=50 WHERE id=?").run(creatorId);
+  sqlite.prepare("INSERT INTO creator_calendar_connections(creator_id,scopes,access_token_encrypted,expires_at) SELECT ?,scopes,access_token_encrypted,expires_at FROM creator_calendar_connections WHERE creator_id='test-creator'").run(creatorId);
+  sqlite.prepare("INSERT INTO creator_availability_rules(creator_id,timezone,day_of_week,start_time,end_time,min_notice_minutes,buffer_minutes) VALUES (?,'America/New_York',4,'09:00','17:00',0,0)").run(creatorId);
   const bookingId = `booking_${id}`;
-  sqlite.prepare("INSERT INTO customer_bookings (id, creator_id, creator_name, seat_id, seat_name, customer_email, appointment_start_at, appointment_end_at, timezone, status, stripe_checkout_session_id) VALUES (?, 'test-creator', 'Test Creator', 'test-seat', '15 minutes', 'test@example.com', '2026-10-01T09:00:00', '2026-10-01T09:15:00', 'America/New_York', 'requested', ?)").run(bookingId, `cs_${id}`);
+  sqlite.prepare("INSERT INTO customer_bookings (id, creator_id, creator_name, seat_id, seat_name, customer_email, appointment_start_at, appointment_end_at, timezone, status, stripe_checkout_session_id) VALUES (?, ?, 'Test Creator', 'test-seat', '15 minutes', 'test@example.com', '2026-10-01T09:00:00', '2026-10-01T09:15:00', 'America/New_York', 'requested', ?)").run(bookingId, creatorId, `cs_${id}`);
   return bookingId;
 }
 function session(id, status = "complete", intentStatus = "requires_capture") {

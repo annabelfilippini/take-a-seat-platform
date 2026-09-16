@@ -1,3 +1,4 @@
+import { readBookingAvailabilityRevision } from "../../../_lib/booking-revalidation";
 import { claimBookingDecision } from "../../../_lib/booking-decisions";
 import { getSafeReturnTo } from "../../../_lib/safe-redirect";
 import { getRequestAdminEmail } from "../../../_lib/admin-auth";
@@ -81,13 +82,15 @@ export async function POST(request: Request) {
       return redirectWithStatus(request, safeReturnTo, "setup-needed", "stripe-secret");
     }
 
+    let availabilityRevision: string;
     try {
+      availabilityRevision = await readBookingAvailabilityRevision(booking.creatorId);
       if (!await canConfirmBookingCalendar(booking)) return redirectWithStatus(request, safeReturnTo, "error", "calendar-conflict");
     } catch {
       return redirectWithStatus(request, safeReturnTo, "setup-needed", "google-calendar");
     }
 
-    if (!await claimBookingDecision(booking.id, "accept")) return redirectWithStatus(request, safeReturnTo, "error", "booking-status");
+    if (!await claimBookingDecision(booking.id, "accept", { creatorId: booking.creatorId, revision: availabilityRevision })) return redirectWithStatus(request, safeReturnTo, "error", "booking-status");
     let paidBooking = null;
 
     try {

@@ -51,7 +51,7 @@ export default function PrivacyPage() {
           <p>
             When a creator chooses to connect Google Calendar, Take a Seat asks
             for permission to check free and busy times on the creator&apos;s primary
-            calendar and to create or recover booking events on calendars the
+            calendar and to create, recover, update, or cancel Take a Seat booking events on calendars the
             creator owns. This is used to prevent scheduling conflicts, add
             confirmed appointments, create Google Meet links, and invite the
             customer.
@@ -61,7 +61,10 @@ export default function PrivacyPage() {
             connection timestamps, and encrypted OAuth access and refresh tokens.
             We also store the Google event identifier and event link associated
             with a confirmed booking. We do not use Google Calendar data for
-            advertising, audience profiling, or unrelated purposes.
+            advertising, audience profiling, or unrelated purposes. Free/busy checks
+            use time intervals, not private event titles, descriptions, locations,
+            notes, or attendees. Customers receive available times only; we do not
+            store the contents of unrelated Google Calendar events.
           </p>
           <p>
             Take a Seat&apos;s use and transfer of information received from Google
@@ -103,12 +106,15 @@ export default function PrivacyPage() {
         <section>
           <h2>Your choices</h2>
           <p>
-            You can revoke Take a Seat&apos;s Google access from your Google Account
+            You can disconnect Calendar on your creator Availability page. This removes
+            our stored Calendar credentials and requests revocation with Google, while
+            preserving your saved Take a Seat availability and booking records. Existing
+            Calendar events remain. You can also revoke access from your Google Account
             permissions at any time. To request access, correction, or deletion of
             information held by Take a Seat, contact us at{" "}
             <a href="mailto:annabelflip1@gmail.com">annabelflip1@gmail.com</a>.
             Revoking Google access stops future Calendar access; contact us if you
-            also want the stored connection record removed.
+            also want the stored connection record removed, or use Disconnect in Availability.
           </p>
         </section>
 

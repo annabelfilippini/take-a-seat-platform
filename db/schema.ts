@@ -189,6 +189,12 @@ export const customerBookings = sqliteTable(
     stripeCheckoutSessionId: text("stripe_checkout_session_id"),
     stripePaymentIntentId: text("stripe_payment_intent_id"),
     googleCalendarEventId: text("google_calendar_event_id"),
+    googleCalendarId: text("google_calendar_id"),
+    googleCalendarConnectionId: text("google_calendar_connection_id"),
+    calendarSyncedRevision: text("calendar_synced_revision"),
+    calendarSyncLock: text("calendar_sync_lock"),
+    calendarSyncLockExpiresAt: integer("calendar_sync_lock_expires_at"),
+    meetingUrl: text("meeting_url"),
     googleCalendarHtmlLink: text("google_calendar_html_link"),
     approvedAt: text("approved_at"),
     createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
@@ -252,3 +258,11 @@ export const creatorMediaChunks = sqliteTable('creator_media_chunks', {
   position: integer('position').notNull(),
   content: text('content').notNull(),
 }, (table) => ({ chunkIdx: uniqueIndex('creator_media_chunk_idx').on(table.mediaId, table.position) }));
+
+// One-use OAuth attempts bind a browser nonce to the authenticated actor.
+export const googleOAuthAttempts = sqliteTable("google_oauth_attempts", {
+  nonce: text("nonce").primaryKey(),
+  creatorId: text("creator_id").notNull(),
+  actorId: text("actor_id").notNull(),
+  expiresAt: integer("expires_at").notNull(),
+});

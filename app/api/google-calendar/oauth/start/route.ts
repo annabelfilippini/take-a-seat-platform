@@ -12,7 +12,7 @@ import {
 import {
   getCreatorOnboardingProfileId,
 } from "../../../../_lib/creator-onboarding";
-import { getCreatorIntegrationAccess } from "../../../../_lib/creator-access";
+import { getCalendarOwner, saveCalendarAttempt } from "../../../../_lib/calendar-oauth-security";
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -40,14 +40,11 @@ export async function GET(request: Request) {
     }
   }
 
-  const access = await getCreatorIntegrationAccess(request, creatorId);
-
-  if (access.status !== "allowed") {
-    const status = access.detail === "creator-auth" ? "setup-needed" : "error";
-    return redirectWithCalendarStatus(request, returnTo, status, access.detail);
-  }
+  const actorId = await getCalendarOwner(request, creatorId);
+  if (!actorId) return redirectWithCalendarStatus(request, returnTo, "error", "creator-access");
 
   const nonce = createNonce();
+  await saveCalendarAttempt(nonce, creatorId, actorId);
   const state = await createOAuthState(
     {
       creatorId,

@@ -1,0 +1,1 @@
+ALTER TABLE `customer_bookings` ADD `google_calendar_connection_id` text;
