@@ -1555,16 +1555,6 @@ function EditableAvailabilityPanel({
       </div>
       <p role="status" data-calendar-state={calendarState}>{calendarState === "connected" ? "Google Calendar connected ✓" : calendarState === "needs-attention" ? "Google Calendar connection needs attention. Reconnect or try again shortly." : "Google Calendar not connected. Connect to accept bookings."}</p>
       {calendarMessage ? <p role="status">{calendarMessage}</p> : null}
-      <p>Only your primary calendar is checked. <a href="/privacy">How we use Google Calendar data</a></p>
-
-      <p className="availability-instructions" id="weekly-availability-help">
-        Set your typical weekly hours, or choose any week up to one year ahead to override them. Saved availability changes live bookable hours immediately. Select the times you can take
-        calls in your timezone. Tap a time to select it, or use a mouse to drag
-        across several times.
-      </p>
-
-      <div className="creator-request-actions"><button type="button" disabled={saveStatus === "saving"} aria-pressed={isDefaultWeek} onClick={() => showWeek("default")}>Default weekly hours</button><button type="button" disabled={saveStatus === "saving"} aria-pressed={!isDefaultWeek} onClick={() => showWeek(initialWeekStart)}>Week overrides</button><button type="button" disabled={saveStatus === "saving"} onClick={() => { setSelectedSlots(new Set()); updateWeekDraft(new Set()); setSaveStatus("idle"); }}>Clear hours</button></div>
-      <p>{isDefaultWeek ? "These hours repeat on weeks without an override." : `Editing ${selectedWeekLabel}. Saving replaces this week only; an empty week closes it.`}</p>
       <button className="editable-primary-button" type="button" disabled={saveStatus === "saving"} onClick={() => void saveAvailability()}>Save availability</button>
       <div className="availability-settings-row">
         <div className="availability-week-controls" aria-label="Availability week">
@@ -1586,7 +1576,7 @@ function EditableAvailabilityPanel({
               value={weekStart}
               onChange={(event) => showWeek(event.target.value)}
             >
-              {isDefaultWeek && <option value="default">Default weekly hours</option>}
+              <option value="default">Default weekly hours</option>
               {weekOptions.map((option) => (
                 <option key={option} value={option}>
                   Week of {formatAvailabilityDate(option)}
@@ -1604,7 +1594,6 @@ function EditableAvailabilityPanel({
             <span aria-hidden="true">›</span>
           </button>
         </div>
-        <label>Jump to a date<input aria-label="Jump to availability date" type="date" min={availabilityBounds.today} max={availabilityBounds.end} disabled={saveStatus === "saving"} onChange={(event) => { if (event.target.value) showWeek(availabilityWeekStart(event.target.value)); }} /></label>
         <label className="availability-timezone-picker">
           <span>Timezone</span>
           <input
@@ -1630,7 +1619,7 @@ function EditableAvailabilityPanel({
       </div>
 
       <div className="creator-availability-box">
-        <div className="availability-calendar" aria-describedby="weekly-availability-help">
+        <div className="availability-calendar">
           <div className="availability-days-row">
             <span className="availability-grid-corner">Time</span>
             {availabilityDays.map((day) => {
