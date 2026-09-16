@@ -106,8 +106,8 @@ All were exercised from a fresh local D1 database by Playwright and independentl
 through SQLite-backed domain tests. No existing migration is edited. Required
 Google secret names remain GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET and
 GOOGLE_TOKEN_ENCRYPTION_KEY. Runtime values and keys were not exported or changed.
-Production approval, committed reviewed code, remote migration/secret confirmation,
-and real Google/Stripe rehearsal remain release prerequisites.
+The approved September 16 deployment and remote migration/secret confirmation
+are recorded below. Real Google/Stripe rehearsal remains a marketplace launch gate.
 
 ## Privacy and least privilege
 
@@ -194,6 +194,36 @@ The Node suite additionally forces refresh/reconnect writes within the same
 stored timestamp and proves the newer ciphertext cannot be overwritten.
 Local proof is complete for these application-controlled scenarios. It is not
 proof of deployed Google consent, real provider delivery or Google approval.
+
+## Production deployment: September 16, 2026
+
+Annabel explicitly approved deployment. PR #35 was squash-merged to main
+`dca3b8b121d1f119d0ccca7f997ca86be31b1e6a`; its tree exactly matched the tested
+branch commit `c3ca3ab`. Deployment ran from that clean committed checkout.
+
+- Required Google, Clerk, Stripe and Resend Worker secret names were present.
+  No secret values were exported or rotated.
+- Remote D1 migrations 0021–0024 applied successfully; a subsequent list reported
+  no pending migrations. An initial read-only D1 check returned Cloudflare 7403;
+  after checking the authenticated account and permissions, the retry succeeded.
+- `npm run deploy` built and published successfully at 19:09 UTC.
+  Worker version `fd9bacc5-4e70-49f8-ab1b-41599b038c73` serves 100% of traffic on
+  `takeaseatwith.com` and `www.takeaseatwith.com`.
+- Previous Worker version: `ad332d31-0d87-4a44-a76a-03663ce11e37`.
+- Live Playwright checks passed in fresh Chrome contexts at 1280×900 and 390×844:
+  homepage/privacy link, updated public Calendar privacy text, Ella's published
+  page, booking-calendar open/close, real server availability response, refresh,
+  invalid OAuth state rejection and unauthenticated connect rejection.
+- Both viewports had zero console/page errors or failed HTTP requests. Availability
+  responses returned 200 and no token/private-event fields. Screenshots were
+  inspected for modal bounds, calendar, time buttons, close control and footer.
+- These were read-only public smoke checks. No booking, charge, invitation,
+  creator connection or Google Console setting was changed by the smoke run.
+
+The 82 Node tests and 29 complete local Playwright journeys documented above
+passed on the identical application tree before deployment. Google production
+audience, domain ownership, sensitive-scope verification and real-account consent
+remain external steps; this deployment does not claim Google approval.
 
 ## Remaining external/product boundaries
 

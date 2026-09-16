@@ -199,10 +199,13 @@ Calendar:
   `docs/calendar-rehearsal-2026-09-12.md`. September 14 live provider rehearsal
   verified OAuth persistence, busy-time rejection, deterministic event creation
   and a customer Inbox invitation with Meet; see the live rehearsal report.
-- September 16 production hardening is local and not deployed: creator-owned
+- September 16 production hardening deployed from merged PR #35, main `dca3b8b`:
+  Worker version `fd9bacc5-4e70-49f8-ab1b-41599b038c73` serves 100% of traffic.
+  Includes creator-owned
   one-use OAuth attempts, live connection status, disconnect/reconnect, server
   slot filtering, complete pre-capture revalidation, and guarded event sync.
-  Apply additive migrations 0021–0024 before an approved release. See
+  Additive migrations 0021–0024 are applied remotely; required secret names and
+  live desktop/mobile booking-calendar smoke checks passed. See
   [implementation and release evidence](google-calendar-implementation.md).
 - The last recorded Google Console observation was External/Testing, with domain
   verification and sensitive-scope submission pending. Recheck current state;
