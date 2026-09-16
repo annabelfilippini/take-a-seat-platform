@@ -271,6 +271,11 @@ export async function markBookingPaymentAuthorized({
 
   if (existingBooking.status !== BOOKING_STATUS.requested) return existingBooking;
 
+  const { retrieveStripePaymentIntent, authorizationDeadline } = await import('./stripe-payments');
+  if (!stripePaymentIntentId) return null;
+  const intent = await retrieveStripePaymentIntent(stripePaymentIntentId);
+  if (intent.id !== stripePaymentIntentId || intent.status !== 'requires_capture' || intent.capture_method !== 'manual' || !(intent.amount_capturable! > 0)) return null;
+  const deadlines = authorizationDeadline(intent, existingBooking.createdAt, localDateTimeToUtc(existingBooking.appointmentStartAt, existingBooking.timezone)?.getTime() ?? 0);
   const { getDb } = await import("../../db");
   const db = getDb();
   const now = new Date().toISOString();
@@ -278,6 +283,8 @@ export async function markBookingPaymentAuthorized({
   await db
     .update(customerBookings)
     .set({
+      ...deadlines,
+      workflowRetryAt: deadlines.respondBy,
       status: BOOKING_STATUS.paymentAuthorized,
       stripePaymentIntentId,
       updatedAt: now,
@@ -314,6 +321,17 @@ export async function markBookingPaid({
 
   if (existingBooking.status === BOOKING_STATUS.paid || existingBooking.status === BOOKING_STATUS.approved) return existingBooking;
 
+  if (!stripePaymentIntentId) return null;
+  const { retrieveStripePaymentIntent } = await import('./stripe-payments');
+  const intent = await retrieveStripePaymentIntent(stripePaymentIntentId);
+  const expectedAmount = existingBooking.offeringUnitAmount ?? intent.amount;
+  if (intent.id !== stripePaymentIntentId || intent.metadata?.booking_id !== bookingId || intent.status !== 'succeeded' ||
+      !expectedAmount || intent.amount_received !== expectedAmount ||
+      (existingBooking.offeringCurrency && intent.currency !== existingBooking.offeringCurrency)) {
+    throw new Error('Stripe has not verified the full booking payment.');
+  }
+
+
   const { getDb } = await import("../../db");
   const db = getDb();
   const now = new Date().toISOString();
@@ -322,6 +340,8 @@ export async function markBookingPaid({
     .update(customerBookings)
     .set({
       status: BOOKING_STATUS.paid,
+      workflowStep: "zoom",
+      workflowRetryAt: Date.now(),
       stripePaymentIntentId,
       updatedAt: now,
     })
@@ -343,11 +363,11 @@ export async function markBookingPaymentEnded({ bookingId, sessionId, status }: 
 }) {
   const booking = await getCustomerBooking(bookingId);
   if (!booking || booking.stripeCheckoutSessionId !== sessionId ||
-    !["requested", "checkout_started", "payment_authorized"].includes(booking.status)) return;
+    !["requested", "checkout_started", "payment_authorized", "approval_processing", "decline_processing", "expiration_processing"].includes(booking.status)) return;
   // Session expiry must never revoke an authorization or a captured payment.
   if (status === "checkout_expired" && booking.status === "payment_authorized") return;
   const { getDb } = await import("../../db");
-  await getDb().update(customerBookings).set({ status: booking.creatorDecision === "decline" ? "declined" : status, updatedAt: new Date().toISOString() })
+  await getDb().update(customerBookings).set({ status: booking.creatorDecision === "decline" ? "declined" : booking.creatorDecision === "expire" ? "expired" : status, updatedAt: new Date().toISOString() })
     .where(and(eq(customerBookings.id, bookingId), eq(customerBookings.stripeCheckoutSessionId, sessionId), eq(customerBookings.status, booking.status)));
 }
 
@@ -426,7 +446,7 @@ export async function markBookingApprovedWithCalendar({
       status: BOOKING_STATUS.approved,
       updatedAt: now,
     })
-    .where(eq(customerBookings.id, bookingId));
+    .where(and(eq(customerBookings.id, bookingId), eq(customerBookings.status, "paid")));
 }
 
 export function getCustomerCalendarFilename(booking: CustomerBooking) {
@@ -441,7 +461,7 @@ export function createCustomerCalendarIcs(booking: CustomerBooking) {
   const summary = `${booking.seatName} with ${booking.creatorName}`;
   const description = [
     "Take a Seat booking request.",
-    booking.customerNote ? `Customer note: ${booking.customerNote}` : null,
+    booking.meetingUrl ? `Join your session: ${booking.meetingUrl}` : null,
   ]
     .filter(Boolean)
     .join("\n");
@@ -460,7 +480,7 @@ export function createCustomerCalendarIcs(booking: CustomerBooking) {
     `DESCRIPTION:${escapeIcsText(description)}`,
     `DTSTART;TZID=${escapeIcsText(booking.timezone)}:${start}`,
     `DTEND;TZID=${escapeIcsText(booking.timezone)}:${end}`,
-    "STATUS:TENTATIVE",
+    booking.status === "approved" ? "STATUS:CONFIRMED" : "STATUS:TENTATIVE",
     "END:VEVENT",
     "END:VCALENDAR",
     "",
@@ -543,6 +563,7 @@ function addMinutesToLocalDateTime(value: string, minutes: number) {
 }
 
 function isBlockingBooking(booking: CustomerBooking) {
+  if (["approval_processing", "decline_processing", "expiration_processing", "cancellation_processing"].includes(booking.status)) return true;
   if (
     booking.status === BOOKING_STATUS.accepted ||
     booking.status === BOOKING_STATUS.paymentAuthorized ||
@@ -567,6 +588,7 @@ function isBlockingBooking(booking: CustomerBooking) {
 
 function canMarkBookingPaid(status: string) {
   return (
+    status === "approval_processing" ||
     status === BOOKING_STATUS.requested ||
     status === BOOKING_STATUS.accepted ||
     status === BOOKING_STATUS.checkoutStarted ||

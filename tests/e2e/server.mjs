@@ -12,7 +12,7 @@ for (const name of ['app','db','drizzle','worker','public','tests/e2e']) {
 for (const name of ['vite.config.ts','package.json','tsconfig.json','next.config.ts']) {
   try { await cp(resolve(name),resolve(root,name)); } catch (error) { if(error.code !== 'ENOENT') throw error; }
 }
-await writeFile(resolve(root,'.dev.vars'), 'TAKE_A_SEAT_DEV_ADMIN_ENABLED=true\nSTRIPE_SECRET_KEY=sk_test_e2e_fixture\nSTRIPE_WEBHOOK_SECRET=whsec_e2e_fixture\nTAKE_A_SEAT_PLATFORM_FEE_BPS=1500\nGOOGLE_TOKEN_ENCRYPTION_KEY=e2e_fixture\nGOOGLE_CLIENT_ID=e2e_client.apps.googleusercontent.com\nGOOGLE_CLIENT_SECRET=e2e_secret\nRESEND_API_KEY=e2e_fixture\nTAKE_A_SEAT_EMAIL_FROM=Take a Seat <test@example.com>\n');
+await writeFile(resolve(root,'.dev.vars'), 'TAKE_A_SEAT_DEV_ADMIN_ENABLED=true\nZOOM_ACCOUNT_ID=e2e\nZOOM_CLIENT_ID=e2e\nZOOM_CLIENT_SECRET=e2e\nZOOM_HOST_USER_IDS=["host_e2e"]\nSTRIPE_BOOKING_PAYMENT_METHOD_CONFIGURATION=pmc_e2e\nSTRIPE_SECRET_KEY=sk_test_e2e_fixture\nSTRIPE_WEBHOOK_SECRET=whsec_e2e_fixture\nTAKE_A_SEAT_PLATFORM_FEE_BPS=1500\nGOOGLE_TOKEN_ENCRYPTION_KEY=e2e_fixture\nGOOGLE_CLIENT_ID=e2e_client.apps.googleusercontent.com\nGOOGLE_CLIENT_SECRET=e2e_secret\nRESEND_API_KEY=e2e_fixture\nTAKE_A_SEAT_EMAIL_FROM=Take a Seat <test@example.com>\n');
 // The production config and source tree never load the fixture identities/providers.
 let config = await readFile(resolve(root,'vite.config.ts'),'utf8');
 config = 'import { e2ePlugin } from "./tests/e2e/vite-plugin";\n' + config;

@@ -138,3 +138,12 @@ Already handled during repository cleanup:
 The creator editor is `/creator/profile`, with authenticated draft preview at
 `/creator/preview`. See [storefront verification and deployment prerequisites](docs/creator-storefront-verification.md).
 Run `npm run test:e2e` for the isolated Playwright creator/customer journeys.
+
+## Booking confirmation work
+
+The centralized Zoom and durable booking workflow is implemented locally on
+`codex/booking-confirmation`, pending provider setup and deployment approval.
+See [booking workflow](docs/booking-confirmation-workflow.md) and
+[Zoom setup and verification](docs/zoom-production-setup.md) before deployment.
+New runtime requirements include a dedicated card-only Stripe payment configuration,
+central Zoom S2S credentials/licensed host pool, migration 0025 and the Worker cron.

@@ -13,7 +13,7 @@ export async function stripeAccountRequest<T>(path: string, accountId: string, m
 }
 export async function getCreatorPaymentView(creatorId: string) {
   const connection = await getCreatorStripeConnection(creatorId);
-  const history = (await listCreatorBookings(creatorId)).filter((booking) => ['paid', 'approved'].includes(booking.status));
+  const history = (await listCreatorBookings(creatorId)).filter((booking) => ['paid', 'approved', 'cancellation_processing', 'cancelled'].includes(booking.status));
   if (!connection) return { status: 'not_connected' as const, history, balances: null, balanceError: null };
   const secretKey = getStripeSecretKey();
   if (!secretKey) throw new Error('Stripe status could not be verified. Retry shortly.');

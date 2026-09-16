@@ -74,13 +74,19 @@ const bookingDomain = await import("../app/_lib/bookings.ts");
 const { withSecureOrigin } = await import("../app/_lib/secure-origin.ts");
 const { getSafeReturnTo } = await import("../app/_lib/safe-redirect.ts");
 const { createHmac } = await import("node:crypto");
-Object.assign(process.env, { TAKE_A_SEAT_DEV_ADMIN_ENABLED: "true", GOOGLE_CLIENT_ID: "test-client", GOOGLE_CLIENT_SECRET: "test-client-secret", GOOGLE_TOKEN_ENCRYPTION_KEY: "test-encryption", STRIPE_SECRET_KEY: "sk_test_rehearsal", STRIPE_WEBHOOK_SECRET: "whsec_rehearsal", TAKE_A_SEAT_PLATFORM_FEE_BPS: "1500", RESEND_API_KEY: "test-resend", TAKE_A_SEAT_EMAIL_FROM: "Take a Seat <test@example.com>" });
+Object.assign(process.env, { STRIPE_BOOKING_PAYMENT_METHOD_CONFIGURATION: "pmc_test", ZOOM_ACCOUNT_ID: "test", ZOOM_CLIENT_ID: "test", ZOOM_CLIENT_SECRET: "test", ZOOM_HOST_USER_IDS: '["host_test"]', TAKE_A_SEAT_DEV_ADMIN_ENABLED: "true", GOOGLE_CLIENT_ID: "test-client", GOOGLE_CLIENT_SECRET: "test-client-secret", GOOGLE_TOKEN_ENCRYPTION_KEY: "test-encryption", STRIPE_SECRET_KEY: "sk_test_rehearsal", STRIPE_WEBHOOK_SECRET: "whsec_rehearsal", TAKE_A_SEAT_PLATFORM_FEE_BPS: "1500", RESEND_API_KEY: "test-resend", TAKE_A_SEAT_EMAIL_FROM: "Take a Seat <test@example.com>" });
 const originalFetch = globalThis.fetch;
 const emails = [], googleEvents = new Map();
 let busy = [], refreshFails = false, conferencePending = false, inserts = 0, captures = 0;
 const sessions = new Map();
 async function provider(url, options = {}) {
     const target = String(url);
+    if (target === 'https://zoom.us/oauth/token') return Response.json({access_token:'test'});
+    if (target.startsWith('https://api.zoom.us/')) {
+      if (target.includes('/users/') && options.method !== 'POST') return Response.json({meetings:[]});
+      if (options.method === 'POST') { globalThis.__zoomTestMeeting = {...JSON.parse(options.body),id:123456789,host_id:'host_test',join_url:'https://zoom.us/j/123456789'}; }
+      return Response.json(globalThis.__zoomTestMeeting);
+    }
     if (target === "https://api.resend.com/emails") {
         emails.push(JSON.parse(options.body));
         return Response.json({ id: "test-email" });
@@ -113,7 +119,7 @@ async function provider(url, options = {}) {
         assert.equal(params.get("payment_intent_data[capture_method]"), "manual");
         assert.equal(params.get("payment_intent_data[application_fee_amount]"), "750");
         const id = params.get("client_reference_id"), sid = "cs_" + id;
-        const session = { id: sid, status: "complete", payment_status: "unpaid", metadata: { booking_id: id }, payment_intent: { id: "pi_" + id, status: "requires_capture", capture_method: "manual", amount_capturable: 5000, metadata: { booking_id: id } } };
+        const session = { id: sid, status: "complete", payment_status: "unpaid", metadata: { booking_id: id }, payment_intent: { id: "pi_" + id, status: "requires_capture", capture_method: "manual", amount:5000, currency:"usd", latest_charge:{payment_method_details:{type:"card",card:{capture_before:Math.floor(Date.now()/1000)+86400*5}}}, amount_capturable: 5000, metadata: { booking_id: id } } };
         sessions.set(sid, session);
         return Response.json({ id: sid, url: "https://checkout.stripe.com/c/pay/" + sid });
     }
@@ -123,10 +129,13 @@ async function provider(url, options = {}) {
     }
     if (target.endsWith("/capture")) {
         captures++;
-        return Response.json({ id: target.split("/").at(-2), status: "succeeded" });
+        const id = target.split('/').at(-2);
+        const session = [...sessions.values()].find(s=>s.payment_intent.id===id);
+        if (session) Object.assign(session.payment_intent,{status:'succeeded',amount_received:5000});
+        return Response.json({ id, status: "succeeded", amount_received:5000 });
     }
     if (target.includes("/v1/payment_intents/"))
-        return Response.json([...sessions.values()].find(s => s.payment_intent.id === target.split("/").at(-1))?.payment_intent);
+        return Response.json([...sessions.values()].find(s => s.payment_intent.id === new URL(target).pathname.split("/").at(-1))?.payment_intent);
     throw new Error("Unexpected provider call: " + target);
 }
 function form(path, values, admin = false) { return new Request("http://localhost" + path, { method: "POST", body: new URLSearchParams(values), headers: { accept: "application/json", ...(admin ? { cookie: "tas_local_admin=1" } : {}) } }); }
@@ -367,13 +376,14 @@ test("schedule changes during the provider check invalidate the atomic reservati
 });
 
 test("opposite creator decisions cannot both claim a payment authorization", async () => {
-    const { claimBookingDecision } = await import("../app/_lib/booking-decisions.ts");
+    const { withBookingLock } = await import("../app/_lib/booking-lock.ts");
     seedBooking("decision-race", "decision-race", "payment_authorized");
-    const results = await Promise.all([claimBookingDecision("decision-race", "accept"), claimBookingDecision("decision-race", "decline")]);
-    assert.equal(results.filter(Boolean).length, 1);
-    const decision = sqlite.prepare("SELECT creator_decision FROM customer_bookings WHERE id='decision-race'").get().creator_decision;
-    assert.equal(await claimBookingDecision("decision-race", decision), true);
-    assert.equal(await claimBookingDecision("decision-race", decision === "accept" ? "decline" : "accept"), false);
+    let unblock; const gate = new Promise(resolve => {unblock=resolve;});
+    const first = withBookingLock('decision-race', async guard => { await guard(); await gate; });
+    await new Promise(resolve=>setImmediate(resolve));
+    await assert.rejects(()=>withBookingLock('decision-race', async()=>{}), /being processed/);
+    unblock(); await first;
+    await withBookingLock('decision-race', async guard=>guard());
 });
 
 

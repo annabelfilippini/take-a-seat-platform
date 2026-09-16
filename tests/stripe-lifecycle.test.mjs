@@ -54,6 +54,7 @@ const { POST: webhook } = await import("../app/api/stripe/webhook/route.ts");
 const { GET: complete } = await import("../app/api/stripe/checkout/complete/route.ts");
 const { POST: approve } = await import("../app/api/bookings/approve/route.ts");
 const { getCustomerBooking } = await import("../app/_lib/bookings.ts");
+Object.assign(process.env, {ZOOM_ACCOUNT_ID:'test',ZOOM_CLIENT_ID:'test',ZOOM_CLIENT_SECRET:'test',ZOOM_HOST_USER_IDS:'["host_test"]'});
 process.env.STRIPE_SECRET_KEY = "sk_test_lifecycle";
 process.env.STRIPE_WEBHOOK_SECRET = "whsec_lifecycle";
 process.env.TAKE_A_SEAT_DEV_ADMIN_ENABLED = "true";
@@ -75,7 +76,7 @@ function seed(id) {
 function session(id, status = "complete", intentStatus = "requires_capture") {
   return { id: `cs_${id}`, status, payment_status: intentStatus === "succeeded" ? "paid" : "unpaid",
     metadata: { booking_id: `booking_${id}` },
-    payment_intent: { id: `pi_${id}`, status: intentStatus, capture_method: "manual", amount_capturable: intentStatus === "requires_capture" ? 5000 : 0, metadata: { booking_id: `booking_${id}` } } };
+    payment_intent: { id: `pi_${id}`, status: intentStatus, amount_received:intentStatus === "succeeded" ? 5000 : 0, capture_method: "manual", amount:5000,currency:"usd",latest_charge:{payment_method_details:{type:"card",card:{capture_before:Math.floor(Date.now()/1000)+5*86400}}}, amount_capturable: intentStatus === "requires_capture" ? 5000 : 0, metadata: { booking_id: `booking_${id}` } } };
 }
 async function event(type, object, timestamp = Math.floor(Date.now() / 1000)) {
   const body = JSON.stringify({ id: "evt_lifecycle", type, data: { object } });
@@ -177,6 +178,9 @@ test("only an authorized creator/admin can capture, and repeated approvals do no
   await withStripe(session(id), async () => { await event("checkout.session.completed", session(id)); });
   const original = globalThis.fetch; const captures = [];
   globalThis.fetch = async (url, options) => {
+    if (String(url) === 'https://zoom.us/oauth/token') return Response.json({access_token:'test'});
+    if (String(url).includes('api.zoom.us')) { if(options?.method === 'POST') throw new Error('Zoom fixture outage'); return Response.json({meetings:[]}); }
+    if (String(url).includes('/payment_intents/') && !String(url).endsWith('/capture')) return Response.json(captures.length ? {...session(id).payment_intent,status:'succeeded',amount_received:5000} : session(id).payment_intent);
     if (String(url).endsWith("/freeBusy")) return Response.json({calendars:{primary:{busy:[]}}});
     assert.match(String(url), /payment_intents\/pi_approve\/capture$/);
     captures.push(options.headers["idempotency-key"]);
@@ -212,14 +216,69 @@ test("an incomplete Connect return does not mark the creator connected", async (
 });
 
 test("a successful HTTP response without a successful capture cannot mark a booking paid", async () => {
+  process.env.ZOOM_HOST_USER_IDS = '["host_processing"]';
   const id = "processingcapture"; const bookingId = seed(id);
   await withStripe(session(id), async () => { await event("checkout.session.completed", session(id)); });
   const original = globalThis.fetch;
-  globalThis.fetch = async (url) => String(url).endsWith("/freeBusy")
-    ? Response.json({calendars:{primary:{busy:[]}}}) : Response.json({ id: `pi_${id}`, status: "processing" });
+  globalThis.fetch = async (url) => {
+    if (String(url) === 'https://zoom.us/oauth/token') return Response.json({access_token:'test'});
+    if (String(url).includes('api.zoom.us')) return Response.json({meetings:[]});
+    if (String(url).endsWith('/freeBusy')) return Response.json({calendars:{primary:{busy:[]}}});
+    return Response.json(String(url).endsWith('/capture') ? {id:`pi_${id}`,status:'processing'} : session(id).payment_intent);
+  };
   try {
     const response = await approve(new Request("http://localhost/api/bookings/approve", { method: "POST", body: new URLSearchParams({ bookingId }), headers: { cookie: "tas_local_admin=1" } }));
-    assert.match(response.headers.get("location"), /detail=capture/);
-    assert.equal((await getCustomerBooking(bookingId)).status, "payment_authorized");
+    assert.match(response.headers.get("location"), /calendar=processing/);
+    assert.equal((await getCustomerBooking(bookingId)).status, "approval_processing");
   } finally { globalThis.fetch = original; }
+});
+
+test('response deadlines use the actual charge expiry and never assume seven days', async()=>{
+  const {authorizationDeadline}=await import('../app/_lib/stripe-payments.ts');
+  const now=Date.now(), created=new Date(now).toISOString(), start=now+7*86400000;
+  const intent={...session('deadline').payment_intent,latest_charge:{payment_method_details:{type:'card',card:{capture_before:Math.floor((now+3*3600000)/1000)}}}};
+  const result=authorizationDeadline(intent,created,start);
+  assert.equal(result.respondBy,result.captureBefore-3600000);
+  assert.ok(result.respondBy<now+24*3600000);
+  assert.equal(authorizationDeadline({...intent,latest_charge:null},created,start).captureBefore,null);
+  assert.equal(authorizationDeadline(intent,created,now+60000).respondBy,now+60000-1800000);
+});
+
+test('the shared booking fence rejects concurrent workers and recovers an abandoned lease',async()=>{
+  const {withBookingLock}=await import('../app/_lib/booking-lock.ts');
+  const id=seed('lease');
+  sqlite.prepare('UPDATE customer_bookings SET workflow_lock=?,workflow_lock_until=? WHERE id=?').run('abandoned',Date.now()-1,id);
+  await withBookingLock(id,async guard=>{
+    await guard();
+    await assert.rejects(()=>withBookingLock(id,async()=>{}),/being processed/);
+    sqlite.prepare('UPDATE customer_bookings SET workflow_lock=? WHERE id=?').run('replacement',id);
+    await assert.rejects(guard,/lease ended/);
+  });
+  assert.equal(sqlite.prepare('SELECT workflow_lock FROM customer_bookings WHERE id=?').get(id).workflow_lock,'replacement');
+});
+
+test('Zoom capacity reservations serialize different creators and expand to a second host',async()=>{
+  const {reserveZoomHost}=await import('../app/_lib/zoom.ts');
+  const first=seed('host-a'), second=seed('host-b');
+  process.env.ZOOM_HOST_USER_IDS='["pool_a"]';
+  const previous=globalThis.fetch;
+  globalThis.fetch=async url=>Response.json(String(url).includes('/oauth/token')?{access_token:'fixture'}:{meetings:[]});
+  try {
+    const outcomes=await Promise.allSettled([first,second].map(async id=>reserveZoomHost(await getCustomerBooking(id))));
+    assert.equal(outcomes.filter(result=>result.status==='fulfilled').length,1);
+    const loser=outcomes[0].status==='rejected'?first:second;
+    process.env.ZOOM_HOST_USER_IDS='["pool_a","pool_b"]';
+    assert.equal(await reserveZoomHost(await getCustomerBooking(loser)),'pool_b');
+    assert.equal(sqlite.prepare("SELECT count(*) AS n FROM zoom_host_reservations WHERE host_id IN ('pool_a','pool_b')").get().n,2);
+  } finally {globalThis.fetch=previous;}
+});
+
+
+test('a succeeded partial capture cannot confirm the full-priced booking through webhook replay',async()=>{
+  const id='partialcapture'; seed(id);
+  const paid=session(id,'complete','succeeded'); paid.payment_intent.amount_received=100;
+  await withStripe(paid,async()=>{
+    for(let attempt=0;attempt<2;attempt++) assert.equal((await event('payment_intent.succeeded',paid.payment_intent)).status,500);
+    assert.equal((await getCustomerBooking(`booking_${id}`)).status,'requested');
+  });
 });

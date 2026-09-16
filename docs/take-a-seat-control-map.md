@@ -474,3 +474,15 @@ have:
 - The test card was removed from public view and its temporary ownership link
   cleared. Its application remains a private draft. See
   `docs/creator-acceptance-repair.md` for release evidence and verification limits.
+
+
+## Booking confirmation implementation (not deployed)
+
+September 16 work on `codex/booking-confirmation` adds central Zoom, Stripe-derived
+response deadlines, full-refund creator cancellation and scheduled delivery recovery.
+Migration 0025 and new Zoom/card-only payment configuration secrets are required.
+The approved customer session/time selection is unchanged. Annabel has no Zoom
+account configured yet; licensed host capacity and live provider rehearsal remain
+release gates. See [workflow](booking-confirmation-workflow.md) and
+[exact setup / test evidence](zoom-production-setup.md). Earlier production Calendar
+and Stripe evidence above does not certify this new Zoom workflow.

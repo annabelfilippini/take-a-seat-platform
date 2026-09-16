@@ -751,3 +751,107 @@ September 14, 2026; regression of incomplete initial-interaction protection.
 - **Regression prevention:** Dedicated Playwright reproduction must pass for both
   transitions, alongside creator/customer timezone and complete booking journeys.
 - **Related files:** availability.ts and creator-journeys.spec.ts.
+
+## 2026-09-16: Authorized requests never acquired a response deadline
+
+- **Bug / impact:** An authorization remained actionable indefinitely if cancellation
+  delivery was delayed; acceptance did not read the actual capture deadline.
+- **Root cause:** The original flow persisted authorization status but no provider
+  expiry or creator response SLA. Webhook-only expiry did not cover missed events.
+- **Fix:** Store Stripe charge capture-before and the earliest product/provider/session
+  response deadline. Server acceptance fails closed; scheduled reconciliation cancels
+  expired authorization before releasing its hold. Processing states remain blocking.
+- **Regression prevention:** Domain deadline/unknown expiry tests and Playwright
+  expiry, stale acceptance rejection, persisted customer copy and slot reuse.
+- **Related files:** stripe-payments.ts, bookings.ts, booking-workflow.ts, migration
+  0025, stripe-lifecycle.test.mjs, creator-journeys.spec.ts.
+- **Feature/date:** Booking confirmation; September 16, local implementation.
+
+## 2026-09-16: Paid booking delivery depended on another creator click
+
+- **Bug / impact:** Capture could succeed while Calendar failed, leaving an accepted
+  customer's session without an invitation until the creator retried manually.
+- **Root cause:** One route chained capture and Calendar; no durable delivery queue
+  or scheduled recovery owned the remaining steps. Same-action decision claims also
+  allowed concurrent downstream calls despite Stripe's capture idempotency key.
+- **Fix:** Shared fenced booking lease, explicit processing states and a D1 outbox
+  consumed by a five-minute Worker cron. Recover current Stripe state before capture;
+  persist Zoom, Calendar and immutable email delivery independently.
+- **Regression prevention:** Browser lost capture → lost Zoom → Calendar outage →
+  email outage chain, concurrent approvals, repeated scheduler runs, refresh and
+  returning login; domain abandoned-lease and opposing-decision tests.
+- **Related files:** booking-lock.ts, booking-workflow.ts, booking-communications.ts,
+  zoom.ts, worker/index.ts, requests routes and tests.
+- **Feature/date:** Booking confirmation; September 16, local implementation.
+
+## 2026-09-16: Calendar and exported ICS included private request notes
+
+- **Bug / impact:** Customer application content was copied into an invitation and
+  downloadable calendar file even though meeting logistics did not need it.
+- **Root cause:** The original event-description builder reused the full request
+  context. Calendar descriptions are participant-facing external content.
+- **Fix:** Keep private notes in the authenticated creator inbox; export only session
+  logistics and the shared participant URL. Only confirmed bookings export ICS.
+- **Regression prevention:** Browser checks event/email/customer page omit private
+  fixture content and host-only links while authenticated Requests retains the form.
+- **Related files:** google-calendar.ts, bookings.ts, booking calendar route, browser tests.
+- **Feature/date:** Booking privacy; September 16, local implementation.
+
+## 2026-09-16: New workflow review found split reschedule and uncertain-cancel windows
+
+- **Bug / impact:** The initial implementation moved Zoom capacity before committing
+  the new booking time; a crash could reserve the wrong interval. Cancellation after
+  a lost Zoom creation response could release capacity without deleting that meeting.
+- **Root cause:** Provider resource recovery and local host reservations were not yet
+  included in the same booking lifecycle boundary as reschedule/cancellation.
+- **Fix:** Move booking and host interval in one transactional D1 batch. Recover an
+  uncertain created Zoom meeting by its host/marker before cancellation cleanup and
+  capacity release. Never create another meeting to resolve uncertainty.
+- **Regression prevention:** Existing same-event reschedule journey plus new failure
+  recovery, host-capacity and cancellation regressions. No production exposure.
+- **Related files:** google-calendar.ts, zoom.ts, booking-workflow.ts, browser tests.
+- **Feature/date:** Found during adversarial implementation review, September 16.
+
+## 2026-09-16: Visual QA found stale meeting-provider copy
+
+- **Bug / impact:** The preserved customer calendar dialog and creator/profile copy
+  still promised Google Meet after confirmation switched to Zoom.
+- **Root cause:** The original video provider was hardcoded in several presentation
+  components and the offering mapper. Backend-focused tests did not assert the label.
+- **Fix:** Replace provider text with Zoom and update the factual privacy description.
+  No customer layout, time interaction or payment button progression changed.
+- **Regression prevention:** Rendered profile assertion plus Playwright checks the
+  real time-selection dialog says Zoom, and desktop/mobile screenshots are inspected.
+- **Related files:** CustomerBookingFlow, public/creator profile copy, offerings.ts,
+  privacy page, rendered-html and creator-journeys tests.
+- **Feature/date:** Found during browser screenshot QA; September 16, local work.
+
+## 2026-09-16: Refunded sessions fell out of the payment-history filter
+
+- **Bug / impact:** Code review found that adding cancellation states would remove
+  those transactions from the creator's historical payments view.
+- **Root cause:** History allowed only `paid` and `approved`, assuming payment never
+  transitioned to a refund state.
+- **Fix:** Retain cancellation-processing and cancelled transactions with their
+  original amount and explicit refund label. Historical emails with no price
+  snapshot no longer invent a zero-dollar payment.
+- **Regression prevention:** The complete browser cancellation journey opens Payments
+  and verifies the refunded session remains in history.
+- **Related files:** creator-payments.ts, booking-communications.ts, browser tests.
+- **Feature/date:** September 16, local cancellation implementation review.
+
+## 2026-09-16: Stripe succeeded could also mean a partial capture
+
+- **Bug / impact:** Review found that webhook reconciliation used `succeeded` alone
+  to mark a booking paid, although Stripe allows partial captures. A manually
+  under-captured PaymentIntent could therefore fulfill a full-price session.
+- **Root cause:** Full-amount validation existed in the acceptance workflow but not
+  the shared paid transition used by webhook and Checkout-return paths.
+- **Fix:** Centralize provider retrieval, booking metadata, captured amount and
+  currency verification in `markBookingPaid`; incomplete capture fails reconciliation
+  and cannot produce a confirmed booking. Manual partial captures need operator review.
+- **Regression prevention:** A succeeded partial-capture webhook replay remains unpaid
+  and requests redelivery; full capture, lost-response recovery and browser flows remain
+  mandatory. Existing fixtures now model Stripe's actual `amount_received` field.
+- **Related files:** bookings.ts, stripe-lifecycle.test.mjs, Calendar/browser fixtures.
+- **Feature/date:** September 16, adversarial payment review.

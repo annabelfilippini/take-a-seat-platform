@@ -323,7 +323,10 @@ async function createManualCaptureCheckoutSession({
     undefined,
     bookingId,
   );
+  const paymentConfiguration = getRuntimeEnv('STRIPE_BOOKING_PAYMENT_METHOD_CONFIGURATION');
+  if (!paymentConfiguration) throw new Error('A card-only booking payment configuration is required.');
   const params = new URLSearchParams({
+    payment_method_configuration: paymentConfiguration,
     cancel_url: cancelUrl,
     customer_email: bookingInput.customerEmail,
     integration_identifier: buildStripeIntegrationIdentifier(),

@@ -13,7 +13,7 @@ type BookingCalendarRouteProps = {
 export async function GET(_request: Request, { params }: BookingCalendarRouteProps) {
   const booking = await getCustomerBooking(params.bookingId);
 
-  if (!booking) {
+  if (!booking || booking.status !== "approved") {
     return new Response("Booking not found.", { status: 404 });
   }
 
@@ -39,8 +39,15 @@ export async function POST(request: Request, { params }: BookingCalendarRoutePro
       const input = await request.json() as { appointmentStartAt?: string; timezone?: string };
       if (typeof input.appointmentStartAt !== "string" || typeof input.timezone !== "string") return Response.json({ error: "A date and IANA timezone are required." }, { status: 400 });
       await rescheduleConfirmedBooking(booking.id, input.appointmentStartAt, input.timezone);
-    } else await syncBookingCalendar(booking.id);
-    return Response.json({ synced: true });
+      const { recoverBooking } = await import('../../../../_lib/booking-workflow');
+      if (booking.zoomMeetingId) await recoverBooking(booking.id);
+    } else {
+      const { withBookingLock } = await import('../../../../_lib/booking-lock');
+      await withBookingLock(booking.id, () => syncBookingCalendar(booking.id));
+    }
+    const current = await getCustomerBooking(booking.id);
+    const processing = Boolean(current?.workflowRetryAt);
+    return Response.json({ synced: !processing, processing }, { status: processing ? 202 : 200 });
   }
   catch { return Response.json({ error: "Calendar needs attention. Reconnect or retry synchronization." }, { status: 503 }); }
 }

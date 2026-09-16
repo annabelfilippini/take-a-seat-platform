@@ -49,3 +49,12 @@ STRIPE_PRICE_ELLA_30="price_replace_me"
 # Annabel internal checkout test keys.
 STRIPE_PRICE_ANNABEL_15="price_replace_me"
 STRIPE_PRICE_ANNABEL_30="price_replace_me"
+
+# Central Take a Seat Zoom S2S app; never NEXT_PUBLIC_ values.
+ZOOM_ACCOUNT_ID="replace_me"
+ZOOM_CLIENT_ID="replace_me"
+ZOOM_CLIENT_SECRET="replace_me"
+# Opaque licensed Zoom user IDs. Each host has one simultaneous booking lane.
+ZOOM_HOST_USER_IDS='["replace_with_licensed_zoom_user_id"]'
+# Dedicated Stripe payment-method configuration: cards/card wallets only.
+STRIPE_BOOKING_PAYMENT_METHOD_CONFIGURATION="pmc_replace_me"

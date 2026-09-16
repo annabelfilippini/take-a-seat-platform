@@ -427,6 +427,7 @@ export async function sendEmail({
   }
 
   const response = await fetch(RESEND_API_URL, {
+    signal: AbortSignal.timeout(15000),
     body: JSON.stringify({
       from,
       html,

@@ -2,7 +2,9 @@ import { env } from 'cloudflare:workers';
 export async function fixtureFetch(input: RequestInfo | URL, init?: RequestInit) {
   const url = String(input);
   const db = env.DB as D1Database;
+  const setting = async (id: string) => (await db.prepare('SELECT value FROM e2e_state WHERE id=?').bind(id).first<{value:string}>())?.value;
   if (url.startsWith('https://api.resend.com/')) {
+    if (await setting('email') === 'fail') return Response.json({}, {status:503});
     const body = String(init?.body || '{}');
     const key = new Headers(init?.headers).get('idempotency-key') || crypto.randomUUID();
     await db.prepare('INSERT OR IGNORE INTO e2e_provider_events (id, kind, payload) VALUES (?, ?, ?)').bind(key,'email',body).run();
@@ -30,14 +32,60 @@ export async function fixtureFetch(input: RequestInfo | URL, init?: RequestInit)
       await db.prepare('INSERT OR IGNORE INTO e2e_provider_events (id,kind,payload) VALUES (?,?,?)').bind(`checkout_${booking}`,'checkout',body.toString()).run();
       return Response.json({id:`cs_${booking}`,url:`http://127.0.0.1:4173/e2e-control?checkout=${booking}`});
     }
+    const piMatch = new URL(url).pathname.match(/^\/v1\/payment_intents\/([^/]+)$/);
+    if (piMatch) {
+      const booking = await db.prepare('SELECT * FROM customer_bookings WHERE stripe_payment_intent_id=? OR id=?').bind(piMatch[1],piMatch[1].replace(/^pi_/, '')).first<{id:string;offering_unit_amount:number;offering_currency:string}>();
+      if (!booking) return Response.json({}, {status:404});
+      const captured = await db.prepare("SELECT id FROM e2e_provider_events WHERE kind='capture' AND payload=?").bind(piMatch[1]).first();
+      const cancelled = await db.prepare("SELECT id FROM e2e_provider_events WHERE kind='cancel' AND payload=?").bind(piMatch[1]).first();
+      return Response.json({id:piMatch[1],metadata:{booking_id:booking.id},amount:booking.offering_unit_amount,currency:booking.offering_currency,
+        amount_received:captured?booking.offering_unit_amount:0, status:captured?'succeeded':cancelled?'canceled':'requires_capture', capture_method:'manual',amount_capturable:captured||cancelled?0:booking.offering_unit_amount,
+        latest_charge:{payment_method_details:{type:'card',card:{capture_before:Number(await setting('capture-before') || Math.floor(Date.now()/1000)+5*86400)}}}});
+    }
+    if (new URL(url).pathname === '/v1/refunds') {
+      if (init?.method !== 'POST') {
+        const rows = await db.prepare("SELECT payload FROM e2e_provider_events WHERE kind='refund'").all<{payload:string}>();
+        return Response.json({data:rows.results.map(row=>JSON.parse(row.payload)),has_more:false});
+      }
+      const body = new URLSearchParams(String(init.body));
+      const id = body.get('metadata[booking_id]')!;
+      const booking = await db.prepare('SELECT offering_unit_amount FROM customer_bookings WHERE id=?').bind(id).first<{offering_unit_amount:number}>();
+      const refund = {id:`re_${id}`,status:'succeeded',amount:booking!.offering_unit_amount,metadata:{booking_id:id},reverse_transfer:body.get('reverse_transfer'),refund_application_fee:body.get('refund_application_fee')};
+      await db.prepare("INSERT OR IGNORE INTO e2e_provider_events VALUES (?,'refund',?)").bind(refund.id,JSON.stringify(refund)).run();
+      return Response.json(refund);
+    }
     const match = url.match(/payment_intents\/([^/]+)\/(capture|cancel)$/);
     if(match) {
       const key = new Headers(init?.headers).get('idempotency-key')!;
       await db.prepare('INSERT OR IGNORE INTO e2e_provider_events (id,kind,payload) VALUES (?,?,?)').bind(key,match[2],match[1]).run();
+      if (match[2] === 'capture' && await setting('capture') === 'lost-response') { await db.prepare("DELETE FROM e2e_state WHERE id='capture'").run(); throw new Error('Lost Stripe capture response'); }
       return Response.json({id:match[1],status:match[2] === 'capture' ? 'succeeded' : 'canceled'});
     }
   }
-  const setting = async (id: string) => (await db.prepare('SELECT value FROM e2e_state WHERE id=?').bind(id).first<{value:string}>())?.value;
+
+  if (url === 'https://zoom.us/oauth/token') return Response.json({access_token:'e2e_zoom_access'});
+  if (url.startsWith('https://api.zoom.us/v2/')) {
+    const body = JSON.parse(String(init?.body || '{}'));
+    if (url.includes('/users/')) {
+      if (init?.method === 'POST') {
+        if (await setting('zoom') === 'fail') return Response.json({}, {status:429});
+        const id = String(100000000 + (await db.prepare("SELECT count(*) AS n FROM e2e_provider_events WHERE kind='zoom'").first<{n:number}>())!.n);
+        const meeting = {...body,id,host_id:new URL(url).pathname.split('/')[3],join_url:`https://zoom.us/j/${id}?pwd=fixture`,start_url:'https://zoom.us/s/host-secret'};
+        await db.prepare("INSERT INTO e2e_provider_events VALUES (?,'zoom',?)").bind(id,JSON.stringify(meeting)).run();
+        if (await setting('zoom') === 'lost-response') { await db.prepare("DELETE FROM e2e_state WHERE id='zoom'").run(); throw new Error('Lost Zoom response'); }
+        return Response.json(meeting);
+      }
+      const rows = await db.prepare("SELECT payload FROM e2e_provider_events WHERE kind='zoom'").all<{payload:string}>();
+      return Response.json({meetings:rows.results.map(row=>JSON.parse(row.payload)),next_page_token:''});
+    }
+    const id = new URL(url).pathname.split('/').at(-1)!;
+    const row = await db.prepare("SELECT payload FROM e2e_provider_events WHERE id=? AND kind='zoom'").bind(id).first<{payload:string}>();
+    if (!row) return Response.json({code:3001}, {status:404});
+    const meeting = JSON.parse(row.payload);
+    if (init?.method === 'PATCH') { Object.assign(meeting,body); await db.prepare('UPDATE e2e_provider_events SET payload=? WHERE id=?').bind(JSON.stringify(meeting),id).run(); }
+    if (init?.method === 'DELETE') { await db.prepare("UPDATE e2e_provider_events SET kind='zoom-deleted' WHERE id=?").bind(id).run(); return new Response(null,{status:204}); }
+    return Response.json(meeting);
+  }
   if(url === 'https://oauth2.googleapis.com/token') {
     const mode = await setting('token');
     if(mode === 'revoked') return Response.json({error:'invalid_grant'}, {status:400});
@@ -60,6 +108,7 @@ export async function fixtureFetch(input: RequestInfo | URL, init?: RequestInit)
     return Response.json({calendars:{primary:{busy:JSON.parse(await setting('busy') || '[]')}}});
   }
   if(url.includes('googleapis.com/calendar/v3/calendars/') && url.includes('/events')) {
+    if (await setting('calendar-insert') === 'fail') return Response.json({}, {status:503});
     const path = new URL(url).pathname;
     const body = JSON.parse(String(init?.body || '{}'));
     const id = init?.method === 'POST' ? body.id : path.split('/').at(-1);

@@ -129,7 +129,7 @@ export function PublicCreatorProfile({
 
         <aside className="reserve-panel" id="reserve" aria-label={`Book ${profile.name}`}>
           <h2>Choose a Time</h2>
-          <p>Private video call on Google Meet.</p>
+          <p>Private video call on Zoom.</p>
           <div className="seat-options">
             {seats.map((seat) => (
               <article className="seat-option" key={String(seat.durationMinutes)}>

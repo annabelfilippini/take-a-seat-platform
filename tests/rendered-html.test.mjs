@@ -1,3 +1,4 @@
+process.env.STRIPE_BOOKING_PAYMENT_METHOD_CONFIGURATION = 'pmc_test';
 import { registerHooks } from "node:module";
 globalThis.__tasTestEnv = {};
 registerHooks({
@@ -653,11 +654,7 @@ test("wires accepted creators to public profile publishing", async () => {
   assert.match(bookingsLib, /accepted: "accepted"/);
   assert.match(bookingsLib, /paymentAuthorized: "payment_authorized"/);
   assert.match(bookingsLib, /markBookingPaymentAuthorized/);
-  assert.match(bookingApproveRoute, /booking\.status === "requested"/);
-  assert.match(bookingApproveRoute, /booking\.status === "payment_authorized"/);
-  assert.match(bookingApproveRoute, /capturePaymentIntent/);
-  assert.match(bookingApproveRoute, /\/payment_intents\/\$\{encodeURIComponent/);
-  assert.match(bookingApproveRoute, /await markBookingPaid\(/);
+  assert.match(bookingApproveRoute, /await acceptBooking\(booking.id\)/);
   assert.match(requestRoute, /payment_intent_data\[capture_method\]/);
   assert.match(requestRoute, /manual_capture_destination_charge/);
   assert.match(requestRoute, /take_a_seat_hold_/);
@@ -1055,7 +1052,7 @@ test("server-renders Ella's profile page", async () => {
   assert.match(html, /30 minutes/);
   assert.match(html, /\$50/);
   assert.match(html, /\$60/);
-  assert.match(html, /Private video call on Google Meet/);
+  assert.match(html, /Private video call on Zoom/);
   assert.match(html, /ella-profile\.jpg/);
   assert.match(html, /ella-reference-sundress\.jpg/);
   assert.match(html, /ella-reference-street-style\.jpg/);

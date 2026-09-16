@@ -16,7 +16,7 @@ async function reset(request:APIRequestContext) {
     for(const statement of readFileSync(resolve('drizzle',file),'utf8').split('--> statement-breakpoint').flatMap((part)=>part.split(';')).filter((part)=>part.trim())) await sql(request,statement);
   }
   await sql(request,'CREATE TABLE IF NOT EXISTS e2e_provider_events (id TEXT PRIMARY KEY, kind TEXT, payload TEXT)');
-  for(const table of ['google_oauth_attempts','creator_media_chunks','creator_media','customer_bookings','creator_notifications','creator_notification_preferences','creator_accounts','creator_invites','creator_availability_rules','creator_stripe_connections','creator_calendar_connections','creator_onboarding_profiles','e2e_provider_events','e2e_state']) await sql(request,`DELETE FROM ${table}`);
+  for(const table of ['booking_deliveries','zoom_host_reservations','google_oauth_attempts','creator_media_chunks','creator_media','customer_bookings','creator_notifications','creator_notification_preferences','creator_accounts','creator_invites','creator_availability_rules','creator_stripe_connections','creator_calendar_connections','creator_onboarding_profiles','e2e_provider_events','e2e_state']) await sql(request,`DELETE FROM ${table}`);
   await sql(request,"INSERT INTO e2e_state VALUES ('stripe','active')");
   await sql(request,"INSERT INTO creator_onboarding_profiles (id,name,email,instagram_platform,bio,application_status,public_slug) VALUES (?, 'Original Creator','creator@example.com','style','', 'accepted','e2e-creator')",[creatorId]);
   await sql(request,"INSERT INTO creator_accounts (creator_id,clerk_user_id,email) VALUES (?, 'user_e2e','creator@example.com')",[creatorId]);
@@ -224,6 +224,8 @@ test('protected customer flow, immutable purchase, request acceptance/decline, r
   await expect(customer.getByRole('button',{name:/Quick Styling Question/})).toContainText('One specific outfit question.');
   await customer.getByRole('button',{name:'Find availability'}).click();
   await expect(customer.getByRole('dialog')).toContainText('Find your moment');
+  await expect(customer.getByRole('dialog')).toContainText('Zoom');
+  await expect(customer.getByRole('dialog')).not.toContainText('Google Meet');
   await customer.locator('.customer-time-options button').first().click();
   await customer.screenshot({path:'.wrangler/customer-time-after.png'});
   await customer.getByRole('button',{name:'Continue',exact:true}).click();
@@ -236,7 +238,7 @@ test('protected customer flow, immutable purchase, request acceptance/decline, r
   await page.getByRole('tab',{name:'Requests',exact:true}).click(); await page.getByRole('button',{name:'Refresh requests'}).click();
   const card=page.locator('.creator-request-card:visible').filter({hasText:'Customer One'});
   await expect(card).toContainText('Help me pack for a trip.');
-  await card.getByRole('button',{name:'Accept request',exact:true}).click(); await expect(card).toContainText('Booked');
+  await card.getByRole('button',{name:'Accept & Confirm',exact:true}).click(); await expect(card).toContainText('Booked');
   await page.reload(); await page.getByRole('tab',{name:'Requests',exact:true}).click(); await expect(page.locator('.creator-request-card:visible').filter({hasText:'Customer One'})).toContainText('Booked');
   const [booking]=await sql(request,"SELECT * FROM customer_bookings WHERE customer_name='Customer One'");
   // Idempotent repeated requests never capture or create a second event.
@@ -399,7 +401,7 @@ test('isolated customers contend through the UI and opposite creator decisions s
   await expect(loser.getByText('That time is no longer available. Please choose another.')).toBeVisible();
   const other=await page.context().newPage(); errors.push(observe(other)); await other.goto('/creator/profile');
   for(const p of [page,other]) { await p.getByRole('tab',{name:'Requests',exact:true}).click(); await p.getByRole('button',{name:'Refresh requests'}).click(); }
-  const accept=page.locator('.creator-request-card:visible').getByRole('button',{name:'Accept request',exact:true});
+  const accept=page.locator('.creator-request-card:visible').getByRole('button',{name:'Accept & Confirm',exact:true});
   const decline=other.locator('.creator-request-card:visible').getByRole('button',{name:'Decline',exact:true});
   expectHttpFailure(page,'/api/creators/requests',409); expectHttpFailure(other,'/api/creators/requests',409);
   // The losing action deliberately returns a conflict response.
@@ -542,7 +544,7 @@ test('signed duplicate webhooks preserve one authorization, capture, notificatio
   expect((await sql(request,"SELECT * FROM creator_notifications WHERE type='booking_requested'"))).toHaveLength(1);
   expect((await sql(request,"SELECT * FROM e2e_provider_events WHERE id=?",[`take-a-seat-booking-request-${booking.id}`]))).toHaveLength(1);
   await page.getByRole('tab',{name:'Requests',exact:true}).click(); await page.getByRole('button',{name:'Refresh requests'}).click();
-  await page.locator('.creator-request-card:visible').getByRole('button',{name:'Accept request',exact:true}).click();
+  await page.locator('.creator-request-card:visible').getByRole('button',{name:'Accept & Confirm',exact:true}).click();
   await expect(page.locator('.creator-request-card:visible')).toContainText('Booked');
   for(const response of await Promise.all([send(),send()])) expect(response.status()).toBe(200);
   expect((await sql(request,'SELECT status FROM customer_bookings'))).toEqual([{status:'approved'}]);
@@ -742,15 +744,15 @@ test('Calendar final acceptance rechecks saved hours and Google before capture',
   const [booking]=await sql(request,'SELECT * FROM customer_bookings');
   await sql(request,'UPDATE creator_availability_rules SET enabled=0');
   const approve=()=>page.request.post('/api/bookings/approve',{form:{bookingId:booking.id,returnTo:'/creator/profile'},maxRedirects:0});
-  expect((await approve()).headers().location).toContain('calendar-conflict');
+  expect((await approve()).headers().location).toContain('conflicts');
   expect(await sql(request,"SELECT * FROM e2e_provider_events WHERE kind='capture'")).toHaveLength(0);
   await sql(request,'UPDATE creator_availability_rules SET enabled=1');
   await providerState(request,'busy',JSON.stringify([{start:`${day}T16:00:00Z`,end:`${day}T18:00:00Z`}]));
-  expect((await approve()).headers().location).toContain('calendar-conflict');
+  expect((await approve()).headers().location).toContain('conflicts');
   expect(await sql(request,"SELECT * FROM e2e_provider_events WHERE kind='capture'")).toHaveLength(0);
   await providerState(request,'busy','[]');
   await providerState(request,'google','mutate-schedule');
-  expect((await approve()).headers().location).toContain('booking-status');
+  expect((await approve()).headers().location).toContain('Availability+changed');
   expect(await sql(request,"SELECT * FROM e2e_provider_events WHERE kind='capture'")).toHaveLength(0);
   await sql(request,'UPDATE creator_availability_rules SET enabled=1');
   expect((await approve()).headers().location).toContain('calendar=sent');
@@ -833,12 +835,12 @@ test('Calendar interrupted event insertion never duplicates onto a reconnected a
   const [booking]=await sql(request,'SELECT * FROM customer_bookings');
   const approve=()=>page.request.post('/api/bookings/approve',{form:{bookingId:booking.id,returnTo:'/creator/profile'},maxRedirects:0});
   await providerState(request,'calendar-insert','lost-response');
-  expect((await approve()).headers().location).toContain('google-calendar');
+  expect((await approve()).headers().location).toContain('calendar=processing');
   expect((await sql(request,'SELECT status FROM customer_bookings'))[0].status).toBe('paid');
   expect(await sql(request,"SELECT * FROM e2e_provider_events WHERE kind='calendar'")).toHaveLength(1);
   const callback=await beginOAuth(page); await page.goto(callback.toString());
   await providerState(request,'calendar-account','different');
-  expect((await approve()).headers().location).toContain('google-calendar');
+  expect((await approve()).headers().location).toContain('calendar=processing');
   expect(await sql(request,"SELECT * FROM e2e_provider_events WHERE kind='calendar'")).toHaveLength(1);
   await providerState(request,'calendar-account','original');
   expect((await approve()).headers().location).toContain('calendar=sent');
@@ -851,4 +853,144 @@ test('Calendar interrupted event insertion never duplicates onto a reconnected a
   const before=await sql(request,'SELECT * FROM customer_bookings');
   expect((await page.request.post('/api/google-calendar/disconnect',{headers:{origin:'http://127.0.0.1:4173'},form:{creatorId}})).status()).toBe(200);
   expect(await sql(request,'SELECT * FROM customer_bookings')).toEqual(before);
+});
+
+async function workflowRequest(request: APIRequestContext, name='Workflow Customer', hour='09') {
+  const day=new Date(Date.now()+3*86400000).toISOString().slice(0,10);
+  const response=await request.post('/api/bookings/request',{form:{creatorId,seatId:'offer_quick',appointmentStartAt:`${day}T${hour}:00:00`,timezone:'America/Los_Angeles',customerEmail:'workflow@example.com',customerName:name,customerNote:'PRIVATE application details'},maxRedirects:0});
+  expect(response.headers().location).toContain('checkout=');
+  await request.get(response.headers().location);
+  return (await sql(request,'SELECT * FROM customer_bookings WHERE customer_name=?',[name]))[0];
+}
+async function maintenance(request: APIRequestContext) {
+  await sql(request,'UPDATE customer_bookings SET workflow_retry_at=0 WHERE workflow_retry_at IS NOT NULL');
+  const result=await request.post('/e2e-control',{data:{maintenance:true}}); expect(result.ok()).toBeTruthy();
+}
+
+test('durable recovery resumes lost capture, lost Zoom, Calendar outage and email outage without duplicates',async({page,request,browser})=>{
+  await seedDraft(request); await login(page); await publish(page);
+  const booking=await workflowRequest(request);
+  const customer=await browser.newPage(); observe(customer);
+  await customer.goto(`/bookings/${booking.id}`); await expect(customer.getByRole('heading',{name:'Payment authorized.',exact:true})).toBeVisible();
+  expect(await sql(request,"SELECT * FROM e2e_provider_events WHERE kind='capture'")).toHaveLength(0);
+  await providerState(request,'capture','lost-response');
+  const accept=()=>page.request.post('/api/creators/requests',{form:{bookingId:booking.id,action:'accept'}});
+  const results=await Promise.all([accept(),accept()]); expect(results.map(result=>result.status()).sort()).toEqual([200,409]);
+  expect((await sql(request,'SELECT status FROM customer_bookings'))[0].status).toBe('approval_processing');
+  await providerState(request,'zoom','lost-response'); await maintenance(request);
+  expect((await sql(request,'SELECT status FROM customer_bookings'))[0].status).toBe('paid');
+  expect(await sql(request,"SELECT * FROM e2e_provider_events WHERE kind='zoom'")).toHaveLength(1);
+  await providerState(request,'calendar-insert','fail'); await maintenance(request);
+  expect((await sql(request,'SELECT zoom_meeting_id FROM customer_bookings'))[0].zoom_meeting_id).toBeTruthy();
+  await providerState(request,'calendar-insert','active'); await providerState(request,'email','fail'); await maintenance(request);
+  expect((await sql(request,'SELECT status FROM customer_bookings'))[0].status).toBe('approved');
+  expect(await sql(request,"SELECT * FROM booking_deliveries WHERE sent_at IS NOT NULL")).toHaveLength(0);
+  await providerState(request,'email','active'); await maintenance(request); await maintenance(request);
+  const [saved]=await sql(request,'SELECT * FROM customer_bookings');
+  expect(saved.workflow_step).toBe('complete'); expect(saved.workflow_error).toBeNull();
+  for(const kind of ['capture','zoom','calendar']) expect(await sql(request,'SELECT * FROM e2e_provider_events WHERE kind=?',[kind])).toHaveLength(1);
+  const calendar=JSON.parse((await sql(request,"SELECT payload FROM e2e_provider_events WHERE kind='calendar'"))[0].payload);
+  expect(calendar.location).toBe(saved.meeting_url); expect(calendar.attendees[0].email).toBe('workflow@example.com'); expect(calendar.description).not.toContain('PRIVATE');
+  const delivery=await sql(request,'SELECT * FROM booking_deliveries'); expect(delivery).toHaveLength(1); expect(delivery[0].sent_at).toBeTruthy();
+  const email=JSON.parse(delivery[0].payload); expect(email.text).toContain('$18.00'); expect(email.text).toContain(saved.meeting_url); expect(email.text).not.toContain('PRIVATE');
+  await page.reload(); await page.getByRole('tab',{name:'Requests',exact:true}).click();
+  await expect(page.getByRole('link',{name:'Join Zoom'})).toHaveAttribute('href',saved.meeting_url);
+  await customer.reload(); await expect(customer.getByRole('heading',{name:'Appointment confirmed.',exact:true})).toBeVisible();
+  await expect(customer.getByRole('link',{name:'Join Zoom'})).toHaveAttribute('href',saved.meeting_url);
+  const html=await customer.content(); expect(html).not.toContain('host-secret'); expect(html).not.toContain('PRIVATE application details');
+  await page.goto('/e2e-control?logout=1'); await login(page); await page.getByRole('tab',{name:'Requests',exact:true}).click(); await expect(page.locator('.creator-request-card:visible')).toContainText('Booked');
+  await page.setViewportSize({width:390,height:844}); await page.screenshot({path:'.wrangler/booking-requests-mobile.png'});
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
+  await customer.setViewportSize({width:390,height:844}); await customer.screenshot({path:'.wrangler/booking-confirmed-mobile.png'});
+  expect(await customer.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
+  await customer.close();
+});
+
+test('Stripe capture deadline expires requests, releases their holds and rejects stale acceptance',async({page,request})=>{
+  await seedDraft(request); await login(page); await publish(page);
+  await providerState(request,'capture-before',String(Math.floor(Date.now()/1000)+1800));
+  const booking=await workflowRequest(request);
+  expect(booking.respond_by).toBeLessThan(Date.now());
+  await maintenance(request);
+  const [expired]=await sql(request,'SELECT * FROM customer_bookings'); expect(expired.status).toBe('expired'); expect(expired.decision_notified_at).toBeTruthy();
+  const response=await page.request.post('/api/creators/requests',{form:{bookingId:booking.id,action:'accept'}}); expect(response.status()).toBe(409);
+  await maintenance(request);
+  expect(await sql(request,"SELECT * FROM e2e_provider_events WHERE kind='cancel'")).toHaveLength(1);
+  for(const kind of ['capture','zoom','calendar']) expect(await sql(request,'SELECT * FROM e2e_provider_events WHERE kind=?',[kind])).toHaveLength(0);
+  await page.goto(`/bookings/${booking.id}`); await expect(page.getByRole('heading',{name:'Request expired.',exact:true})).toBeVisible(); await page.reload(); await expect(page.getByText(/no payment was captured/i)).toBeVisible();
+  await providerState(request,'capture-before',String(Math.floor(Date.now()/1000)+86400));
+  const replacement=await workflowRequest(request,'Replacement'); expect(replacement.status).toBe('payment_authorized');
+});
+
+test('creator cancellation refunds once, deletes only its meeting and invitation, and survives refresh',async({page,request})=>{
+  await seedDraft(request); await login(page); await publish(page);
+  const booking=await workflowRequest(request);
+  const result=await page.request.post('/api/creators/requests',{form:{bookingId:booking.id,action:'accept'}}); expect(result.ok()).toBeTruthy();
+  await page.getByRole('tab',{name:'Requests',exact:true}).click(); await page.getByRole('button',{name:'Refresh requests'}).click();
+  page.once('dialog',dialog=>dialog.accept()); await page.getByRole('button',{name:'Cancel & refund',exact:true}).click(); await expect(page.locator('.creator-request-card:visible')).toContainText('Cancelled and refunded');
+  await maintenance(request);
+  const repeat=await page.request.post('/api/creators/requests',{form:{bookingId:booking.id,action:'cancel'}}); expect(repeat.ok()).toBeTruthy();
+  const refunds=await sql(request,"SELECT * FROM e2e_provider_events WHERE kind='refund'"); expect(refunds).toHaveLength(1);
+  expect(JSON.parse(refunds[0].payload)).toMatchObject({amount:1800,reverse_transfer:'true',refund_application_fee:'true'});
+  expect(await sql(request,"SELECT * FROM e2e_provider_events WHERE kind='zoom-deleted'")).toHaveLength(1);
+  const calendar=JSON.parse((await sql(request,"SELECT payload FROM e2e_provider_events WHERE kind='calendar'"))[0].payload); expect(calendar.status).toBe('cancelled');
+  expect(await sql(request,'SELECT * FROM zoom_host_reservations')).toHaveLength(0);
+  await page.getByRole('tab',{name:'Payments',exact:true}).click(); await page.getByRole('button',{name:'Refresh Stripe status'}).click();
+  await expect(page.locator('.creator-request-card:visible').filter({hasText:'Workflow Customer'})).toContainText('Cancelled and refunded');
+  await page.goto(`/bookings/${booking.id}`); await expect(page.getByRole('heading',{name:'Session cancelled and refunded.',exact:true})).toBeVisible(); await page.reload(); await expect(page.getByRole('link',{name:'Join Zoom'})).toHaveCount(0);
+});
+
+test('request decisions enforce creator ownership and a busy central host blocks capture',async({page,request})=>{
+  await seedDraft(request); await login(page); await publish(page);
+  const booking=await workflowRequest(request);
+  const forbidden=await request.post('/api/creators/requests',{form:{bookingId:booking.id,action:'accept'}}); expect(forbidden.status()).toBe(403);
+  await sql(request,"UPDATE customer_bookings SET creator_id='other_creator' WHERE id=?",[booking.id]);
+  const otherOwner=await page.request.post('/api/creators/requests',{form:{bookingId:booking.id,action:'accept'}}); expect(otherOwner.status()).toBe(403);
+  await sql(request,'UPDATE customer_bookings SET creator_id=? WHERE id=?',[creatorId,booking.id]);
+  await sql(request,"INSERT INTO zoom_host_reservations VALUES ('other-creator-booking','host_e2e',0,9999999999999)");
+  const full=await page.request.post('/api/creators/requests',{form:{bookingId:booking.id,action:'accept'}}); expect(full.status()).toBe(409); expect((await full.json()).error).toContain('hosts are reserved');
+  expect(await sql(request,"SELECT * FROM e2e_provider_events WHERE kind='capture'")).toHaveLength(0);
+  await sql(request,"DELETE FROM zoom_host_reservations WHERE booking_id='other-creator-booking'");
+  const accepted=await page.request.post('/api/creators/requests',{form:{bookingId:booking.id,action:'accept'}}); expect((await accepted.json()).booking.status).toBe('approved');
+});
+
+test('reschedule recovery keeps the same meeting and event and commits host capacity with time',async({page,request})=>{
+  await seedDraft(request); await login(page); await publish(page);
+  const booking=await workflowRequest(request);
+  await page.request.post('/api/creators/requests',{form:{bookingId:booking.id,action:'accept'}});
+  const [before]=await sql(request,'SELECT * FROM customer_bookings');
+  const path=`/api/bookings/${booking.id}/calendar`, headers={origin:'http://127.0.0.1:4173'};
+  const target=booking.appointment_start_at.replace('T09:', 'T10:');
+  // A host occupied by a different creator blocks the move, leaving both times intact.
+  const start=Date.parse(target+'-07:00');
+  await sql(request,"INSERT INTO zoom_host_reservations VALUES ('other','host_e2e',?,?)",[start-900000,start+1800000]);
+  const blocked=await page.request.post(path,{headers,data:{appointmentStartAt:target,timezone:booking.timezone}}); expect(blocked.status()).toBe(503);
+  expect((await sql(request,'SELECT appointment_start_at FROM customer_bookings'))[0].appointment_start_at).toBe(booking.appointment_start_at);
+  await sql(request,"DELETE FROM zoom_host_reservations WHERE booking_id='other'");
+  await providerState(request,'calendar-insert','fail');
+  const moved=await page.request.post(path,{headers,data:{appointmentStartAt:target,timezone:booking.timezone}}); expect(moved.ok()).toBeTruthy();
+  const [pending]=await sql(request,'SELECT * FROM customer_bookings'); expect(pending.appointment_start_at).toBe(target); expect(pending.workflow_step).toBe('reschedule');
+  const [reservation]=await sql(request,'SELECT * FROM zoom_host_reservations'); expect(reservation.start_at).toBe(start-900000);
+  await providerState(request,'calendar-insert','active'); await providerState(request,'email','fail'); await maintenance(request);
+  await providerState(request,'email','active'); await maintenance(request);
+  const [after]=await sql(request,'SELECT * FROM customer_bookings');
+  expect(after.zoom_meeting_id).toBe(before.zoom_meeting_id); expect(after.google_calendar_event_id).toBe(before.google_calendar_event_id); expect(after.meeting_url).toBe(before.meeting_url);
+  for(const kind of ['capture','zoom','calendar']) expect(await sql(request,'SELECT * FROM e2e_provider_events WHERE kind=?',[kind])).toHaveLength(1);
+  const deliveries=await sql(request,'SELECT * FROM booking_deliveries ORDER BY first_attempt_at'); expect(deliveries).toHaveLength(2);
+  expect(JSON.parse(deliveries[1].payload).text).toContain('rescheduled'); expect(JSON.parse(deliveries[1].payload).text).toContain('10:00 AM'); expect(deliveries[1].sent_at).toBeTruthy();
+});
+
+test('cancel after an uncertain Zoom creation recovers and deletes it without creating another',async({page,request})=>{
+  await seedDraft(request); await login(page); await publish(page);
+  const booking=await workflowRequest(request);
+  await providerState(request,'zoom','lost-response');
+  await page.request.post('/api/creators/requests',{form:{bookingId:booking.id,action:'accept'}});
+  const [paid]=await sql(request,'SELECT * FROM customer_bookings'); expect(paid.status).toBe('paid'); expect(paid.zoom_meeting_id).toBeNull();
+  const cancelled=await page.request.post('/api/creators/requests',{form:{bookingId:booking.id,action:'cancel'}}); expect((await cancelled.json()).booking.status).toBe('cancelled');
+  await maintenance(request);
+  expect(await sql(request,"SELECT * FROM e2e_provider_events WHERE kind='zoom'")).toHaveLength(0);
+  expect(await sql(request,"SELECT * FROM e2e_provider_events WHERE kind='zoom-deleted'")).toHaveLength(1);
+  expect(await sql(request,"SELECT * FROM e2e_provider_events WHERE kind='calendar'")).toHaveLength(0);
+  expect(await sql(request,'SELECT * FROM zoom_host_reservations')).toHaveLength(0);
+  expect((await sql(request,'SELECT workflow_step FROM customer_bookings'))[0].workflow_step).toBe('complete');
 });
