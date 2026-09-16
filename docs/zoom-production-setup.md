@@ -7,7 +7,8 @@ or authorized. The Server-to-Server app is activated with exactly the five scope
 below. All four Zoom values are encrypted production Worker secrets. The actual
 integration passed real Zoom API creation, lost-response recovery, repeated and
 concurrent execution, host/link validation, rescheduling and deletion. Unattended
-two-participant joining remains blocked by another meeting occupying this host.
+two-participant joining is unverified. The old occupied-host state cleared without
+ending a real meeting; the new guest test reached final legal acceptance.
 No plan was purchased and PR #37 was not deployed.
 
 Follow-up audit: production migration 0025 is now applied, Google public branding
@@ -16,8 +17,8 @@ Stripe configuration prepared. Zoom's API terms and exact app access were explic
 approved by Annabel. See the
 [current release audit](first-creator-release-audit-2026-09-16.md)
 for observed provider settings and remaining gates. The cancellation
-implementation is a technical capability; the latest request reopens final
-launch-policy review and no new business policy is established by this guide.
+implementation and request deadline were explicitly approved for first launch.
+Customer cancellation/rescheduling remains support-managed without self-service promises.
 
 ## Recommended initial account
 
@@ -151,12 +152,17 @@ verification and the guest-join attempt. Each created one meeting; all three wer
 deleted and verified absent. The loopback harness is stopped. Follow-up application
 fix commit: `190353d`; no credentials were written to the temporary harness or repo.
 
-The guest browser subsequently reported **The host has another meeting in progress**.
-The portal identifies an existing **Take a Seat Onboarding** meeting as in progress;
-it is not a disposable meeting from this rehearsal. Ending it requires Annabel's
-permission. Do not count the two-participant, media, duration or overrun checks as
-passed. This also demonstrates that personal meetings on this host can block launch
-sessions; reserve the licensed host exclusively for Take a Seat during booked hours.
+The earlier guest attempt reported **The host has another meeting in progress**.
+On final follow-up the existing **Take a Seat Onboarding** entry shows Launch and
+no active owner call was visible. No legitimate meeting was terminated or deleted.
+A fresh API run passed the same recovery/reschedule/single-host checks. Its stored
+participant URL opened an unsigned-in guest prejoin. Final Join explicitly accepts
+Zoom's Terms/Privacy and is awaiting action-time human approval. Do not count joining,
+two-participant media, duration or overrun checks as passed. Personal calls on this
+host can still block booked sessions; dedicate it during booked hours. The fresh
+disposable meeting was then deleted once and verified absent; its reservation was
+released and the temporary harness stopped. A new disposable meeting is needed
+after legal acceptance is approved.
 
 Cloudflare secret-only configuration produced version
 `4a05c6c9-5ad0-4a78-8e71-617c27c93918` at 100% traffic. All 129 code-module hashes

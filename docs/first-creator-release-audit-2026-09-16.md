@@ -3,8 +3,11 @@
 Audit date: September 16, 2026. **FIRST CREATOR ONBOARDING: BLOCKED.**
 PR #37 application commit reviewed: `3381a0c292eb6b5602738600b57c48441c837c92`.
 Real-provider follow-up application fix: `190353d` (verify five-minute Zoom early join).
-This report separates observed external state, implemented capability and undecided
-business policy. No real payment, refund, payout or new customer email was initiated.
+Final verification includes GitHub main `5012acc` merged into the candidate at
+`491f2fb`; PR #37 remains draft, unmerged and undeployed.
+This report separates observed external state, implemented capability and approved
+launch policy. No real-money payment, refund, payout or new customer email was
+initiated. A disposable $1 sandbox payment was authorized, captured and fully refunded.
 
 ## Completed automatically
 
@@ -19,11 +22,16 @@ business policy. No real payment, refund, payout or new customer email was initi
   `pmc_1UGPKh1B3wHKPpd6FDzkHyr0`. API readback confirms active, live, card on and
   every other API-reported payment method off. Default configuration was preserved. This new
   configuration is not yet connected to a deployed booking flow.
-- Created the matching test-mode configuration `pmc_1UGPTd1B3wHKPpd6A9yy9PLM`.
-  Link is disabled. Cards and Cartes Bancaires remain enabled; Stripe also shows
-  Stripe balance as Enabled in preview with no disable control. This is not yet
-  certified card-only: verify eligibility in an actual one-time/manual-capture
-  Checkout before assigning it to the Worker. No real or test charge was made.
+- Verified the matching test configuration `pmc_1UGPTd1B3wHKPpd6A9yy9PLM` by
+  real API and hosted Checkout: active, test mode, only `card` eligible. A public
+  Stripe test card authorized $1 with manual capture and a real `capture_before`.
+  Two capture calls with the same idempotency key returned the same charge. A full
+  test refund succeeded. This resolves the earlier dashboard-preview uncertainty.
+- Saved Google's exact root TXT with Annabel's owner-access approval; both public
+  resolvers returned it and Search Console accepted domain ownership. Existing SPF
+  and unrelated DNS were preserved. Keep the verification TXT in place.
+- Annabel confirmed Ella as the first creator. Her supplied Google identity already
+  appears in the two-user OAuth test audience; no new access grant was needed.
 - Fresh lint, TypeScript, production build, 86 Node tests and 35 Playwright journeys
   passed. Tests include D1 persistence, hard refresh, returning fixture login,
   published customer data, payment/recovery failures and desktop/mobile coverage.
@@ -49,22 +57,25 @@ notes are not evidence of a final customer-facing business policy.
 
 During implementation Annabel explicitly approved full refunds for creator
 cancellations, including transfer and fee reversal. PR #37 implements that capability.
-The latest request reopens launch-policy review. Keep the capability in the draft PR;
-do not treat it as settled published terms or release it implicitly with this audit.
+Annabel reconfirmed the existing behavior for the first creator launch on September
+16: creator cancellation returns the full payment with transfer/platform-fee reversal;
+requests expire after at most 24 hours, sooner near the session/card deadline;
+customer cancellation/rescheduling stays support-managed with no promised self-service
+policy. No additional entitlement, cutoff, fee or automated customer policy was added.
 
-| Situation | Existing main behavior | PR #37 behavior / unresolved policy |
+| Situation | Existing main behavior | PR #37 behavior / approved launch scope |
 | --- | --- | --- |
 | Creator declines before capture | Cancel authorization; notify customer | Same outcome with durable retry and expiry handling; no refund because nothing captured |
 | Creator cancels after capture | Manual Stripe refund described in planning docs; no automated full-refund button | Owner-only Cancel & refund; full captured amount; `reverse_transfer=true`, `refund_application_fee=true`; no amount selector, cancellation fee, cutoff or completed-session exclusion |
-| Customer cancels | No self-service endpoint/UI | Still absent; customer entitlement, notice windows and exceptions remain undecided |
+| Customer cancels | No self-service endpoint/UI | Still absent; support-managed, with no promised self-service policy |
 | Creator reschedules | Creator-authorized Calendar reschedule endpoint | Preserve payment/amount; reserve new capacity atomically; update same Zoom meeting and Calendar event; retry customer email. No extra charge or automatic partial refund |
-| Customer reschedules | No customer self-service | Still absent; notice window, consent requirements and limits need business policy |
+| Customer reschedules | No customer self-service | Still absent; support-managed, with no promised self-service policy |
 | Request expires | Provider cancellation reconciliation existed | New response deadline: earliest of request creation +24 hours, session start minus 30 minutes, actual card capture deadline minus 1 hour; unknown capture deadline cannot authorize capture |
 | Refund before payout | Operator-managed | Full Stripe refund/reversal attempt; needs sufficient balances and Stripe success |
 | Refund after bank payout | Operator-managed | Same API attempt; does not pull a completed bank payout back. Insufficient connected balance can reject refund plus reversal; platform shortfall can leave refund pending |
 
-The 24-hour response SLA and session margin are implementation choices requiring
-launch-policy review too. Rescheduling currently has an API, not a customer or creator
+The 24-hour response SLA and earlier session/card margins are approved for this
+launch. Rescheduling currently has an API, not a customer or creator
 date-picker in Requests. Do not advertise self-service rescheduling.
 
 Refund completion requires Stripe `succeeded` and the full amount. Pending/failed
@@ -110,11 +121,11 @@ and Secrets. Paste credential values there, never into chat, Git or this report.
 
 | Variable/binding | Provider / purpose | Secret? | Required now? | Production existence | Action |
 | --- | --- | --- | --- | --- | --- |
-| `STRIPE_SECRET_KEY` | Stripe API | Yes | Yes | Present | Verify active account/mode in controlled rehearsal; local test key returned 401 and cannot substitute |
+| `STRIPE_SECRET_KEY` | Stripe API | Yes | Yes | Present | Verify active runtime account/mode; fresh sandbox key worked only in isolated rehearsal |
 | `STRIPE_WEBHOOK_SECRET` | Stripe event verification | Yes | Yes | Present | Must match enabled endpoint and API-key mode |
 | `STRIPE_LIVE_WEBHOOK_SECRET` | Staged live endpoint secret | Yes | Not read by app | Present | At deliberate live cutover copy correct signing secret to runtime name; presence here alone does nothing |
 | `STRIPE_BOOKING_PAYMENT_METHOD_CONFIGURATION` | Stripe booking Checkout methods | No, private config | PR #37 | Missing | Set matching sandbox ID for rehearsal; use new live ID only with live credentials |
-| `TAKE_A_SEAT_PLATFORM_FEE_BPS` | Platform fee | No | Yes | Present, 1500 | 15% configured; business-policy review still applies |
+| `TAKE_A_SEAT_PLATFORM_FEE_BPS` | Platform fee | No | Yes | Present, 1500 | 15% configured; existing launch behavior retained |
 | `STRIPE_PRICE_ELLA_15`, `STRIPE_PRICE_ELLA_30` | Demo price references | No, stored as secrets | No for accepted creators | Present | Mode-check only if using demo routes; saved creator offerings use inline prices |
 | `STRIPE_CONNECT_COUNTRY` | Default onboarding country | No | Optional | Missing | Default behavior applies; verify actual creator country/capabilities |
 | `GOOGLE_CLIENT_ID` | Google OAuth client | No, stored as secret | Yes | Present | Match inspected Web client during controlled OAuth |
@@ -171,22 +182,26 @@ canonical callback **registered**:
 Verification Center says verification is not required while Testing; there is no
 approved/pending verification evidence. Treat verification as **not approved**;
 historical submission state is not independently established by that message.
-Two test users exist, including Annabel's Gmail. The first creator's Google identity
-has not been identified/verified against that list. Annabel can rehearse with her
-already allowed account; arbitrary creators cannot be assumed eligible.
+Two test users exist. Annabel confirmed Ella as the first creator, and the supplied
+Google identity matches the existing test-user entry. **FIRST CREATOR CAN AUTHORIZE
+TODAY: YES, as an eligible test user**, subject to her own sign-in/consent and account
+restrictions. Her actual connection has not been exercised; no invitation was sent.
 
-Branding homepage/privacy fields were blank and are now saved. The exact two
-implemented Calendar scopes are now declared and reload-verified. The existing
-production Web client now has no JavaScript origins and exactly the canonical
-callback; localhost and workers.dev entries were removed without rotating credentials.
-Real local OAuth needs a separate development project/client before reuse.
-Domain ownership remains pending: the exact Google TXT is prepared in Cloudflare,
-but not saved until owner-access confirmation. Before general launch: establish
-Search Console ownership for `takeaseatwith.com`, complete branding, publish External/In production,
-submit sensitive-scope verification and obtain Google's decision. Exact field
-values/scopes/reviewer materials: [Google setup](google-oauth-production-readiness-2026-09-16.md).
-Changing Publishing status is not verification approval. Testing Calendar grants
-are temporary and not a durable unrestricted launch solution.
+Branding homepage/privacy URLs, exactly `calendar.freebusy` and
+`calendar.events.owned`, zero JavaScript origins and exactly the canonical callback
+are saved. Credentials were preserved. A separate development OAuth client remains
+unconfigured.
+
+**Domain verified: YES.** After Annabel's explicit owner-access approval, only the
+exact Google root TXT was added in Cloudflare. Public DNS readback and Search Console's
+“Ownership verified” result confirmed the domain property. Preserve that TXT.
+
+**Public OAuth fully approved: NO.** Audience remains External/Testing; Verification
+Center says verification is not required in Testing. Domain ownership does not approve
+sensitive scopes. Testing Calendar refresh grants generally expire after seven days
+and Google warnings may appear. For unrestricted durable onboarding, finish the
+production publishing and sensitive-scope review described in
+[Google setup](google-oauth-production-readiness-2026-09-16.md).
 
 ### Stripe
 
@@ -205,19 +220,27 @@ requires the actual card capture deadline. Creators continue receiving Connect
 destination transfers after capture; checkout-method configuration does not replace
 or modify their connected payout accounts or bank payout schedule.
 
-The existing account’s test-mode configuration is now prepared as noted above;
-its preview method and actual Checkout still require validation. If the production
-key instead belongs to a separate sandbox account, create the configuration there:
-Stripe account switcher → intended sandbox →
-Settings → Payments → Payment methods → For your platform account → Create → New
-configuration → Next → name **Take a Seat bookings — cards** → Create configuration.
-Inspect defaults (the live UI enabled Cards and Link despite documentation saying
-methods start off); leave Cards on and disable Link and all other non-card methods.
-Copy that sandbox `pmc_…` into the runtime configuration for rehearsal. Do not use
-the live ID with a sandbox key. For live cutover verify first creator's live Connect
-recipient/transfer readiness, set matching live API/signing/config values and enable
-the live webhook together. No uncontrolled real-money transaction is authorized.
-[Stripe configurations](https://docs.stripe.com/payments/payment-method-configurations).
+The matching test configuration passed real API and hosted Checkout inspection with
+only `card`. Disposable sandbox PaymentIntent `pi_3UGQs41B3wHKPpd603668CKZ` was
+`requires_capture`, amount/capturable 100 cents, received 0, with an actual card
+capture deadline. Two idempotent capture calls returned one charge and received 100.
+Full test refund `re_3UGQs41B3wHKPpd60L6yJ6i7` succeeded for 100. No production
+booking metadata was attached. The isolated harness cleared its in-memory credential.
+This proves the provider payment boundary, not the complete application/Connect journey.
+
+Sandbox webhook `we_1UEZSp1B3wHKPpd6AWnBkj8K` remains enabled with all six events
+at the existing workers.dev callback. The live endpoint remains disabled. The live
+API returned **zero live connected accounts**; D1 contains only the previous sandbox
+connection and no first-creator live connection. Actual Worker key mode remains
+unverified because Cloudflare does not expose saved secret values. The required
+payment configuration runtime name is still absent.
+
+Revealing the existing live key reached Stripe's “Verification required” panel,
+which remained at “Please wait…” even after a reload/retry. No key was revealed or
+rotated, and no security challenge was bypassed. Complete provider verification,
+then set the matching live API/signing/config values and enable the live webhook
+as one deliberate cutover after creator transfer readiness. An enabled test webhook
+or staged `STRIPE_LIVE_WEBHOOK_SECRET` does not establish live readiness.
 
 ### Zoom
 
@@ -245,10 +268,17 @@ Three sequential disposable booking runs were used for discovery, corrected API
 verification and the guest-join attempt. Each created exactly one meeting despite
 retries; all three were deleted and verified absent. The local harness is stopped.
 
-Guest browser joining is **blocked**: Zoom reports another meeting in progress.
-The host portal shows the existing **Take a Seat Onboarding** call in progress. It
-was not created by this rehearsal; permission to end it is pending. Two-participant
-joining, audio/video, duration and overrun behavior are therefore not verified.
+Final follow-up: the existing **Take a Seat Onboarding** portal entry now shows
+Launch instead of End/Join, and the native owner app has no active call. It was not
+ended or deleted. A fresh disposable run again passed all API checks above. Its safe
+stored link reached an unsigned-in browser guest prejoin without a host start URL.
+Final Join explicitly accepts Zoom's Terms/Privacy; action-time human approval is
+pending. **Guest joining remains unverified**, including two-participant, media,
+duration and overrun behavior. Do not carry forward the old occupied-host diagnosis
+as a current observation. The fresh disposable meeting was deleted once, verified
+absent, and its reservation released. Both temporary provider harnesses are stopped;
+no credentials were saved in them.
+
 Minimum: one Take a Seat-owned paid/licensed dedicated host, S2S app activated,
 five granular meeting scopes, four Worker settings and a two-participant joining
 test without the owner present. One host supports one simultaneous booking lane
@@ -259,8 +289,8 @@ Use [Zoom production setup](zoom-production-setup.md) for exact app navigation,
 scopes and values. Both participants join without host privileges; no host key or
 start URL is shared. Verify join-before-host, waiting-room/authentication settings,
 duration and overrun behavior with the actual plan. Plan capacity is verified;
-actual unattended participation and application-enforced capacity are still rehearsal
-gates. No extra license or broad user-management scope is required.
+actual unattended participation is still a rehearsal gate; the application
+reservation test passed. No extra license or broad user-management scope is required.
 
 ### Email
 
@@ -291,46 +321,48 @@ PR #37 application code remains undeployed.
 
 ## PR, deployment and rehearsal decision
 
-[PR #37](https://github.com/annabelfilippini/take-a-seat-platform/pull/37) is open/draft,
-mergeable against GitHub main `12f142ff01f0fa266ab0dbfa86a85e8afeb056a3`; zero reviews,
-zero inline review comments, zero status checks, and no GitHub Actions workflows.
-There is no CI pass to claim. Local release checks passed as recorded above.
-Required migration/config/docs are included. No known failing local application
-journey was found, but external gates mean **do not merge/deploy for launch yet**.
+[PR #37](https://github.com/annabelfilippini/take-a-seat-platform/pull/37) remains open/draft.
+GitHub main advanced to `5012acc2025747c851b1a7a69abef2c8a62d32b3` (PRs #38/#39).
+It was merged without conflict into this candidate at `491f2fb`, preserving those
+creator UI updates. Fresh checks on that merged candidate passed: lint, TypeScript,
+production build, 87 Node tests and 35 Playwright journeys. There are no GitHub status
+checks to substitute for this local evidence. Diff checks and scans found no added
+credential values or checked test control/auth/provider markers in compiled output.
 
-Full PR #37 rehearsal: **BLOCKED / NOT RUN**. Zoom API-only rehearsal passed; the
-occupied host and unverified matching Stripe runtime configuration still prevent
-customer→authorization→accept→capture→one Zoom→one Calendar→same-link email proof.
-Previously successful Meet/sandbox rehearsal is not proof for this Zoom release.
-Automation can inspect provider records, exercise configured test payments/retries,
-and verify D1/email delivery. Account-owner steps remain Google consent/verification,
-Zoom license/app access and two-device participant joining; use only controlled
-identities and a verified sandbox payment key.
+No newly reproduced application bug was found during this final follow-up. The
+previous real Zoom early-join fix remains in BUG_LOG with regression coverage.
+Existing cancellation policy is now explicitly approved; no policy code was changed.
 
-Post-deployment full smoke: **NOT RUN because no deployment**. Read-only checks of
-the currently serving homepage, sign-in, creator entry, directory and privacy returned
-200 after migration; `/e2e-control` returned 404. These checks do not prove login or
-save persistence. Release smoke must still cover exact acceptance deep link, returning
-login, profile save/refresh, availability save/refresh, published profile/session
-selection, Requests, Payments, API/console/network failures and narrow/mobile layout.
+Full PR #37 real-provider application rehearsal: **BLOCKED / NOT COMPLETE**. Real
+Zoom API checks and a real hosted Stripe sandbox authorization/capture/refund passed
+independently. They do not prove the entire customer request → creator accept →
+Stripe capture → Zoom → Google attendee invitation → delivered confirmation chain.
+The September 14 Meet rehearsal remains historical evidence only.
 
-Once gates pass: recheck exact PR head/main, rerun changed-code checks, merge reviewed
-commit, deploy from clean main, record commit SHA and Worker version/traffic, confirm
-cron invocation and perform the full smoke above. Annabel's conditional deployment
-authorization applies only once these blockers are resolved.
+Production state rechecked: version `4a05c6c9-5ad0-4a78-8e71-617c27c93918`, created
+20:59:23 UTC / deployed 20:59:24 UTC, serves 100%. Wrangler reports only **fetch**,
+with no scheduled handler; dashboard has no cron trigger. Its exact source commit
+is not recorded in version metadata and is not asserted. PR #37 was not deployed.
+Migration 0025, both new tables and all 13 columns were freshly verified remotely.
+No production cron execution, expiration or retry result is claimed.
+
+Post-deployment smoke: **NOT RUN because no deployment**. Current production creator
+profile/Payments/Availability screens loaded under the existing QA identity without
+writes; the public founder test profile loaded. These do not prove the original
+invite, save/refresh, returning login or new customer booking flow. Those complete
+checks, mobile layout, console/network review and actual scheduled recovery remain
+required after a permitted deployment.
 
 ## Current setup checkpoint
 
-Annabel authorized autonomous provider setup, credential storage in Cloudflare and
-controlled real-provider testing, followed by the next unresolved audit blocker.
-PR #37 must remain undeployed until the release blockers and rehearsal requirements
-are addressed. Zoom app/secrets/API checks are complete, with guest joining blocked
-by an unrelated active owner call. Google domain verification TXT is prepared but
-not saved; the tool-required confirmation to establish the same owner's verified
-Search Console access is pending. No credentials have been displayed, saved in
-documentation or committed.
+Resolved in the final follow-up: domain ownership, first-creator test-audience
+eligibility, explicit launch policy, sandbox card-only configuration/manual capture,
+and current-main integration with all release tests passing.
 
-Remaining launch blockers: unattended Zoom participant rehearsal, Google production/test-creator
-eligibility, matching Stripe runtime configuration and live webhook/Connect readiness,
-final cancellation/reschedule/response policy, real-provider Zoom rehearsal, then
-reviewed deployment, production cron and complete production smoke verification.
+Remaining: Zoom guest legal acceptance and actual participant test; Stripe credential
+verification and live runtime/webhook/first-creator Connect readiness; full combined
+real-provider rehearsal and new confirmation delivery. Keep PR #37 draft and
+undeployed while those gates remain. Once ready, merge reviewed code and deploy from
+clean main under Annabel's conditional authorization, record the exact commit/version,
+verify scheduled recovery, and complete production smoke. No deployment was made in
+this final follow-up and no production customer record was changed.

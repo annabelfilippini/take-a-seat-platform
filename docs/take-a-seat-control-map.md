@@ -2,14 +2,15 @@
 
 Last updated: 2026-09-16
 
-**First creator release remains blocked.** Production migration 0025 is applied;
-PR #37 is still draft and undeployed. Fresh provider audit confirms Google
-External/Testing, verified Resend domain, disabled live Stripe webhook and no deployed
-recovery cron. Zoom's five-scope app and production secrets are configured; real API
-retry/reschedule/delete checks pass. Guest joining is blocked by another active
-meeting on the sole host. A dedicated live card-only Stripe configuration is prepared.
-See the [current release audit](first-creator-release-audit-2026-09-16.md)
-for verified state, secrets inventory, policy review and the next manual step.
+**First creator release remains blocked.** Migration 0025 is applied; PR #37 is
+still draft and undeployed. Main `5012acc` was merged into the candidate and all
+87 Node / 35 Playwright tests, lint, TypeScript and build pass. Google domain ownership
+is verified; Ella is already eligible under External/Testing, with temporary grants
+and no public OAuth approval. Zoom API checks pass; guest legal acceptance/join test
+remains open. Sandbox card-only Checkout, manual capture and full refund passed.
+Live Stripe webhook is disabled, no live Connect recipient exists, payment-method
+runtime config is missing, and the deployed Worker has no scheduled handler/cron.
+See the [current release audit](first-creator-release-audit-2026-09-16.md).
 
 This is the working source of truth for Take a Seat while the product is being
 organized. It should stay short, current, and operational.
@@ -218,9 +219,9 @@ Calendar:
   Additive migrations 0021–0024 are applied remotely; required secret names and
   live desktop/mobile booking-calendar smoke checks passed. See
   [implementation and release evidence](google-calendar-implementation.md).
-- The last recorded Google Console observation was External/Testing, with domain
-  verification and sensitive-scope submission pending. Recheck current state;
-  this work makes no Console changes. Exact values, separated production/dev
+- The September 16 Google Console observation is External/Testing. Domain ownership
+  is verified; first-creator test-user eligibility is confirmed, but sensitive-scope
+  production approval remains pending. Exact values, separated production/dev
   projects, reviewer instructions and video script are in
   [Google production setup](google-oauth-production-readiness-2026-09-16.md).
 - Booking request and Stripe Checkout routes server-validate submitted times
@@ -492,8 +493,8 @@ have:
 September 16 work on `codex/booking-confirmation` adds central Zoom, Stripe-derived
 response deadlines, full-refund creator cancellation and scheduled delivery recovery.
 Migration 0025 and new Zoom/card-only payment configuration secrets are required.
-The approved customer session/time selection is unchanged. Annabel has no Zoom
-account configured yet; licensed host capacity and live provider rehearsal remain
-release gates. See [workflow](booking-confirmation-workflow.md) and
+The approved customer session/time selection is unchanged. The five-scope Zoom app,
+one licensed host and all four Worker secrets are configured; real API checks pass.
+Guest joining and the combined real-provider workflow remain release gates. See [workflow](booking-confirmation-workflow.md) and
 [exact setup / test evidence](zoom-production-setup.md). Earlier production Calendar
 and Stripe evidence above does not certify this new Zoom workflow.
