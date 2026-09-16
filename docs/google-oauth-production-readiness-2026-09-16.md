@@ -59,9 +59,9 @@ calendar contents, contacts, Gmail, Drive, or profile scopes for this integratio
 1. Merge and deploy the public `/privacy` page from a clean, reviewed branch.
 2. Confirm the production privacy URL returns HTTP 200 and the homepage visibly
    links to it on desktop and mobile.
-3. Verify `takeaseatwith.com` ownership in Search Console. Google currently
-   offers a Cloudflare-assisted DNS verification flow; review the requested DNS
-   permission before authorizing it.
+3. Verify `takeaseatwith.com` ownership in Search Console with the generated
+   manual TXT record in Cloudflare DNS. This avoids authorizing Google to access
+   the Cloudflare account. Keep the record after verification.
 4. Save the homepage and privacy URLs on Google Auth Platform > Branding. Add the
    square logo only if it is ready to become part of the verified brand.
 5. Add the two exact Calendar scopes on Data Access and save.
