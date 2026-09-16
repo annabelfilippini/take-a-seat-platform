@@ -1,6 +1,6 @@
 # Take a Seat Control Map
 
-Last updated: 2026-09-14
+Last updated: 2026-09-16
 
 This is the working source of truth for Take a Seat while the product is being
 organized. It should stay short, current, and operational.
@@ -199,6 +199,16 @@ Calendar:
   `docs/calendar-rehearsal-2026-09-12.md`. September 14 live provider rehearsal
   verified OAuth persistence, busy-time rejection, deterministic event creation
   and a customer Inbox invitation with Meet; see the live rehearsal report.
+- September 16 production hardening is local and not deployed: creator-owned
+  one-use OAuth attempts, live connection status, disconnect/reconnect, server
+  slot filtering, complete pre-capture revalidation, and guarded event sync.
+  Apply additive migrations 0021–0024 before an approved release. See
+  [implementation and release evidence](google-calendar-implementation.md).
+- The last recorded Google Console observation was External/Testing, with domain
+  verification and sensitive-scope submission pending. Recheck current state;
+  this work makes no Console changes. Exact values, separated production/dev
+  projects, reviewer instructions and video script are in
+  [Google production setup](google-oauth-production-readiness-2026-09-16.md).
 - Booking request and Stripe Checkout routes server-validate submitted times
   against creator availability before creating a booking.
 - Public creator profiles collect the request first, then send the customer to

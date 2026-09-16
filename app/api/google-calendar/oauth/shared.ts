@@ -47,6 +47,8 @@ export function redirectWithCalendarStatus(
   return new Response(null, {
     headers: {
       ...(headers ? Object.fromEntries(headers) : {}),
+      "cache-control": "no-store",
+      "referrer-policy": "no-referrer",
       location: target.toString(),
     },
     status: 303,
@@ -92,13 +94,11 @@ export async function createOAuthState(payload: OAuthStatePayload, secret: strin
 }
 
 export async function parseOAuthState(state: string, secret: string) {
-  const [body, signature] = state.split(".");
-
-  if (!body || !signature || signature !== (await sign(body, secret))) {
-    return null;
-  }
-
+  const [body, signature, extra] = state.split(".");
+  if (state.length > 4096 || extra || !body || !signature) return null;
   try {
+    const key = await crypto.subtle.importKey("raw", encoder.encode(secret), { hash: "SHA-256", name: "HMAC" }, false, ["verify"]);
+    if (!await crypto.subtle.verify("HMAC", key, base64UrlDecode(signature), encoder.encode(body))) return null;
     const payload = JSON.parse(decoder.decode(base64UrlDecode(body))) as OAuthStatePayload;
 
     if (
@@ -129,7 +129,7 @@ export function buildGoogleAuthorizationUrl({
   const url = new URL(GOOGLE_AUTH_URL);
   url.searchParams.set("access_type", "offline");
   url.searchParams.set("client_id", clientId);
-  url.searchParams.set("include_granted_scopes", "true");
+  url.searchParams.set("include_granted_scopes", "false");
   url.searchParams.set("prompt", "consent");
   url.searchParams.set("redirect_uri", redirectUri);
   url.searchParams.set("response_type", "code");

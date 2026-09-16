@@ -96,6 +96,7 @@ test("server-renders the public booking homepage", async () => {
   assert.match(html, /Our Mission/);
   assert.match(html, /Search creators/);
   assert.match(html, /Sign In/);
+  assert.match(html, /href="\/privacy"[^>]*>Privacy<\/a>/);
   assert.match(html, /directory-results/);
   assert.match(html, /placeholder="Search creators"/);
   assert.match(html, /Ella McLane/);
@@ -141,6 +142,21 @@ test("server-renders the public booking homepage", async () => {
     /Fifteen minutes\s*with the person you\s*already follow/i,
   );
   assert.doesNotMatch(html, /react-loading-skeleton|codex-preview|SkeletonPreview/);
+});
+
+test("server-renders the public privacy notice required for Google OAuth", async () => {
+  const response = await render("/privacy");
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
+
+  const html = await response.text();
+  assert.match(html, /<title>Privacy \| Take a Seat<\/title>/i);
+  assert.match(html, /Privacy at Take a Seat/);
+  assert.match(html, /Google Calendar data/);
+  assert.match(html, /calendar\.freebusy|free and busy times/i);
+  assert.match(html, /Limited Use requirements/);
+  assert.match(html, /disconnect Calendar on your creator Availability page/i);
+  assert.match(html, /mailto:annabelflip1@gmail\.com/);
 });
 
 test("server-renders the Take a Seat creator directory", async () => {
@@ -1147,54 +1163,13 @@ test("server-renders Annabel's test profile page", async () => {
   assert.match(html, /action="\/api\/stripe\/checkout"/);
 });
 
-test("starts Google Calendar OAuth for a creator", async () => {
-  await withEnv(
-    {
-      TAKE_A_SEAT_DEV_ADMIN_ENABLED: "true",
-      GOOGLE_CLIENT_ID: "test-client.apps.googleusercontent.com",
-      GOOGLE_CLIENT_SECRET: "test-client-secret",
-      GOOGLE_OAUTH_REDIRECT_URI:
-        "http://localhost:3000/api/google-calendar/oauth/callback",
-    },
-    async () => {
-      const response = await dispatch(
-        "/api/google-calendar/oauth/start?creatorId=ella&returnTo=/creators/onboard",
-        {
-          headers: {
-            accept: "text/html",
-            cookie: "tas_local_admin=1",
-          },
-        },
-      );
-      assert.equal(response.status, 303);
-
-      const location = response.headers.get("location");
-      assert.ok(location);
-      const authUrl = new URL(location);
-
-      assert.equal(authUrl.origin, "https://accounts.google.com");
-      assert.equal(authUrl.pathname, "/o/oauth2/v2/auth");
-      assert.equal(
-        authUrl.searchParams.get("client_id"),
-        "test-client.apps.googleusercontent.com",
-      );
-      assert.equal(
-        authUrl.searchParams.get("redirect_uri"),
-        "http://localhost/api/google-calendar/oauth/callback",
-      );
-      assert.equal(authUrl.searchParams.get("access_type"), "offline");
-      assert.equal(authUrl.searchParams.get("prompt"), "consent");
-      assert.match(
-        authUrl.searchParams.get("scope") ?? "",
-        /https:\/\/www\.googleapis\.com\/auth\/calendar\.freebusy/,
-      );
-      assert.match(
-        authUrl.searchParams.get("scope") ?? "",
-        /https:\/\/www\.googleapis\.com\/auth\/calendar\.events\.owned/,
-      );
-      assert.match(response.headers.get("set-cookie") ?? "", /HttpOnly/);
-    },
-  );
+test("an admin cannot connect their Google Calendar to a selected creator", async () => {
+  await withEnv({ TAKE_A_SEAT_DEV_ADMIN_ENABLED: "true", GOOGLE_CLIENT_ID: "test-client.apps.googleusercontent.com", GOOGLE_CLIENT_SECRET: "test-client-secret" }, async () => {
+    const response = await dispatch("/api/google-calendar/oauth/start?creatorId=ella&returnTo=/creators/onboard", { headers: { cookie: "tas_local_admin=1" } });
+    assert.equal(response.status, 303);
+    assert.match(response.headers.get("location"), /calendar=error&detail=creator-access/);
+    assert.equal(response.headers.get("set-cookie"), null);
+  });
 });
 
 test("requires creator access before starting Google Calendar OAuth", async () => {
@@ -1215,7 +1190,7 @@ test("requires creator access before starting Google Calendar OAuth", async () =
       assert.equal(response.status, 303);
       assert.match(
         response.headers.get("location") ?? "",
-        /\/creators\/dashboard\?calendar=setup-needed&detail=creator-auth/,
+        /\/creators\/dashboard\?calendar=error&detail=creator-access/,
       );
     },
   );

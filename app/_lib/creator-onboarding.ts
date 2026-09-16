@@ -538,7 +538,8 @@ export async function publishCreatorProfile(creatorId: string) {
   const rules = await db.select().from(creatorAvailabilityRules).where(and(
     eq(creatorAvailabilityRules.creatorId, creatorId), eq(creatorAvailabilityRules.enabled, true),
   ));
-  if (!rules.length || !profile.calendarConnectedAt) {
+  const { getCreatorCalendarState } = await import("./google-calendar");
+  if (!rules.length || await getCreatorCalendarState(creatorId) !== "connected") {
     return { status: "error", detail: "Save your availability, connect Google Calendar, and finish Stripe payouts before going live." };
   }
   const { getCreatorStripeConnection, getConnectedAccountTransferStatus, getStripeSecretKey } = await import("./stripe-connect");

@@ -1,3 +1,4 @@
+import { getCreatorCalendarState } from "../../_lib/google-calendar";
 import type { Metadata } from "next";
 import { SignInClerkScreen } from "../../_components/SignInClerkScreen";
 import { getClerkPublishableKey, isPhoneSignInEnabled } from "../../_lib/clerk-auth";
@@ -31,6 +32,7 @@ export default async function CreatorDashboardPage({
   if (creatorAccount && "profile" in creatorAccount) {
     return (
       <EditableCreatorProfilePreview
+        initialCalendarState={await getCreatorCalendarState(creatorAccount.profile.id)}
         stripeStatus={typeof searchParams?.stripe === "string" ? searchParams.stripe : undefined}
         calendarStatus={typeof searchParams?.calendar === "string" ? searchParams.calendar : undefined}
         initialAvailabilityRules={creatorAccount.availabilityRules}

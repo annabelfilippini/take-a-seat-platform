@@ -682,3 +682,72 @@ Full suite and deterministic delayed-script regression passed (19 journeys).
 ### Date / feature
 
 September 14, 2026; regression of incomplete initial-interaction protection.
+
+## 2026-09-16: Calendar connection and OAuth lifecycle lacked usable-state proof
+
+- **Bug / impact:** Expired or revoked credentials still displayed Connected;
+  publishing trusted a timestamp. Callback replay/session switches were not
+  checked against a consumed server attempt. Reconnecting without a refresh token
+  could combine a different Google's account access token with the old refresh token.
+- **Root cause:** Historical flags and browser-only callback correlation stood in
+  for current provider capability and authenticated, one-use ownership.
+- **Fix:** Live free/busy status check, offline/scope checks, creator-only start and
+  callback ownership, one-use D1 attempt, fresh refresh token required on reconnect,
+  generic errors and in-app disconnect with local credential deletion and revocation.
+  Refresh writes compare the prior ciphertext as well as timestamp, so concurrent
+  reconnects cannot be overwritten even within the same millisecond.
+- **Regression prevention:** Playwright OAuth success, denial, replay, missing code,
+  wrong/stale state, account ownership, refresh/revoke/failure/reconnect and persistence.
+- **Related files:** OAuth routes, calendar-oauth-security.ts, google-calendar.ts,
+  dashboard, migrations 0021–0024, creator-journeys.spec.ts.
+- **Context:** September 16, 2026; isolated local application/provider boundaries.
+
+## 2026-09-16: Displayed slots and acceptance used incomplete conflict checks
+
+- **Bug / impact:** Customers could select already-busy slots. A creator could
+  accept a request after removing its availability or adding another booking.
+- **Root cause:** Browser generation used rules alone; reservation had the full
+  guard but acceptance checked Google only. This repeats the incomplete-guard
+  pattern in the September 14 availability incident.
+- **Fix:** Server slot endpoint filters Google intervals, bookings and active holds;
+  final acceptance checks current saved schedule, duration, limits, bookings and
+  Google, excluding only the current request. The approved paid layout is preserved.
+- **Regression prevention:** Playwright conflict exclusion/unaffected slots, stale
+  slot rejection, changed availability before acceptance, timezone/DST and customer
+  paid progression; existing atomic reservation regressions remain mandatory.
+- **Related files:** bookable-times.ts, availability endpoint, CustomerBookingFlow.tsx,
+  google-calendar.ts, bookings.ts and creator-journeys.spec.ts.
+
+## 2026-09-16: Booking calendar destination lacked update/cancellation boundaries
+
+- **Bug / impact:** Confirmed event IDs existed, but no safe update/delete path;
+  a retry after reconnect could resolve primary to a different calendar.
+- **Root cause:** Calendar synchronization only implemented insertion and stored
+  its association after asynchronous Meet creation completed.
+- **Fix:** Persist association early and store the returned organizer calendar ID;
+  deterministic IDs, pre-insert connection binding, booking metadata checks and ETag-conditional mutations target
+  only the booking event. An inaccessible old calendar after reconnect is never
+  misreported as a completed cancellation. Reschedule validates and commits D1 before sync. The
+  cancellation sync consumes an already-authoritative cancelled booking; it does
+  not implement or impersonate a payment refund policy. A meeting URL field prepares
+  later Zoom supply while existing bookings retain Meet behavior.
+- **Regression prevention:** Playwright repeated confirmation/update/delete, wrong
+  metadata rejection, attendee sendUpdates behavior and retained D1 booking records.
+- **Related files:** google-calendar.ts, booking calendar route, schema/migrations,
+  creator-journeys.spec.ts.
+
+## 2026-09-16: Sessions spanning a DST change had an unsafe wall-clock end
+
+- **Reproduction:** Playwright requests March 14, 2027 or November 1, 2026
+  availability in America/Los_Angeles. A 15-minute call at 01:45 was offered.
+- **Impact:** Spring's stored 02:00 end does not exist; fall's stored 02:00 end is
+  75 real minutes later. Calendar invitations could disagree with the paid duration.
+- **Root cause:** Slot generation verified the start against DST but bookings store
+  local start/end plus timezone, and end arithmetic assumed no offset transition.
+- **Fix:** The shared generator checks the actual elapsed-time end against the
+  representable local end and excludes transition-spanning slots. The repeated
+  fall hour uses the existing deterministic first occurrence; nonexistent times
+  remain excluded. This applies equally to displayed slots and final validation.
+- **Regression prevention:** Dedicated Playwright reproduction must pass for both
+  transitions, alongside creator/customer timezone and complete booking journeys.
+- **Related files:** availability.ts and creator-journeys.spec.ts.

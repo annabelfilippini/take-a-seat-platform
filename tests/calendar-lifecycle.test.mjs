@@ -54,7 +54,7 @@ registerHooks({
     },
     load(url, context, next) {
         if (/\.tsx?$/.test(url) && !url.includes("node_modules")) {
-            return { format: "module", source: ts.transpileModule(readFileSync(new URL(url), "utf8"), { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext, jsx: ts.JsxEmit.ReactJSX } }).outputText, shortCircuit: true };
+            return { format: "module", source: ts.transpileModule(readFileSync(new URL(url), "utf8").replace("return getSignedInClerkUserFromHeaders(request.headers, request.url);", "if (request.headers.get('cookie')?.includes('tas_calendar_test=1')) return globalThis.__calendarTestUser; return getSignedInClerkUserFromHeaders(request.headers, request.url);"), { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext, jsx: ts.JsxEmit.ReactJSX } }).outputText, shortCircuit: true };
         }
         return next(url, context);
     },
@@ -160,13 +160,14 @@ test("application, invitation, saved profile, OAuth, reservation, authorization,
         const creator = { id: (await domain.getCreatorDashboardAccount(owner)).profile.id };
         assert.equal(await domain.getPublishedCreatorBySlug("rehearsal-creator"), null);
         await domain.saveCreatorAvailability({ creatorId: creator.id, timezone: "America/New_York", bufferMinutes: 15, minNoticeMinutes: 0, maxBookingsPerDay: null, maxBookingsPerWeek: null, rules: [{ dayOfWeek: 4, startTime: "09:00", endTime: "12:00" }] });
-        const started = await start(new Request("http://localhost/api/google-calendar/oauth/start?creatorId=" + creator.id + "&returnTo=/creators/dashboard", { headers: { cookie: "tas_local_admin=1" } }));
+        globalThis.__calendarTestUser = owner;
+        const started = await start(new Request("http://localhost/api/google-calendar/oauth/start?creatorId=" + creator.id + "&returnTo=/creators/dashboard", { headers: { cookie: "tas_calendar_test=1" } }));
         assert.equal(started.status, 303);
         const oauth = new URL(started.headers.get("location"));
         const callbackUrl = new URL(oauth.searchParams.get("redirect_uri"));
         callbackUrl.searchParams.set("state", oauth.searchParams.get("state"));
         callbackUrl.searchParams.set("code", "local-test-code");
-        const connected = await callback(new Request(callbackUrl, { headers: { cookie: started.headers.get("set-cookie").split(";")[0] } }));
+        const connected = await callback(new Request(callbackUrl, { headers: { cookie: started.headers.get("set-cookie").split(";")[0] + "; tas_calendar_test=1" } }));
         assert.match(connected.headers.get("location"), /calendar=connected/);
         sqlite.prepare("INSERT INTO creator_stripe_connections(creator_id,stripe_account_id,account_country,connected_at) VALUES(?,'acct_test','US','2026-09-01')").run(creator.id);
         sqlite.prepare("UPDATE creator_onboarding_profiles SET stripe_connected_at='2026-09-13' WHERE id=?").run(creator.id);
@@ -318,10 +319,14 @@ test("busy buffers and provider errors fail closed before reserving a checkout",
     }
 });
 test("partial OAuth permission does not become a connected calendar", async () => {
+    sqlite.prepare("INSERT INTO creator_onboarding_profiles(id,name,email,instagram_platform,bio,application_status) VALUES('partial','Partial','partial@example.com','style','','accepted')").run();
+    sqlite.prepare("INSERT INTO creator_accounts(creator_id,clerk_user_id,email) VALUES('partial','user_partial','partial@example.com')").run();
+    globalThis.__calendarTestUser = {userId:'user_partial',email:'partial@example.com',phone:null};
+    sqlite.prepare("INSERT INTO google_oauth_attempts VALUES('expected','partial','user_partial',?)").run(Date.now()+60000);
     const state = await createOAuthState({ creatorId: "partial", nonce: "expected", returnTo: "/creators/dashboard", expiresAt: Date.now() + 60000 }, process.env.GOOGLE_CLIENT_SECRET);
     globalThis.fetch = async () => Response.json({ access_token: "test", expires_in: 3600, scope: "https://www.googleapis.com/auth/calendar.freebusy" });
     try {
-        const response = await callback(new Request(`http://localhost/api/google-calendar/oauth/callback?state=${state}&code=test`, { headers: { cookie: "tas_google_oauth_nonce=expected" } }));
+        const response = await callback(new Request(`http://localhost/api/google-calendar/oauth/callback?state=${state}&code=test`, { headers: { cookie: "tas_google_oauth_nonce=expected; tas_calendar_test=1" } }));
         assert.match(response.headers.get("location"), /calendar-permissions/);
         assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM creator_calendar_connections WHERE creator_id='partial'").get().n, 0);
     }
@@ -369,4 +374,19 @@ test("opposite creator decisions cannot both claim a payment authorization", asy
     const decision = sqlite.prepare("SELECT creator_decision FROM customer_bookings WHERE id='decision-race'").get().creator_decision;
     assert.equal(await claimBookingDecision("decision-race", decision), true);
     assert.equal(await claimBookingDecision("decision-race", decision === "accept" ? "decline" : "accept"), false);
+});
+
+
+test("refresh racing a reconnect cannot overwrite the new credential generation", async () => {
+  await connect("refresh-race", Date.now() - 1000);
+  const replacement = await encryptToken("reconnected-access", process.env.GOOGLE_TOKEN_ENCRYPTION_KEY);
+  globalThis.fetch = async () => {
+    // Preserve the same timestamp deliberately: token ciphertext also guards the write.
+    sqlite.prepare("UPDATE creator_calendar_connections SET access_token_encrypted=?, expires_at=? WHERE creator_id='refresh-race'").run(replacement, Date.now()+3600000);
+    return Response.json({access_token:"obsolete-access",refresh_token:"obsolete-refresh",expires_in:3600});
+  };
+  try {
+    await assert.rejects(() => calendar.isCreatorCalendarFree("refresh-race",new Date(),new Date(Date.now()+60000)),/connection changed/);
+    assert.equal(sqlite.prepare("SELECT access_token_encrypted FROM creator_calendar_connections WHERE creator_id='refresh-race'").get().access_token_encrypted, replacement);
+  } finally { globalThis.fetch = originalFetch; }
 });

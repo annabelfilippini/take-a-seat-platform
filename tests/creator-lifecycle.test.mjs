@@ -49,7 +49,7 @@ registerHooks({
   },
 });
 const nativeFetch = globalThis.fetch;
-const readinessFetch = async (url, options) => String(url).includes("api.stripe.com/v2/core/accounts/") ? Response.json({ configuration: { recipient: { capabilities: { stripe_balance: { stripe_transfers: { status: "active" } } } } } }) : nativeFetch(url, options);
+const readinessFetch = async (url, options) => String(url).endsWith("/freeBusy") ? Response.json({calendars:{primary:{busy:[]}}}) : String(url).includes("api.stripe.com/v2/core/accounts/") ? Response.json({ configuration: { recipient: { capabilities: { stripe_balance: { stripe_transfers: { status: "active" } } } } } }) : nativeFetch(url, options);
 globalThis.fetch = readinessFetch;
 const domain = await import("../app/_lib/creator-onboarding.ts");
 const availability = await import("../app/_lib/availability.ts");
@@ -68,8 +68,12 @@ function formRequest(path, values, admin = false) {
   return new Request(`http://localhost${path}`, { method: "POST", body: new URLSearchParams(values), headers: { accept: "application/json", ...(admin ? { cookie: "tas_local_admin=1" } : {}) } });
 }
 
+process.env.GOOGLE_TOKEN_ENCRYPTION_KEY = "creator-test-key";
+const { encryptToken } = await import("../app/_lib/token-encryption.ts");
+const calendarToken = await encryptToken("creator-test-token", "creator-test-key");
 function readyConnections(creatorId) {
   process.env.STRIPE_SECRET_KEY = "sk_test_fixture";
+  sqlite.prepare("INSERT OR REPLACE INTO creator_calendar_connections(creator_id,scopes,access_token_encrypted,refresh_token_encrypted,expires_at) VALUES (?,?,?,?,?)").run(creatorId, "https://www.googleapis.com/auth/calendar.freebusy https://www.googleapis.com/auth/calendar.events.owned", calendarToken, calendarToken, Date.now()+3600000);
   sqlite.prepare("INSERT OR IGNORE INTO creator_stripe_connections (creator_id,stripe_account_id,account_country) VALUES (?, ?, ?)").run(creatorId, `acct_${creatorId}`, "US");
   sqlite.prepare("UPDATE creator_onboarding_profiles SET calendar_connected_at = '2026-09-13', stripe_connected_at = '2026-09-13' WHERE id = ?").run(creatorId);
   sqlite.prepare("INSERT INTO creator_availability_rules (creator_id, timezone, day_of_week, start_time, end_time) VALUES (?, 'America/Los_Angeles', 1, '09:00', '17:00')").run(creatorId);
@@ -82,7 +86,7 @@ test("application → review email → acceptance → verified owner → saved p
   const originalFetch = globalThis.fetch;
   const emails = [];
   globalThis.fetch = async (url, options) => {
-    if (String(url).includes("api.stripe.com/")) return readinessFetch(url, options);
+    if (String(url).includes("api.stripe.com/") || String(url).endsWith("/freeBusy")) return readinessFetch(url, options);
     assert.equal(url, "https://api.resend.com/emails");
     emails.push(JSON.parse(options.body));
     return Response.json({ id: "test-email" });

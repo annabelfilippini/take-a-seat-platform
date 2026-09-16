@@ -1,4 +1,5 @@
-import { sql } from "drizzle-orm";
+import { getCalendarOwner, consumeCalendarAttempt } from "../../../../_lib/calendar-oauth-security";
+import { readGoogleBusyPeriods } from "../../../../_lib/google-calendar";
 import { creatorCalendarConnections } from "../../../../../db/schema";
 import { markCalendarConnected } from "../../../../_lib/creator-onboarding";
 import {
@@ -73,7 +74,7 @@ export async function GET(request: Request) {
       request,
       returnTo,
       "cancelled",
-      oauthError,
+      "access-denied",
       clearNonceHeaders,
     );
   }
@@ -90,7 +91,13 @@ export async function GET(request: Request) {
     );
   }
 
+  const actorId = await getCalendarOwner(request, payload.creatorId);
+  if (!actorId) return redirectWithCalendarStatus(request, returnTo, "error", "creator-access", clearNonceHeaders);
+
   try {
+    if (!await consumeCalendarAttempt(payload.nonce, payload.creatorId, actorId)) {
+      return redirectWithCalendarStatus(request, returnTo, "error", "used-state", clearNonceHeaders);
+    }
     const token = await exchangeCodeForToken({
       clientId,
       clientSecret,
@@ -103,15 +110,18 @@ export async function GET(request: Request) {
         request,
         returnTo,
         "error",
-        token.error ?? "invalid-token-response",
+        "invalid-token-response",
         clearNonceHeaders,
       );
     }
 
-    if (token.scope && GOOGLE_CALENDAR_SCOPES.some((scope) => !token.scope!.split(" ").includes(scope))) {
+    if (!token.scope || GOOGLE_CALENDAR_SCOPES.some((scope) => !token.scope!.split(" ").includes(scope))) {
       return redirectWithCalendarStatus(request, returnTo, "error", "calendar-permissions", clearNonceHeaders);
     }
 
+    // Never retain a previous Google account's refresh token on reconnect.
+    if (!token.refresh_token) return redirectWithCalendarStatus(request, returnTo, "error", "offline-access", clearNonceHeaders);
+    await readGoogleBusyPeriods({ accessToken: token.access_token, calendarId: "primary" }, new Date(), new Date(Date.now() + 60_000));
     const tokenEncryptionSecret = getRuntimeEnv("GOOGLE_TOKEN_ENCRYPTION_KEY") ?? clientSecret;
     const now = new Date();
     const expiresAt = new Date(Date.now() + token.expires_in * 1000);
@@ -143,7 +153,9 @@ export async function GET(request: Request) {
         set: {
           accessTokenEncrypted: encryptedAccessToken,
           expiresAt,
-          refreshTokenEncrypted: sql`coalesce(excluded.refresh_token_encrypted, ${creatorCalendarConnections.refreshTokenEncrypted})`,
+          refreshTokenEncrypted: encryptedRefreshToken,
+          calendarId: "primary",
+          connectedAt: now.toISOString(),
           scopes: token.scope ?? GOOGLE_CALENDAR_SCOPES.join(" "),
           tokenType: token.token_type ?? "Bearer",
           updatedAt: now.toISOString(),
@@ -195,6 +207,7 @@ async function exchangeCodeForToken({
     body,
     headers: { "content-type": "application/x-www-form-urlencoded" },
     method: "POST",
+    signal: AbortSignal.timeout(15000),
   });
 
   if (!response.ok) throw new Error("Google token exchange failed.");

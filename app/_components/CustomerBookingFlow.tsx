@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
-import { getAvailabilityWindowStart, getViewerAvailability } from "../_lib/availability";
+import { getAvailabilityWindowStart, getViewerAvailability, type ViewerAvailabilityDay } from "../_lib/availability";
 import type { CreatorAvailabilityRule, Seat } from "../_lib/creators";
 
 type CustomerBookingFlowProps = {
@@ -70,9 +70,26 @@ export function CustomerBookingFlow({
     return () => window.removeEventListener("pageshow", restore);
   }, []);
 
-  const viewerAvailability = useMemo(() => getViewerAvailability({
+  const scheduledAvailability = useMemo(() => getViewerAvailability({
     availabilityRules, creatorId, seat: activeSeat, viewerTimezone, windowStart: availabilityWindowStart,
   }), [activeSeat, availabilityRules, availabilityWindowStart, creatorId, viewerTimezone]);
+  const availabilityKey = `${activeSeatId}|${viewerTimezone}|${visibleMonth}`;
+  const [checkedAvailability, setCheckedAvailability] = useState<{ key: string; days: ViewerAvailabilityDay[]; error?: string }>();
+  useEffect(() => {
+    if (!isOpen || previewOnly || !activeSeat) return;
+    const abort = new AbortController();
+    const query = new URLSearchParams({ creatorId, seatId: activeSeat.id, timezone: viewerTimezone, month: visibleMonth });
+    fetch(`/api/bookings/availability?${query}`, { signal: abort.signal, cache: "no-store" })
+      .then(async response => {
+        const data = await response.json() as { days: ViewerAvailabilityDay[]; error?: string };
+        if (!abort.signal.aborted) setCheckedAvailability({ key: availabilityKey, days: response.ok ? data.days : [], error: data.error });
+      }).catch(() => {
+        if (!abort.signal.aborted) setCheckedAvailability({ key: availabilityKey, days: [], error: "Availability could not be checked. Please close and try again." });
+      });
+    return () => abort.abort();
+  }, [isOpen, previewOnly, activeSeat, creatorId, viewerTimezone, visibleMonth, availabilityKey]);
+  const viewerAvailability = useMemo(() => previewOnly ? scheduledAvailability : checkedAvailability?.key === availabilityKey ? checkedAvailability.days : [], [previewOnly, scheduledAvailability, checkedAvailability, availabilityKey]);
+  const availabilityMessage = !previewOnly && checkedAvailability?.key !== availabilityKey ? "Checking availability…" : checkedAvailability?.error;
   const availabilityByDate = useMemo(() => new Map(viewerAvailability.map((day) => [day.date, day.slots])), [viewerAvailability]);
   const visibleAvailability = viewerAvailability.filter((day) => day.date.startsWith(visibleMonth));
   const activeSelectedDate = visibleAvailability.some((day) => day.date === selectedDate)
@@ -87,12 +104,13 @@ export function CustomerBookingFlow({
     topic.trim() ? `Wants to talk about: ${topic.trim()}` : null,
   ].filter(Boolean).join("\n\n");
   const firstMonth = formatMonthValue(availabilityWindowStart);
-  const lastMonth = viewerAvailability.at(-1)?.date.slice(0, 7) ?? firstMonth;
-  const nextAvailableDate = viewerAvailability.find((day) => day.date.slice(0, 7) > visibleMonth)?.date;
+  const lastMonth = scheduledAvailability.at(-1)?.date.slice(0, 7) ?? firstMonth;
+  const nextAvailableDate = scheduledAvailability.find((day) => day.date.slice(0, 7) > visibleMonth)?.date;
 
   function openBooking() {
     setStep("time");
     setIsSubmitting(false);
+    setCheckedAvailability(undefined);
     setIsOpen(true);
   }
 
@@ -156,7 +174,7 @@ export function CustomerBookingFlow({
                 <div className="customer-time-options">{selectedSlots.map((slot) => (
                   <button aria-pressed={slot.id === selectedSlotId} className={slot.id === selectedSlotId ? "selected" : ""} key={slot.id} onClick={() => setSelectedSlotId(slot.id)} type="button">{slot.displayTime}</button>
                 ))}</div>
-                {!selectedSlots.length ? <div className="customer-booking-prompt"><p>No open times are listed for this month yet.</p>
+                {!selectedSlots.length ? <div className="customer-booking-prompt"><p role="status">{availabilityMessage ?? "No open times are listed for this month yet."}</p>
                   {nextAvailableDate ? <button className="customer-booking-text-button" type="button" onClick={() => { setVisibleMonth(nextAvailableDate.slice(0, 7)); selectDate(nextAvailableDate); }}>Show next available date</button> : <p>Please check back for new availability.</p>}
                 </div> : null}
               </section>

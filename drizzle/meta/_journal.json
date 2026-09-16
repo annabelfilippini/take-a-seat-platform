@@ -141,6 +141,34 @@
       "when": 1789433055183,
       "tag": "0020_magenta_hellfire_club",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "6",
+      "when": 1789581547164,
+      "tag": "0021_zippy_taskmaster",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "6",
+      "when": 1789581884856,
+      "tag": "0022_dark_peter_parker",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "6",
+      "when": 1789582371547,
+      "tag": "0023_striped_dexter_bennett",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "6",
+      "when": 1789582636148,
+      "tag": "0024_open_glorian",
+      "breakpoints": true
     }
   ]
 }

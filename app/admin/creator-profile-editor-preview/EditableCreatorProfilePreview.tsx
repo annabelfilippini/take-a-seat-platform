@@ -203,6 +203,7 @@ const subscribeHydration = () => () => {};
 
 export function EditableCreatorProfilePreview({
   calendarStatus,
+  initialCalendarState = "not-connected",
   stripeStatus,
   initialAvailabilityRules = [],
   initialProfile,
@@ -210,6 +211,7 @@ export function EditableCreatorProfilePreview({
   initialNotifications = [],
 }: {
   calendarStatus?: string;
+  initialCalendarState?: "connected" | "needs-attention" | "not-connected";
   stripeStatus?: string;
   initialAvailabilityRules?: EditableAvailabilityRule[];
   initialProfile: EditableProfileState;
@@ -218,6 +220,7 @@ export function EditableCreatorProfilePreview({
 }) {
   const hydrated = useSyncExternalStore(subscribeHydration, () => true, () => false);
   const [profile, setProfile] = useState(initialProfile);
+  const [calendarState, setCalendarState] = useState(initialCalendarState);
   const [stripeReady, setStripeReady] = useState(false);
   const [lastSavedAt, setLastSavedAt] = useState(initialProfile.draftSavedAt);
   const [uploadState, setUploadState] = useState("");
@@ -731,7 +734,7 @@ export function EditableCreatorProfilePreview({
   const setupChecks = [
     { id: "profile" as const, label: "Profile picture, about text, and conversation topics", done: profileReady },
     { id: "profile" as const, label: "Call lengths and prices", done: callsReady },
-    { id: "availability" as const, label: "Saved availability and Google Calendar", done: hasAvailability && Boolean(profile.calendarConnectedAt) },
+    { id: "availability" as const, label: "Saved availability and Google Calendar", done: hasAvailability && (calendarState === "connected") },
     { id: "payments" as const, label: "Stripe payouts connected", done: stripeReady },
   ];
   const allReady = setupChecks.every((check) => check.done);
@@ -740,8 +743,8 @@ export function EditableCreatorProfilePreview({
   return (
     <main className="platform-shell amber-profile-page editable-profile-page" inert={!hydrated}>
       {calendarStatus ? (
-        <p role={calendarStatus === "connected" && profile.calendarConnectedAt ? "status" : "alert"} className="calendar-connection-notice">
-          {calendarStatus === "connected" && profile.calendarConnectedAt ? "Google Calendar connected. Your saved hours will be checked for calendar conflicts."
+        <p role={calendarStatus === "connected" && calendarState === "connected" ? "status" : "alert"} className="calendar-connection-notice">
+          {calendarStatus === "connected" && calendarState === "connected" ? "Google Calendar connected. Your saved hours will be checked for calendar conflicts."
             : calendarStatus === "cancelled" ? "Calendar connection was cancelled. You can connect again when you are ready."
               : "Google Calendar could not connect. Please try Connect calendar again. Your saved profile has not changed."}
         </p>
@@ -1107,7 +1110,8 @@ export function EditableCreatorProfilePreview({
         role="tabpanel"
       >
         <EditableAvailabilityPanel
-          calendarConnectedAt={profile.calendarConnectedAt}
+          calendarState={calendarState}
+          onCalendarState={setCalendarState}
           creatorId={profile.id}
           initialRules={initialAvailabilityRules}
           timezone={profile.timezone}
@@ -1195,19 +1199,44 @@ function TikTokIcon() {
 }
 
 function EditableAvailabilityPanel({
-  calendarConnectedAt,
+  calendarState,
+  onCalendarState,
   creatorId,
   initialRules,
   timezone: initialTimezone,
   onSaved,
 }: {
-  calendarConnectedAt?: string | null;
+  calendarState: "connected" | "needs-attention" | "not-connected";
+  onCalendarState: (state: "connected" | "needs-attention" | "not-connected") => void;
   creatorId: string;
   initialRules: EditableAvailabilityRule[];
   timezone: string;
   onSaved: (hasHours: boolean, timezone: string, advance: boolean) => void;
 }) {
-  const calendarConnected = Boolean(calendarConnectedAt);
+  const [calendarMessage, setCalendarMessage] = useState("");
+  const [disconnecting, setDisconnecting] = useState(false);
+  useEffect(() => {
+    const check = async () => {
+      try {
+        const response = await fetch(`/api/google-calendar/status?creatorId=${encodeURIComponent(creatorId)}`, { cache: "no-store" });
+        if (response.ok) onCalendarState((await response.json() as { state: typeof calendarState }).state);
+        else onCalendarState("needs-attention");
+      } catch { onCalendarState("needs-attention"); }
+    };
+    window.addEventListener("focus", check);
+    return () => window.removeEventListener("focus", check);
+  }, [creatorId, onCalendarState]);
+  async function disconnectCalendar() {
+    setDisconnecting(true);
+    try {
+      const response = await fetch("/api/google-calendar/disconnect", { method: "POST", body: new URLSearchParams({ creatorId }) });
+      if (!response.ok) throw new Error();
+      const result = await response.json() as { state: typeof calendarState; message: string };
+      onCalendarState(result.state); setCalendarMessage(result.message);
+    } catch { setCalendarMessage("Calendar could not disconnect. Please try again."); }
+    finally { setDisconnecting(false); }
+  }
+
   const initialBounds = availabilityDateBounds(initialTimezone);
   const initialWeekStart = availabilityWeekStart(initialBounds.today);
   const [weekStart, setWeekStart] = useState(initialWeekStart);
@@ -1519,10 +1548,14 @@ function EditableAvailabilityPanel({
               creatorId,
             )}&returnTo=${CREATOR_PROFILE_EDITOR_URL}`}
           >
-            {calendarConnected ? "Calendar connected" : "Connect calendar"}
+            {calendarState === "not-connected" ? "Connect calendar" : "Reconnect calendar"}
           </a>
+          {calendarState !== "not-connected" ? <button type="button" className="seat-secondary-button compact-form-button" disabled={disconnecting} onClick={() => void disconnectCalendar()}>{disconnecting ? "Disconnecting…" : "Disconnect Google Calendar"}</button> : null}
         </div>
       </div>
+      <p role="status" data-calendar-state={calendarState}>{calendarState === "connected" ? "Google Calendar connected ✓" : calendarState === "needs-attention" ? "Google Calendar connection needs attention. Reconnect or try again shortly." : "Google Calendar not connected. Connect to accept bookings."}</p>
+      {calendarMessage ? <p role="status">{calendarMessage}</p> : null}
+      <p>Only your primary calendar is checked. <a href="/privacy">How we use Google Calendar data</a></p>
 
       <p className="availability-instructions" id="weekly-availability-help">
         Set your typical weekly hours, or choose any week up to one year ahead to override them. Saved availability changes live bookable hours immediately. Select the times you can take

@@ -1,4 +1,5 @@
-import { and, eq, or, isNull } from 'drizzle-orm';
+import { bookingAvailabilityRevision } from "./booking-revalidation";
+import { and, eq, or, isNull, sql } from 'drizzle-orm';
 import { customerBookings } from '../../db/schema';
 import { getCustomerBooking } from './bookings';
 import { getStripeSecretKey, STRIPE_API_VERSION } from './stripe-connect';
@@ -7,10 +8,11 @@ import { sendEmail } from './email';
 // Persist the chosen operation before any network call. Concurrent opposite
 // decisions cannot capture and cancel the same authorization. Same-action retries
 // use the provider's idempotency key and continue after a lost response.
-export async function claimBookingDecision(id: string, decision: 'accept' | 'decline') {
+export async function claimBookingDecision(id: string, decision: 'accept' | 'decline', expected?: { creatorId: string; revision: string }) {
   const { getDb } = await import('../../db');
   const result = await getDb().update(customerBookings).set({ creatorDecision: decision })
     .where(and(eq(customerBookings.id, id), eq(customerBookings.status, 'payment_authorized'),
+      expected ? sql`${expected.revision} = (${bookingAvailabilityRevision(expected.creatorId)})` : undefined,
       or(isNull(customerBookings.creatorDecision), eq(customerBookings.creatorDecision, decision))))
     .returning({ id: customerBookings.id });
   return result.length > 0;

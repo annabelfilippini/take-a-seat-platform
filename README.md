@@ -65,7 +65,7 @@ stay in ignored local env files or Cloudflare Worker secrets.
   sign-in link. Returning creators use email-code sign-in at `/sign-in`. Phone sign-in is
   hidden unless explicitly enabled in both Clerk and the Worker configuration.
 - Email: Resend transactional email.
-- Calendar: Google OAuth, encrypted token refresh, free/busy validation, and retry-safe Meet event creation. See `docs/calendar-rehearsal-2026-09-12.md` for the remaining live rehearsal gate.
+- Calendar: Google OAuth, encrypted token refresh, free/busy validation, and retry-safe Meet event creation. See `docs/google-calendar-implementation.md` for the current application release gate and `docs/google-oauth-production-readiness-2026-09-16.md` for exact production setup and submission materials.
 - Payments: Stripe Connect and Stripe Checkout groundwork, with test-mode
   webhook handling and inline Checkout pricing for accepted creators.
 
@@ -87,6 +87,8 @@ Cloudflare production bindings are declared in `wrangler.deploy.jsonc`.
 
 - `/`: public homepage.
 - `/take-a-seat`: creator directory.
+- `/privacy`: public privacy notice, including Google Calendar data use and
+  deletion choices required for OAuth production review.
 - `/with/[slug]`: reusable public creator profile route.
 - `/with/ella`, `/with/annabel`: profile/test routes that still
   need consolidation into the reusable route over time.

@@ -60,12 +60,14 @@ export function getViewerAvailability({
   seat,
   viewerTimezone,
   windowStart,
+  windowDays,
 }: {
   availabilityRules: CreatorAvailabilityRule[];
   creatorId: string;
   seat: Seat | undefined;
   viewerTimezone: string;
   windowStart: Date;
+  windowDays?: number;
 }): ViewerAvailabilityDay[] {
   const sourceSlots = getSourceAvailabilitySlots({
     availabilityRules,
@@ -73,6 +75,7 @@ export function getViewerAvailability({
     now: new Date(),
     seat,
     windowStart,
+    windowDays,
   });
   const groupedAvailability = new Map<string, ViewerAvailabilitySlot[]>();
 
@@ -129,7 +132,8 @@ export function getMatchedAvailabilitySlot({
     creatorId,
     now: new Date(),
     seat,
-    windowStart: getAvailabilityWindowStart(),
+    windowStart: new Date(`${appointmentStartAt.slice(0, 10)}T12:00:00Z`),
+    windowDays: 5,
   }).find((slot) => slot.startsAtUtc === requestedStartUtc.getTime());
 
   if (!matchedSlot) {
@@ -180,15 +184,17 @@ function getSourceAvailabilitySlots({
   now,
   seat,
   windowStart,
+  windowDays,
 }: {
   availabilityRules: CreatorAvailabilityRule[];
   creatorId: string;
   now: Date;
   seat: Seat | undefined;
   windowStart: Date;
+  windowDays?: number;
 }) {
   const sourceSlots = availabilityRules.length
-    ? getRuleAvailabilitySlots(availabilityRules, seat, windowStart, now)
+    ? getRuleAvailabilitySlots(availabilityRules, seat, windowStart, now, windowDays)
     : getFallbackAvailabilitySlots(creatorId).filter((slot) => slot.startsAtUtc >= now.getTime() && slot.startsAtUtc >= windowStart.getTime());
 
   return sourceSlots.sort((first, second) => first.startsAtUtc - second.startsAtUtc);
@@ -221,12 +227,13 @@ function getRuleAvailabilitySlots(
   seat: Seat | undefined,
   windowStart: Date,
   now: Date,
+  windowDays = defaultAvailabilityWindowDays,
 ): SourceAvailabilitySlot[] {
   const boundsByTimezone = new Map(rules.map((rule) => [rule.timezone, availabilityDateBounds(rule.timezone, now)]));
   const slots: SourceAvailabilitySlot[] = [];
   const durationMinutes = getSeatDurationMinutes(seat);
 
-  for (let index = 0; index < defaultAvailabilityWindowDays; index += 1) {
+  for (let index = 0; index < windowDays; index += 1) {
     const date = addDays(windowStart, index - 2);
     const dateValue = formatLocalDateValue(date);
     const dateRules = rulesForAvailabilityWeek(rules, availabilityWeekStart(dateValue))
@@ -244,6 +251,12 @@ function getRuleAvailabilitySlots(
         if (!Number.isFinite(startsAtUtc) || startsAtUtc < minimumStart) {
           continue;
         }
+        // Booking storage uses local start/end and IANA zone. Do not offer a
+        // session crossing an offset jump that this format cannot disambiguate.
+        const wallEnd = new Date(Date.parse(`${dateValue}T${time}:00Z`) + durationMinutes * 60_000).toISOString().slice(0, 19);
+        const actualEnd = new Date(startsAtUtc + durationMinutes * 60_000);
+        if (formatLocalDateTimeInTimezone(actualEnd, rule.timezone) !== wallEnd ||
+          localDateTimeToUtc(wallEnd, rule.timezone)?.getTime() !== actualEnd.getTime()) continue;
 
         slots.push({
           date: dateValue,
