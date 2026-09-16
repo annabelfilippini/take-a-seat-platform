@@ -199,6 +199,12 @@ Calendar:
   `docs/calendar-rehearsal-2026-09-12.md`. September 14 live provider rehearsal
   verified OAuth persistence, busy-time rejection, deterministic event creation
   and a customer Inbox invitation with Meet; see the live rehearsal report.
+- Google Auth Platform is still in Testing as of September 16. Ella's authorized
+  Google account is already a test user, but Testing authorizations expire after
+  seven days. Production publishing requires the new public `/privacy` page to
+  deploy, OAuth branding URLs and Calendar scopes to be saved, domain ownership
+  to be verified, and the sensitive-scope review to be submitted. See
+  [Google OAuth production readiness](google-oauth-production-readiness-2026-09-16.md).
 - Booking request and Stripe Checkout routes server-validate submitted times
   against creator availability before creating a booking.
 - Public creator profiles collect the request first, then send the customer to

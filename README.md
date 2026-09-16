@@ -87,6 +87,8 @@ Cloudflare production bindings are declared in `wrangler.deploy.jsonc`.
 
 - `/`: public homepage.
 - `/take-a-seat`: creator directory.
+- `/privacy`: public privacy notice, including Google Calendar data use and
+  deletion choices required for OAuth production review.
 - `/with/[slug]`: reusable public creator profile route.
 - `/with/ella`, `/with/annabel`: profile/test routes that still
   need consolidation into the reusable route over time.

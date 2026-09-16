@@ -94,6 +94,11 @@ export function BookingPlatform({ creators }: { creators?: Creator[] }) {
           </button>
         </form>
       </section>
+
+      <footer className="site-footer" aria-label="Site information">
+        <span>Take a Seat</span>
+        <a href="/privacy">Privacy</a>
+      </footer>
     </main>
   );
 }

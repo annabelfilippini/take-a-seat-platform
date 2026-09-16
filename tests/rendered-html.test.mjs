@@ -96,6 +96,7 @@ test("server-renders the public booking homepage", async () => {
   assert.match(html, /Our Mission/);
   assert.match(html, /Search creators/);
   assert.match(html, /Sign In/);
+  assert.match(html, /href="\/privacy"[^>]*>Privacy<\/a>/);
   assert.match(html, /directory-results/);
   assert.match(html, /placeholder="Search creators"/);
   assert.match(html, /Ella McLane/);
@@ -141,6 +142,21 @@ test("server-renders the public booking homepage", async () => {
     /Fifteen minutes\s*with the person you\s*already follow/i,
   );
   assert.doesNotMatch(html, /react-loading-skeleton|codex-preview|SkeletonPreview/);
+});
+
+test("server-renders the public privacy notice required for Google OAuth", async () => {
+  const response = await render("/privacy");
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
+
+  const html = await response.text();
+  assert.match(html, /<title>Privacy \| Take a Seat<\/title>/i);
+  assert.match(html, /Privacy at Take a Seat/);
+  assert.match(html, /Google Calendar data/);
+  assert.match(html, /calendar\.freebusy|free and busy times/i);
+  assert.match(html, /Limited Use requirements/);
+  assert.match(html, /revoke Take a Seat&#x27;s Google access/i);
+  assert.match(html, /mailto:annabelflip1@gmail\.com/);
 });
 
 test("server-renders the Take a Seat creator directory", async () => {
