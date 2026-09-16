@@ -2,6 +2,7 @@
 
 Audit date: September 16, 2026. **FIRST CREATOR ONBOARDING: BLOCKED.**
 PR #37 application commit reviewed: `3381a0c292eb6b5602738600b57c48441c837c92`.
+Real-provider follow-up application fix: `190353d` (verify five-minute Zoom early join).
 This report separates observed external state, implemented capability and undecided
 business policy. No real payment, refund, payout or new customer email was initiated.
 
@@ -28,6 +29,17 @@ business policy. No real payment, refund, payout or new customer email was initi
   published customer data, payment/recovery failures and desktop/mobile coverage.
 - Credential-pattern scan found no secret values in PR additions; compiled output
   contains none of the test auth/provider/control-route markers checked.
+- Created and activated the Take a Seat Zoom S2S app with precisely five meeting
+  scopes. Stored all four expected Zoom values as production Worker secrets without
+  exposing credentials. Verified real-provider recovery/reschedule/delete and
+  single-host reservation behavior; guest joining remains blocked as detailed below.
+- Fixed the real-provider early-join mismatch and added regression coverage. Latest
+  lint, TypeScript, production build, 87 Node tests and 35 Playwright journeys passed.
+- Saved exactly `calendar.freebusy` and `calendar.events.owned` in Google Data Access;
+  reload confirmed persistence. No additional Google permissions were requested.
+- Removed development origins/callbacks from the existing Google Web client. Reload
+  confirms no JavaScript origins and exactly the canonical production callback;
+  credentials were preserved. Separate real development OAuth remains unconfigured.
 
 ## Cancellation, refund and reschedule capability versus policy
 
@@ -109,10 +121,10 @@ and Secrets. Paste credential values there, never into chat, Git or this report.
 | `GOOGLE_CLIENT_SECRET` | OAuth token exchange | Yes | Yes | Present | Rehearse token exchange/refresh; do not rotate casually |
 | `GOOGLE_TOKEN_ENCRYPTION_KEY` | Stored OAuth tokens | Yes | Yes | Present | Preserve; changing can invalidate existing token decryption |
 | `GOOGLE_OAUTH_REDIRECT_URI` | Legacy callback config | No, stored as secret | Unused | Present | Current code derives canonical callback; no longer relied on |
-| `ZOOM_ACCOUNT_ID` | Central S2S account | Private identifier | PR #37 | Missing | Obtain from Take a Seat S2S app |
-| `ZOOM_CLIENT_ID` | Central S2S app | Private identifier | PR #37 | Missing | Obtain from S2S App credentials |
-| `ZOOM_CLIENT_SECRET` | Central S2S authentication | Yes | PR #37 | Missing | Enter directly into Worker secret |
-| `ZOOM_HOST_USER_IDS` | Licensed dedicated host pool | No, private config | PR #37 | Missing | JSON array of opaque licensed host IDs, not emails |
+| `ZOOM_ACCOUNT_ID` | Central S2S account | Private identifier | PR #37 | Present, secret | Real account-credentials exchange passed |
+| `ZOOM_CLIENT_ID` | Central S2S app | Private identifier | PR #37 | Present, secret | Exact activated app; token scopes verified |
+| `ZOOM_CLIENT_SECRET` | Central S2S authentication | Yes | PR #37 | Present, secret | Transferred privately; real authentication passed |
+| `ZOOM_HOST_USER_IDS` | Licensed dedicated host pool | No, private config | PR #37 | Present, secret | One opaque owner ID; API host match and one-lane reservation verified |
 | `RESEND_API_KEY` | Transactional email | Yes | Yes | Present | Domain verified; local key is sending-only, so dashboard used for audit |
 | `TAKE_A_SEAT_EMAIL_FROM` | Email sender | No | Yes | Present | `Take a Seat <applications@takeaseatwith.com>` |
 | `TAKE_A_SEAT_APPLICATION_RECIPIENT` | Admin application inbox | Private contact config | Yes | Present | Existing monitored admin inbox retained |
@@ -163,11 +175,14 @@ Two test users exist, including Annabel's Gmail. The first creator's Google iden
 has not been identified/verified against that list. Annabel can rehearse with her
 already allowed account; arbitrary creators cannot be assumed eligible.
 
-Branding homepage/privacy fields were blank and are now saved. Production client
-still contains localhost:3000/3001 and workers.dev origins/callbacks. Domain ownership
-was not verified in this audit. Before general launch: establish Search Console
-ownership for `takeaseatwith.com`, move development callbacks to a development
-project/client, complete Data Access and branding, publish External/In production,
+Branding homepage/privacy fields were blank and are now saved. The exact two
+implemented Calendar scopes are now declared and reload-verified. The existing
+production Web client now has no JavaScript origins and exactly the canonical
+callback; localhost and workers.dev entries were removed without rotating credentials.
+Real local OAuth needs a separate development project/client before reuse.
+Domain ownership remains pending: the exact Google TXT is prepared in Cloudflare,
+but not saved until owner-access confirmation. Before general launch: establish
+Search Console ownership for `takeaseatwith.com`, complete branding, publish External/In production,
 submit sensitive-scope verification and obtain Google's decision. Exact field
 values/scopes/reviewer materials: [Google setup](google-oauth-production-readiness-2026-09-16.md).
 Changing Publishing status is not verification approval. Testing Calendar grants
@@ -206,8 +221,34 @@ the live webhook together. No uncontrolled real-money transaction is authorized.
 
 ### Zoom
 
-User confirmed not set up; Marketplace currently requires sign-in. No Take a Seat
-paid plan, licensed host, S2S app, credentials or concurrency has been verified.
+Marketplace is authenticated. Zoom account/user management verifies the owner and
+one licensed Zoom Workplace Pro (Named Host) user. Annabel explicitly accepts one
+simultaneous Take a Seat meeting for the initial launch and prohibits purchasing
+another license. Zoom's API License and Terms of Use were accepted with her explicit
+approval. The Server-to-Server app **Take a Seat booking meetings** is now activated
+with exactly the five approved scopes; OAuth token scope readback matches. All four
+runtime Zoom values are present as encrypted production Worker secrets.
+
+Real Zoom API rehearsal through PR #37 helpers passed: one meeting per booking,
+correct licensed host, safe join URL stored, no host start URL stored, recovery after
+a deliberately lost successful create response, sequential/concurrent retries without
+duplicates, same-meeting reschedule once, delete once, 404/list absence and reservation
+cleanup. Persistence used isolated SQLite through the D1 statement interface, not
+production D1. No payment or customer email was triggered.
+
+The first rehearsal exposed Zoom ignoring `jbh_time=5` because the host's custom
+early-join-limit checkbox was off. Enabled and saved the five-minute setting; a fresh
+real meeting returned five minutes. Added backend rejection of a mismatched limit
+and regression coverage (BUG_LOG). All required code checks passed.
+
+Three sequential disposable booking runs were used for discovery, corrected API
+verification and the guest-join attempt. Each created exactly one meeting despite
+retries; all three were deleted and verified absent. The local harness is stopped.
+
+Guest browser joining is **blocked**: Zoom reports another meeting in progress.
+The host portal shows the existing **Take a Seat Onboarding** call in progress. It
+was not created by this rehearsal; permission to end it is pending. Two-participant
+joining, audio/video, duration and overrun behavior are therefore not verified.
 Minimum: one Take a Seat-owned paid/licensed dedicated host, S2S app activated,
 five granular meeting scopes, four Worker settings and a two-participant joining
 test without the owner present. One host supports one simultaneous booking lane
@@ -217,8 +258,9 @@ creators; do not assume one account permits unlimited simultaneous meetings.
 Use [Zoom production setup](zoom-production-setup.md) for exact app navigation,
 scopes and values. Both participants join without host privileges; no host key or
 start URL is shared. Verify join-before-host, waiting-room/authentication settings,
-duration and overrun behavior with the actual plan. Creating an account, purchasing
-a license and granting new S2S access require account-owner involvement.
+duration and overrun behavior with the actual plan. Plan capacity is verified;
+actual unattended participation and application-enforced capacity are still rehearsal
+gates. No extra license or broad user-management scope is required.
 
 ### Email
 
@@ -238,12 +280,14 @@ PR #37 real confirmation email exists to inspect yet.
 
 ### Cloudflare
 
-Authenticated control-plane access works. Correct DB and existing secret names
-verified; migration completed; old Worker version
-`fd9bacc5-4e70-49f8-ab1b-41599b038c73` still has 100% traffic. Current version matches
-the previous release record for `dca3b8b`; Worker metadata has no embedded Git SHA,
-so that SHA association is documentary, not a newly queried build fingerprint.
-No deployment was performed in this audit.
+Authenticated control-plane access works. Correct DB and secret names verified;
+migration completed. The earlier audit observed version `fd9bacc5`; a fresh check
+before Zoom setup found `118d3598-0f2c-4bc4-8223-c5566bbae692` serving 100% traffic,
+deployed at 20:29 UTC outside this setup action. The Zoom secret-only dashboard save
+produced `4a05c6c9-5ad0-4a78-8e71-617c27c93918`, serving 100% at 20:59 UTC.
+All 129 code-module hashes are identical before/after this save. Deployed content
+has no PR #37 Zoom implementation. This was an authorized configuration update;
+PR #37 application code remains undeployed.
 
 ## PR, deployment and rehearsal decision
 
@@ -254,7 +298,8 @@ There is no CI pass to claim. Local release checks passed as recorded above.
 Required migration/config/docs are included. No known failing local application
 journey was found, but external gates mean **do not merge/deploy for launch yet**.
 
-Live PR #37 rehearsal: **BLOCKED / NOT RUN**. Missing Zoom setup and unverified matching Stripe runtime configuration prevent
+Full PR #37 rehearsal: **BLOCKED / NOT RUN**. Zoom API-only rehearsal passed; the
+occupied host and unverified matching Stripe runtime configuration still prevent
 customer→authorization→accept→capture→one Zoom→one Calendar→same-link email proof.
 Previously successful Meet/sandbox rehearsal is not proof for this Zoom release.
 Automation can inspect provider records, exercise configured test payments/retries,
@@ -274,16 +319,18 @@ commit, deploy from clean main, record commit SHA and Worker version/traffic, co
 cron invocation and perform the full smoke above. Annabel's conditional deployment
 authorization applies only once these blockers are resolved.
 
-## Manual action now: one step
+## Current setup checkpoint
 
-**Zoom → [Marketplace sign-in](https://zoom.us/signin?continue=https%3A%2F%2Fmarketplace.zoom.us%2F)**:
-sign into the account that will own Take a Seat's central meetings. Do not paste a
-password or secret here. Success means Marketplace displays the intended account
-instead of Sign In. Then verify its plan before choosing or buying a dedicated host.
-Subsequent setup should be guided one step at a time; the sections above are the
-dependency inventory, not a request to complete all provider changes at once.
+Annabel authorized autonomous provider setup, credential storage in Cloudflare and
+controlled real-provider testing, followed by the next unresolved audit blocker.
+PR #37 must remain undeployed until the release blockers and rehearsal requirements
+are addressed. Zoom app/secrets/API checks are complete, with guest joining blocked
+by an unrelated active owner call. Google domain verification TXT is prepared but
+not saved; the tool-required confirmation to establish the same owner's verified
+Search Console access is pending. No credentials have been displayed, saved in
+documentation or committed.
 
-Remaining launch blockers: central Zoom setup, Google production/test-creator
+Remaining launch blockers: unattended Zoom participant rehearsal, Google production/test-creator
 eligibility, matching Stripe runtime configuration and live webhook/Connect readiness,
 final cancellation/reschedule/response policy, real-provider Zoom rehearsal, then
 reviewed deployment, production cron and complete production smoke verification.

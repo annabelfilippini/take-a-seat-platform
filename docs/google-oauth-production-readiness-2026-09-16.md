@@ -9,6 +9,14 @@ unconfirmed.** Earlier account observations
 are historical: project `take-a-seat-platform` had an External/Testing audience,
 blank homepage/privacy URLs and undeclared Data Access scopes. Recheck the Console.
 
+September 16 follow-up: homepage/privacy URLs and the exact two scopes below are
+saved and reload-verified. The existing Web client now has zero JavaScript origins
+and only the canonical production callback; its credentials were not rotated.
+Domain ownership TXT is prepared but awaits the required owner-access confirmation.
+Audience remains Testing and Google verification is not approved. Real development
+OAuth requires a separate project/client before use. See the
+[current release audit](first-creator-release-audit-2026-09-16.md).
+
 ## 1. Project and environment separation
 
 Use the existing `take-a-seat-platform` project for production after auditing its

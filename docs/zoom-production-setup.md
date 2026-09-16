@@ -1,13 +1,21 @@
 # Zoom setup and booking release report
 
-September 16, 2026. Annabel confirmed Zoom is **not set up**. No Zoom account,
-license, capacity or live meeting has been inspected or verified. No plan was
-purchased and no production deployment was performed.
+September 16, 2026. The account owner and one licensed **Zoom Workplace Pro
+(Named Host)** user are verified in Zoom. Annabel approved one simultaneous
+Take a Seat meeting for the first-creator launch; no additional license is needed
+or authorized. The Server-to-Server app is activated with exactly the five scopes
+below. All four Zoom values are encrypted production Worker secrets. The actual
+integration passed real Zoom API creation, lost-response recovery, repeated and
+concurrent execution, host/link validation, rescheduling and deletion. Unattended
+two-participant joining remains blocked by another meeting occupying this host.
+No plan was purchased and PR #37 was not deployed.
 
 Follow-up audit: production migration 0025 is now applied, Google public branding
-URLs saved and a separate live card-only Stripe configuration prepared. Zoom is
-still unconfigured. See [current release audit](first-creator-release-audit-2026-09-16.md)
-for observed provider settings and the single next manual step. The cancellation
+URLs and exact Calendar scope declarations saved, and a separate live card-only
+Stripe configuration prepared. Zoom's API terms and exact app access were explicitly
+approved by Annabel. See the
+[current release audit](first-creator-release-audit-2026-09-16.md)
+for observed provider settings and remaining gates. The cancellation
 implementation is a technical capability; the latest request reopens final
 launch-policy review and no new business policy is established by this guide.
 
@@ -27,7 +35,12 @@ plans. It does not infer licensing from an email or assume unlimited capacity.
 For unattended participation, enable join before host and disable waiting room and
 mandatory authentication for these dedicated hosts; keep passcodes enabled. The app
 uses generated meeting IDs, a passcode and join-before-host five minutes early, with
-recording disabled. Verify no locked account/group setting overrides those choices.
+recording disabled. Enable the host's **Participants can join 5 minutes before start
+time** checkbox as well as join-before-host. The real rehearsal found that Zoom
+returned `jbh_time=0` while that checkbox was unchecked, despite the create request
+specifying five minutes. The host setting is now saved and real API readback returns
+five minutes. The backend now rejects a differing returned limit; see BUG_LOG.
+Verify no locked account/group setting overrides those choices.
 Both creator and customer join as participants. They have no host moderation/recording
 controls. If those controls become a product requirement, change the hosting model;
 never send a start URL or host key to customers.
@@ -111,6 +124,48 @@ sets a 24-hour product response SLA with additional provider/session-time margin
    apply. Do not enable real-money bookings just because the local suite passes.
 
 ## Local verification and limitations
+
+### Real Zoom API evidence, September 16
+
+An isolated loopback harness invoked the actual `reserveZoomHost`,
+`ensureBookingZoom`, `withBookingLock`, `syncBookingZoom` and `releaseZoomHost`
+helpers against isolated SQLite through the application's D1 statement interface.
+Credentials existed only in process/browser memory and encrypted Cloudflare secrets.
+Zoom requests were real; no payment, customer email or production booking was made.
+
+- OAuth token scopes matched the five documented scopes exactly.
+- A second creator's overlapping booking was rejected with one configured host.
+- Exactly one create request succeeded per disposable booking. Dropping that real
+  response before application persistence caused marker-based recovery, not another
+  create. Sequential and concurrent retries kept the same meeting.
+- Zoom's returned host matched the licensed owner; its participant URL matched the
+  stored booking URL. No host start URL was stored in the booking.
+- Corrected settings: five-minute early join, waiting room off, mandatory
+  authentication off, generated meeting ID, passcode present, recording off.
+- Rescheduling patched the same meeting once; repeating it made no extra patch.
+  Cancellation deleted it once; GET returned 404/code 3001 and the host list had no
+  matching meeting; the reservation was released.
+
+Three sequential disposable booking runs covered initial discovery, corrected API
+verification and the guest-join attempt. Each created one meeting; all three were
+deleted and verified absent. The loopback harness is stopped. Follow-up application
+fix commit: `190353d`; no credentials were written to the temporary harness or repo.
+
+The guest browser subsequently reported **The host has another meeting in progress**.
+The portal identifies an existing **Take a Seat Onboarding** meeting as in progress;
+it is not a disposable meeting from this rehearsal. Ending it requires Annabel's
+permission. Do not count the two-participant, media, duration or overrun checks as
+passed. This also demonstrates that personal meetings on this host can block launch
+sessions; reserve the licensed host exclusively for Take a Seat during booked hours.
+
+Cloudflare secret-only configuration produced version
+`4a05c6c9-5ad0-4a78-8e71-617c27c93918` at 100% traffic. All 129 code-module hashes
+matched the previously deployed version `118d3598-0f2c-4bc4-8223-c5566bbae692`.
+No PR #37 Zoom implementation was present in that deployed code before or after.
+
+After the discovered early-join bug fix, lint, TypeScript, production build,
+**87 Node tests and all 35 Playwright journeys passed**. The historical table below
+records the earlier pre-provider run; it is not the only verification performed.
 
 The tests use real application routes, isolated local D1 and browser contexts; Stripe,
 Zoom, Google and Resend are intercepted at the server transport boundary. Real
