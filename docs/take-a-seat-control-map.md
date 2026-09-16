@@ -60,8 +60,10 @@ Creator backend:
   checks passed. Real-money launch gates remain below. See the
   [reliability audit](marketplace-reliability-qa-2026-09-14.md) and
   [live rehearsal](marketplace-live-rehearsal-2026-09-14.md).
-- Up to 12 ordered offerings with explicit durations, prices, descriptions, and archival.
-- Default weekly hours plus dated overrides through one year, with IANA timezones.
+- Up to 12 ordered offerings with explicit durations, prices, descriptions, and an Active checkbox.
+  Inactive offerings retain their IDs and historical booking details.
+- One week dropdown selects default weekly hours or dated overrides through one year,
+  with IANA timezones.
   Saved availability affects live bookings immediately; empty overrides close that week.
 - Requests support authorized acceptance/capture and decline/cancellation, with retries.
 - Payments reads current Stripe transfer readiness, balances, and historical sessions.

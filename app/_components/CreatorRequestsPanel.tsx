@@ -41,7 +41,7 @@ export function CreatorRequestsPanel({ creatorId }: { creatorId: string }) {
     finally { busy.current = false; setPending(null); }
   }
   return <div className="creator-workspace-panel"><div className="creator-panel-heading"><div><span>Your conversations</span><h1>Requests</h1></div><button type="button" onClick={() => void load()} disabled={loading || Boolean(pending)}>Refresh requests</button></div>
-    <p>Review the person, their question, and the time before accepting. Acceptance captures the authorized payment and confirms the calendar invitation.</p>
+    <p>Acceptance captures the authorized payment and confirms the calendar invitation.</p>
     {error && <p role="alert">{error}</p>}{loading ? <p role="status">Loading requests…</p> : !bookings.length ? <p>No requests yet. They will appear here when someone chooses a session.</p> : null}
     <div className="creator-request-list">{[...bookings].sort((a,b) => b.createdAt.localeCompare(a.createdAt)).map((booking) => <article className="creator-request-card" key={booking.id}>
       <div className="creator-panel-heading"><h2>{booking.customerName || 'Customer'}</h2><strong>{bookingStatusLabel(booking.status)}</strong></div>

@@ -174,8 +174,8 @@ test('failed save keeps edits and never claims success, then retry persists',asy
 test('default availability, dated override, timezone, one-year navigator and mobile layout',async({page,request})=>{
   await sql(request,'DELETE FROM creator_availability_rules');
   const errors=observe(page); await login(page); await page.getByRole('tab',{name:'Availability',exact:true}).click();
-  await page.getByRole('button',{name:'Default weekly hours',exact:true}).click();
-  await page.getByRole('button',{name:'Clear hours',exact:true}).click();
+  await page.getByLabel('Choose availability week').selectOption('default');
+  while (await page.locator('[data-availability-key][aria-pressed=true]:not([disabled])').count()) await page.locator('[data-availability-key][aria-pressed=true]:not([disabled])').first().press('Space');
   for(const time of ['10:00','10:15','10:30','10:45']) await page.locator(`[data-availability-key="1|${time}"]`).press('Space');
   await page.getByPlaceholder('Search timezone').fill('America/New_York');
   await page.getByRole('button',{name:'Save availability',exact:true}).last().click();
@@ -183,21 +183,21 @@ test('default availability, dated override, timezone, one-year navigator and mob
   await page.getByRole('tab',{name:'Preview & Publish'}).click();
   await expect(page.locator('.creator-setup-checklist li').filter({hasText:'Saved availability and Google Calendar'})).toContainText('Ready');
   await page.getByRole('tab',{name:'Availability',exact:true}).click();
-  await page.getByRole('button',{name:'Week overrides',exact:true}).click();
+  await page.getByLabel('Choose availability week').selectOption({index:1});
   await page.getByRole('button',{name:'Next availability week'}).click();
   const week=await page.getByLabel('Choose availability week').inputValue();
-  await page.getByRole('button',{name:'Clear hours',exact:true}).click();
+  while (await page.locator('[data-availability-key][aria-pressed=true]:not([disabled])').count()) await page.locator('[data-availability-key][aria-pressed=true]:not([disabled])').first().press('Space');
   await page.getByRole('button',{name:'Save availability',exact:true}).last().click();
   await expect(page.getByText(/Availability saved for/)).toBeVisible();
   await page.reload(); await page.getByRole('tab',{name:'Availability',exact:true}).click();
   await page.getByLabel('Choose availability week').selectOption(week);
   await expect(page.locator('[data-availability-key][aria-pressed=true]')).toHaveCount(0);
-  await page.getByRole('button',{name:'Default weekly hours',exact:true}).click();
+  await page.getByLabel('Choose availability week').selectOption('default');
   await expect(page.locator('[data-availability-key][aria-pressed=true]')).toHaveCount(4);
   await expect(page.getByPlaceholder('Search timezone')).toHaveValue('America/New_York');
-  const max=await page.getByLabel('Jump to availability date').getAttribute('max');
-  expect(Date.parse(max!)-Date.now()).toBeGreaterThan(360*86400000);
-  await page.getByLabel('Jump to availability date').fill(max!);
+  const max=await page.getByLabel('Choose availability week').locator('option').last().getAttribute('value');
+  expect(Date.parse(max!)-Date.now()).toBeGreaterThan(355*86400000);
+  await page.getByLabel('Choose availability week').selectOption(max!);
   await expect(page.getByLabel('Choose availability week')).not.toHaveValue('default');
   await page.setViewportSize({width:390,height:844});
   expect(await page.evaluate(()=>document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
@@ -299,7 +299,7 @@ test('an abandoned checkout is released only after Stripe confirms expiry',async
 });
 
 
-test('multiple offerings retain order and archive without exposing inactive sessions',async({page,request,browser})=>{
+test('multiple offerings retain order and toggle Active without exposing inactive sessions',async({page,request,browser})=>{
   const errors=observe(page); await seedDraft(request); await login(page);
   await page.getByRole('button',{name:'Add offering',exact:true}).click();
   await page.getByLabel('Offering 2 title').fill('Closet planning');
@@ -307,18 +307,29 @@ test('multiple offerings retain order and archive without exposing inactive sess
   await page.getByLabel('Offering 2 price').fill('65');
   await page.getByLabel('Offering 2 description').fill('Plan a complete week of outfits.');
   await page.locator('.creator-offering-card').nth(1).getByRole('checkbox').check();
-  await page.getByRole('button',{name:'Move offering 2 up'}).click(); await save(page); await page.reload();
-  await expect(page.getByLabel('Offering 1 title')).toHaveValue('Closet planning');
-  await expect(page.getByLabel('Offering 1 duration')).toHaveValue('45');
+  await expect(page.getByRole('button',{name:/Move offering/})).toHaveCount(0);
+  await save(page); await page.reload();
+  await expect(page.getByLabel('Offering 1 title')).toHaveValue('Quick Styling Question');
+  await expect(page.getByLabel('Offering 2 title')).toHaveValue('Closet planning');
+  await expect(page.getByLabel('Offering 2 duration')).toHaveValue('45');
+  await page.locator('.creator-offering-card').nth(1).screenshot({path:'.wrangler/offering-no-arrows-desktop.png'});
+  await page.setViewportSize({width:390,height:844});
+  await page.locator('.creator-offering-card').nth(1).screenshot({path:'.wrangler/offering-no-arrows-mobile.png'});
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
+  await page.setViewportSize({width:1280,height:900});
   await publish(page);
   const customer=await browser.newPage(); observe(customer); await customer.goto('http://127.0.0.1:4173/with/e2e-creator');
   await expect(customer.getByRole('button',{name:/Closet planning/})).toContainText('45 min');
   await expect(customer.getByRole('button',{name:/Closet planning/})).toContainText('$65');
   await page.getByRole('tab',{name:'Profile',exact:true}).click();
-  await page.locator('.creator-offering-card').first().getByRole('button',{name:'Archive',exact:true}).click(); await save(page); await publish(page);
+  await page.locator('.creator-offering-card').nth(1).getByRole('checkbox',{name:'Active',exact:true}).uncheck(); await save(page); await publish(page);
   await customer.reload(); await expect(customer.getByRole('button',{name:/Closet planning/})).toHaveCount(0);
   await expect(customer.getByRole('button',{name:/Quick Styling Question/})).toBeVisible();
-  await page.reload(); await expect(page.locator('.creator-offering-card').first()).toContainText('Archived');
+  await page.reload(); await expect(page.locator('.creator-offering-card').nth(1).getByRole('checkbox',{name:'Active',exact:true})).not.toBeChecked();
+  await page.context().clearCookies(); await login(page);
+  await expect(page.locator('.creator-offering-card').nth(1).getByRole('checkbox',{name:'Active',exact:true})).not.toBeChecked();
+  await page.locator('.creator-offering-card').nth(1).getByRole('checkbox',{name:'Active',exact:true}).check(); await save(page); await publish(page);
+  await customer.reload(); await expect(customer.getByRole('button',{name:/Closet planning/})).toBeVisible();
   await customer.close(); expect(errors).toEqual([]);
 });
 
@@ -362,11 +373,11 @@ test('slow save preserves newer edits and double clicks send one write', async (
 test('saved default timezone carries into untouched weeks before and after refresh', async ({page,request})=>{
   const errors=observe(page); await seedDraft(request); await login(page);
   await page.getByRole('tab',{name:'Availability',exact:true}).click();
-  await page.getByRole('button',{name:'Default weekly hours',exact:true}).click();
+  await page.getByLabel('Choose availability week').selectOption('default');
   await page.getByPlaceholder('Search timezone').fill('America/New_York');
   await page.getByRole('button',{name:'Save availability',exact:true}).last().click();
   await expect(page.getByText('Availability saved for default weekly schedule.')).toBeVisible();
-  await page.getByRole('button',{name:'Week overrides',exact:true}).click();
+  await page.getByLabel('Choose availability week').selectOption({index:1});
   await page.getByRole('button',{name:'Next availability week'}).click();
   const week=await page.getByLabel('Choose availability week').inputValue();
   await expect(page.getByPlaceholder('Search timezone')).toHaveValue('America/New_York');
