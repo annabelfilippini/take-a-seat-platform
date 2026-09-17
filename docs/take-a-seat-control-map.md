@@ -83,6 +83,9 @@ App/runtime:
 
 - Framework: vinext.
 - Production URL: `https://takeaseatwith.com/`.
+- Link previews use `public/homepage-social-preview-v1.png`, a 1200 × 630 capture
+  of the homepage hero, configured in `app/layout.tsx`. Use a new filename when
+  changing this image; messaging services may retain previously cached cards.
 - Production target: Cloudflare Workers.
 - Production config: `wrangler.deploy.jsonc`.
 - Local Vite config: `vite.config.ts`.
