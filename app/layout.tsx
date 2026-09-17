@@ -7,17 +7,17 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://takeaseatwith.com"),
   title: "Take a Seat",
   description:
-    "Book private seats with rising creators, tastemakers, and experts.",
+    "Meet your personal styling committee. Book a private seat with creators, tastemakers, and experts.",
   openGraph: {
     title: "Take a Seat",
     description:
-      "Book private seats with rising creators, tastemakers, and experts.",
+      "Meet your personal styling committee. Book a private seat with creators, tastemakers, and experts.",
     images: [
       {
-        url: "/og.png",
+        url: "/homepage-social-preview-v1.png",
         width: 1200,
         height: 630,
-        alt: "Take a Seat social preview.",
+        alt: "Meet Your Personal Styling Committee — the Take a Seat homepage, with a woman getting ready at her vanity with her hair in a towel.",
       },
     ],
   },
@@ -25,8 +25,8 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Take a Seat",
     description:
-      "Book private seats with rising creators, tastemakers, and experts.",
-    images: ["/og.png"],
+      "Meet your personal styling committee. Book a private seat with creators, tastemakers, and experts.",
+    images: ["/homepage-social-preview-v1.png"],
   },
   icons: {
     icon: "/favicon.png",

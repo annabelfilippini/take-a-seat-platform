@@ -5,7 +5,7 @@ import { BookingPlatform } from "./_components/BookingPlatform";
 export const metadata: Metadata = {
   title: "Take a Seat",
   description:
-    "Choose a private seat with rising creators, tastemakers, and experts.",
+    "Meet your personal styling committee. Book a private seat with creators, tastemakers, and experts.",
 };
 
 export const dynamic = "force-dynamic";

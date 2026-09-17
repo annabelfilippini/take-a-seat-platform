@@ -751,3 +751,29 @@ September 14, 2026; regression of incomplete initial-interaction protection.
 - **Regression prevention:** Dedicated Playwright reproduction must pass for both
   transitions, alongside creator/customer timezone and complete booking journeys.
 - **Related files:** availability.ts and creator-journeys.spec.ts.
+
+
+## 2026-09-17: Shared homepage links showed an obsolete promotional image
+
+- **Bug / impact:** Messaging previews showed the old Amber clothing collage instead
+  of the homepage headline and towel-haired woman.
+- **Root cause:** Root Open Graph and Twitter metadata still explicitly selected
+  the old `public/og.png`; previews do not automatically capture the current homepage.
+- **Fix:** Select a versioned 1200 × 630 homepage hero capture and align descriptions
+  with the current headline. Existing messaging cards may remain cached.
+- **Regression prevention:** Browser coverage checks server-delivered metadata,
+  fetchable PNG dimensions, refresh, fresh mobile context, and homepage CTA navigation.
+- **Verification:** Lint, build and all 82 Node tests pass. The focused Playwright
+  journey passes; inspected desktop (1200 × 630) and mobile (390 × 844). Actual
+  Messages rendering remains unverified until deployment.
+- **Release:** Isolated from the pending booking branch; deployment requires approval.
+
+
+## 2026-09-17: Three checkout tests expired with the real clock
+
+- **Bug / impact:** The full Node suite rejected three valid-checkout fixtures at
+  the availability guard before exercising the intended Stripe behavior.
+- **Root cause:** Those tests hardcoded September 17 at 09:30 New York while using
+  the real current date; the fixture became a past appointment today.
+- **Fix / regression:** Freeze Date to September 14 within each affected test using
+  automatically restored Node test mocks. Production availability checks are unchanged.
