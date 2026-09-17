@@ -742,7 +742,9 @@ test("rejects manually submitted booking times outside creator availability", as
   assert.equal(stripeFetchCalled, false);
 });
 
-test("returns a specific Stripe setup blocker before request checkout", async () => {
+test("returns a specific Stripe setup blocker before request checkout", async (context) => {
+  // Keep the September 17 booking fixture in the future as the real clock advances.
+  context.mock.timers.enable({ apis: ["Date"], now: new Date("2026-09-14T12:00:00Z") });
   const previousSecret = process.env.STRIPE_SECRET_KEY;
   const originalFetch = globalThis.fetch;
   let stripeFetchCalled = false;
@@ -1287,7 +1289,9 @@ test("checks Stripe transfer readiness before marking Connect returned accounts 
   );
 });
 
-test("creates Stripe Checkout destination charges with a platform fee", async () => {
+test("creates Stripe Checkout destination charges with a platform fee", async (context) => {
+  // Keep the September 17 booking fixture in the future as the real clock advances.
+  context.mock.timers.enable({ apis: ["Date"], now: new Date("2026-09-14T12:00:00Z") });
   const originalFetch = globalThis.fetch;
   let stripeRequest;
 
@@ -1419,7 +1423,9 @@ test("creates Stripe Checkout destination charges with a platform fee", async ()
   );
 });
 
-test("sends public booking requests to Stripe Checkout for payment authorization", async () => {
+test("sends public booking requests to Stripe Checkout for payment authorization", async (context) => {
+  // Keep the September 17 booking fixture in the future as the real clock advances.
+  context.mock.timers.enable({ apis: ["Date"], now: new Date("2026-09-14T12:00:00Z") });
   const originalFetch = globalThis.fetch;
   let stripeRequest;
 
