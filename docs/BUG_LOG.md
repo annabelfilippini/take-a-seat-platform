@@ -794,7 +794,8 @@ September 14, 2026; regression of incomplete initial-interaction protection.
   reload, returning login, publication, HEIC failure recovery, and a stalled
   mobile upload followed by retry of the same file with text edits preserved.
 - **Evidence and limits:** [Upload repair](profile-upload-repair-2026-09-22.md).
-  Production deploy and the creator's original-file retest remain pending.
+  Deployed September 22 from PR #41; production large-photo upload passed.
+  The creator's original-file retest remains pending.
 
 ## 2026-09-22: Homepage navigation retained the positional hydration-ID bug
 
