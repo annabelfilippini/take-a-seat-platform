@@ -5,6 +5,10 @@ Last updated: 2026-09-16
 This is the working source of truth for Take a Seat while the product is being
 organized. It should stay short, current, and operational.
 
+Photo upload repair on `codex/profile-update-repair` passes 82 Node and 32 browser
+tests and awaits deployment approval. See [upload repair](profile-upload-repair-2026-09-22.md)
+for confirmed failure paths and the remaining original-file/device check.
+
 For email delivery, invitation, and admin/creator login troubleshooting, read
 [the onboarding lessons](creator-onboarding-lessons.md) before live testing.
 

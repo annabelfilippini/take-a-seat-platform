@@ -45,6 +45,13 @@ test('shared homepage serves its hero preview before JavaScript and after refres
     await expect(page.locator('meta[name="twitter:image"]')).toHaveAttribute('content', imageUrl);
     await page.locator('.hero-image').evaluate((img: HTMLImageElement) => img.decode());
     await page.screenshot({ caret: 'initial', path: `.wrangler/homepage-preview-${viewport.width}.png` });
+    if (viewport.width < 600) {
+      const toggle=page.getByRole('button',{name:'Open navigation',exact:true});
+      await toggle.click(); await expect(toggle).toHaveAttribute('aria-expanded','true');
+      await expect(page.getByRole('navigation',{name:'Primary navigation'})).toBeVisible();
+      await expect(toggle).toHaveAttribute('aria-controls','home-primary-navigation');
+      await toggle.click(); await expect(toggle).toHaveAttribute('aria-expanded','false');
+    }
     await page.locator('.hero-cta').click();
     await expect(page).toHaveURL(/\/take-a-seat\??$/);
     expect(errors).toEqual([]);

@@ -17,6 +17,7 @@ import { CreatorPaymentsPanel } from "../../_components/CreatorPaymentsPanel";
 import type { Offering } from "../../_lib/offerings";
 import { CREATOR_PROFILE_EDITOR_URL } from "../../_lib/creator-destination";
 
+import { PHOTO_UPLOAD_ACCEPT, MEDIA_UPLOAD_ACCEPT, isUploadPhoto, isSupportedUpload, uploadFileType, uploadCreatorFile } from "../../_lib/creator-upload";
 import { prepareProfileMedia } from "../../_lib/profile-media";
 import { profileSaveError } from "../../_lib/profile-save";
 import {
@@ -224,6 +225,7 @@ export function EditableCreatorProfilePreview({
   const [stripeReady, setStripeReady] = useState(false);
   const [lastSavedAt, setLastSavedAt] = useState(initialProfile.draftSavedAt);
   const [uploadState, setUploadState] = useState("");
+  const [uploadTarget, setUploadTarget] = useState<"profile" | "gallery">("profile");
   const uploadBusy = useRef(false);
   const [activeCreatorTab, setActiveCreatorTab] =
     useState<EditableCreatorTab>(calendarStatus ? "availability" : stripeStatus ? "payments" : "profile");
@@ -392,19 +394,16 @@ export function EditableCreatorProfilePreview({
     if (uploadBusy.current) return;
     uploadBusy.current = true; setUploadState("Uploading…");
     try {
-      if (file.size > 8 * 1024 * 1024) throw new Error("Choose a file up to 8 MB.");
-      const body = new FormData(); body.set("creatorId", profile.id); body.set("file", file);
-      const response = await fetch("/api/creators/media", { method: "POST", body });
-      const result = await response.json() as {source?:string;error?:string};
-      if (!response.ok || !result.source) throw new Error(result.error || "Upload failed. Please retry.");
-      onLoad(result.source); setUploadState("Upload ready. Save your draft to keep this selection.");
+      const source = await uploadCreatorFile(profile.id, file);
+      onLoad(source); setUploadState("Upload ready. Save your draft to keep this selection.");
     } catch (error) { setUploadState(error instanceof Error ? error.message : "Upload failed. Please retry."); }
     finally { uploadBusy.current = false; }
   }
 
   function chooseMediaItemFile(id: string, file: File | undefined) {
     if (!file) return;
-    if (!isSupportedMediaFile(file)) {
+    setUploadTarget("gallery");
+    if (!isSupportedUpload(file)) {
       setUploadState("Use a JPG, PNG, WebP photo or MP4/WebM video.");
       return;
     }
@@ -477,7 +476,8 @@ export function EditableCreatorProfilePreview({
 
   function chooseProfileImage(file: File | undefined) {
     if (!file) return;
-    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) { setUploadState("Choose a JPG, PNG or WebP profile photo."); return; }
+    setUploadTarget("profile");
+    if (!isUploadPhoto(file)) { setUploadState("Choose a JPG, PNG or WebP profile photo."); return; }
 
     void uploadFile(file, (source) => {
       setProfile((current) => ({
@@ -630,7 +630,8 @@ export function EditableCreatorProfilePreview({
 
   function chooseDraftMediaFile(file: File | undefined) {
     if (!file) return;
-    if (!isSupportedMediaFile(file)) {
+    setUploadTarget("gallery");
+    if (!isSupportedUpload(file)) {
       setUploadState("Use a JPG, PNG, WebP photo or MP4/WebM video.");
       return;
     }
@@ -789,7 +790,6 @@ export function EditableCreatorProfilePreview({
         id="editable-creator-profile"
         role="tabpanel"
       >
-      {uploadState && <p role="status" className="creator-upload-status">{uploadState}</p>}
       <fieldset className="creator-setup-fields" disabled={!hydrated || publishing || uploadState === "Uploading…"}>
       <section className="amber-profile-hero editable-public-preview" id="public-preview">
         <div className="amber-hero-copy">
@@ -820,13 +820,14 @@ export function EditableCreatorProfilePreview({
               <label>
                 <span>Upload profile picture</span>
                 <input
-                  accept="image/*"
+                  accept={PHOTO_UPLOAD_ACCEPT}
                   aria-label="Upload profile picture"
                   className="editable-profile-field editable-file-input"
                   type="file"
                   onChange={(event) => chooseProfileImage(takeUploadFile(event.currentTarget))}
                 />
               </label>
+              <p className="editable-upload-note">JPG, PNG or WebP, up to 30 MB. Large photos are resized automatically.</p>
               {profileImageFileName ? (
                 <p className="editable-upload-note">Uploaded {profileImageFileName}</p>
               ) : null}
@@ -853,6 +854,7 @@ export function EditableCreatorProfilePreview({
                 </button>
               </div>
             </details>
+            {uploadTarget === "profile" && uploadState && <p role="status" className="creator-upload-status">{uploadState}</p>}
           </div>
           <EditableTextarea
             ariaLabel="Creator hero name"
@@ -967,7 +969,7 @@ export function EditableCreatorProfilePreview({
                 <MediaPreview item={item} />
                 <div className="editable-media-source-control">
                   <input
-                    accept="image/*,video/*"
+                    accept={MEDIA_UPLOAD_ACCEPT}
                     aria-label={`Upload replacement for ${item.title}`}
                     className="editable-profile-field editable-file-input"
                     type="file"
@@ -992,11 +994,11 @@ export function EditableCreatorProfilePreview({
             ))}
           </div>
 
-          <p>Up to 8 photos or videos, 8 MB each. JPG, PNG, WebP, MP4 or WebM. Originals are kept so you can recrop later.</p>
+          <p>Up to 8 photos or videos. JPG, PNG or WebP photos up to 30 MB are resized when needed; MP4 or WebM videos up to 8 MB. After uploading, select Add media, then Save draft.</p>
           <div className="editable-add-media">
             <div className="editable-add-source">
               <input
-                accept="image/*,video/*"
+                accept={MEDIA_UPLOAD_ACCEPT}
                 aria-label="Upload new media file"
                 className="editable-profile-field editable-file-input"
                 ref={draftMediaFileInputRef}
@@ -1018,6 +1020,7 @@ export function EditableCreatorProfilePreview({
           </div>
         </div>
           </details>
+          {uploadTarget === "gallery" && uploadState && <p role="status" className="creator-upload-status">{uploadState}</p>}
         </div>
       </section>
 
@@ -2236,12 +2239,8 @@ function getAvailabilitySlotKeyFromPointer(event: PointerEvent<HTMLElement>) {
   return cell instanceof HTMLElement ? cell.dataset.availabilityKey ?? null : null;
 }
 
-function isSupportedMediaFile(file: File) {
-  return ["image/jpeg", "image/png", "image/webp", "video/mp4", "video/webm"].includes(file.type);
-}
-
 function getMediaKindForFile(file: File): EditableGalleryItem["kind"] {
-  return file.type.startsWith("video/") ? "video" : "photo";
+  return uploadFileType(file).startsWith("video/") ? "video" : "photo";
 }
 
 function getMediaTitleFromFileName(fileName: string) {

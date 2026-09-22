@@ -1,13 +1,14 @@
 "use client";
 
 /* eslint-disable @next/next/no-img-element */
-import { useId, useState } from "react";
+import { useState } from "react";
 import type { Creator } from "../_lib/creators";
 import { CreatorDirectory } from "./CreatorDirectory";
 
 export function BookingPlatform({ creators }: { creators?: Creator[] }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const navId = useId();
+  // This page has one primary menu; its ID must survive vinext tree changes.
+  const navId = "home-primary-navigation";
 
   return (
     <main className="platform-shell">

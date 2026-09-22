@@ -388,7 +388,7 @@ test("server-renders the admin creator profile editor preview", async () => {
   assert.match(html, /aria-label="TikTok URL"/);
   assert.match(html, /aria-label="Upload new media file"/);
   assert.match(html, />Add media<\/button>/);
-  assert.match(html, /accept="image\/\*,video\/\*"/);
+  assert.match(html, /accept="image\/jpeg,image\/png,image\/webp,video\/mp4,video\/webm"/);
   assert.doesNotMatch(html, /aria-label="New media URL"/);
   assert.doesNotMatch(html, /aria-label="TikTok video URL"/);
   assert.doesNotMatch(html, /TikTok video ID/);
