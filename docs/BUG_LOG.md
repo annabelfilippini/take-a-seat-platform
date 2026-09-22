@@ -777,3 +777,21 @@ September 14, 2026; regression of incomplete initial-interaction protection.
   the real current date; the fixture became a past appointment today.
 - **Fix / regression:** Freeze Date to September 14 within each affected test using
   automatically restored Node test mocks. Production availability checks are unchanged.
+
+## 2026-09-22: Creator photo uploads rejected selectable files or stalled editing
+
+- **Report:** A creator could not add photos. Her original file/device/error is
+  unavailable, so her exact trigger remains unconfirmed.
+- **Confirmed root causes:** Wildcard file pickers offered unsupported formats;
+  MIME-only checks rejected missing metadata; camera photos over 8 MB had no
+  resize path; unbounded upload requests disabled the entire editor; errors
+  appeared away from the gallery picker.
+- **Fix:** Shared file preparation, explicit supported picker types, bounded
+  native photo conversion/resizing, a 60-second upload timeout, and local error
+  feedback. Existing ownership, signature, storage, draft, and publication
+  checks remain authoritative.
+- **Regression protection:** Playwright checks large-photo D1 persistence,
+  reload, returning login, publication, HEIC failure recovery, and a stalled
+  mobile upload followed by retry of the same file with text edits preserved.
+- **Evidence and limits:** [Upload repair](profile-upload-repair-2026-09-22.md).
+  Production deploy and the creator's original-file retest remain pending.

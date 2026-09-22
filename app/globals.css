@@ -1466,6 +1466,10 @@ img {
   width: 100%;
 }
 
+.editable-profile-photo-controls .editable-upload-note {
+  margin: 12px 0;
+}
+
 .editable-profile-photo-controls label {
   display: grid;
   gap: 8px;
