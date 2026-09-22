@@ -40,8 +40,30 @@ Gallery instructions explain Add media followed by Save draft.
 
 ## Verification and release
 
-Pending final verification. This patch is isolated from the unreleased booking
-workflow on `codex/profile-update-repair`, based on main `823d7ae`.
+Final checks passed on September 22:
+
+- `npm run lint` and `npm run typecheck`.
+- `npm test`: production build and all 82 Node tests.
+- `npm run test:e2e`: all 32 journeys, with console/network error monitoring.
+- Large-photo resizing, missing MIME metadata, HEIC error recovery, real local
+  D1 persistence, hard refresh, fresh authenticated context, publication and
+  public image access, timeout/retry with unsaved text retained.
+- Inspected desktop 1280 × 900 and narrow 390 × 844 screenshots. Fixed a help
+  text overlap found in desktop QA; picker, errors and retry controls are usable.
+- Wrangler deployment dry run, no pending production migrations, and presence
+  of every secret required by this main-based patch.
+
+A preliminary full run hit an artifact-stream failure during browser teardown.
+A subsequent run exposed a real homepage navigation hydration mismatch caused
+by positional `useId`, a pattern already repaired in the shared page header.
+The homepage now uses a stable ID, with mobile-menu regression coverage. The
+final complete run passed without retries or suppressed unexpected failures.
+
+Adversarial review checked type/size rejection, failed and timed-out requests,
+late results, retained draft data, and unchanged authorization/publication.
+The upload changes and discovered homepage repair are separate focused commits.
+This patch is isolated from the unreleased booking workflow on
+`codex/profile-update-repair`, based on main `823d7ae`.
 Production deployment requires Annabel's explicit approval.
 
 A real-device Apple Photo Library conversion and the creator's original file
