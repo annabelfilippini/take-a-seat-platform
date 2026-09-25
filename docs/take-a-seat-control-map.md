@@ -16,7 +16,15 @@ fresh login now pass. Profile uploads and saved edits passed live. The new test
 card remains private pending Stripe setup in Annabel's other terminal. See
 [the current QA record](creator-live-qa-2026-09-24.md).
 
-Last updated: 2026-09-16
+Last updated: 2026-09-25
+
+Latest preparation: the combined current-main/Zoom/Stripe-return candidate passes
+90 Node and 40 Playwright tests, lint, TypeScript and deploy dry run. A reproduced
+near-term booking deadline bug is fixed. The existing Meet flow passed a real
+sandbox booking today; the combined Zoom provider rehearsal and live cutover remain
+pending. Development Google project is created, with OAuth/CLI owner approval steps
+in progress. See [current rehearsal](launch-rehearsal-2026-09-25.md) before using the
+historical release evidence below.
 
 **First creator release remains blocked.** Migration 0025 is applied; PR #37 is
 still draft and undeployed. Main `5012acc` was merged into the candidate and all
