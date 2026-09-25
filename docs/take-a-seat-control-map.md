@@ -1,5 +1,10 @@
 # Take a Seat Control Map
 
+September 25 lifecycle QA found a Stripe hosted-return Clerk handshake omission;
+the repair is local and not deployed. Production applications, delivered email,
+original invites and fresh-login profile persistence passed. Full provider booking
+remains unverified. See [lifecycle findings](creator-lifecycle-qa-2026-09-25.md).
+
 Fresh creator live QA on September 24 reproduced a Google OAuth callback session
 refresh failure. PR #43 is deployed (`93d8d23`); the real callback, refresh and
 fresh login now pass. Profile uploads and saved edits passed live. The new test

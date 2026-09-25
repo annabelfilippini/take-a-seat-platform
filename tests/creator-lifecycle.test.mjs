@@ -245,6 +245,38 @@ test("Calendar navigations refresh Clerk before consuming OAuth state and retain
   }
 });
 
+test("Stripe onboarding return and refresh retain the original destination through Clerk handshake", async () => {
+  const { withClerkSessionRefresh } = await import("../app/_lib/clerk-session-refresh.ts");
+  const env = { CLERK_SECRET_KEY: "test-only", NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "test-only" };
+  for (const route of ["start", "return"]) {
+    const request = new Request(`https://takeaseatwith.com/api/stripe/connect/${route}?creatorId=qa-owner&returnTo=%2Fcreator%2Fprofile`, {
+      headers: { "sec-fetch-dest": "document", "sec-fetch-site": "cross-site", referer: "https://connect.stripe.com/", cookie: "__session=fixture-old" },
+    });
+    let calls = 0;
+    const redirect = await withClerkSessionRefresh(request, env, async () => { calls++; return new Response("Must not run yet"); }, async incoming => ({
+      headers: new Headers({ location: `https://clerk.example.test/handshake?redirect_url=${encodeURIComponent(incoming.url)}` }),
+      isAuthenticated: false, status: "handshake",
+    }));
+    assert.equal(redirect.status, 307);
+    assert.equal(calls, 0, "Do not create an account or process return before session refresh");
+    assert.equal(new URL(redirect.headers.get("location")).searchParams.get("redirect_url"), request.url);
+    const returned = await withClerkSessionRefresh(request, env, async incoming => {
+      assert.equal(incoming.url, request.url);
+      assert.equal(incoming.headers.get("authorization"), "Bearer fixture-verified");
+      return new Response(null, {status:303,headers:{location:"/creator/profile?stripe=connected"}});
+    }, async () => ({headers:new Headers({"set-cookie":"__session=fixture-new; HttpOnly"}),isAuthenticated:true,status:"signed-in",token:"fixture-verified"}));
+    assert.equal(returned.status,303);
+    assert.equal(returned.headers.getSetCookie().length,1);
+    const signedOut = await withClerkSessionRefresh(request, env, async incoming => {
+      assert.equal(incoming.headers.has("authorization"),false);
+      return new Response("Denied",{status:403});
+    }, async () => ({headers:new Headers(),isAuthenticated:false,status:"signed-out"}));
+    assert.equal(signedOut.status,403);
+    const failure = await withClerkSessionRefresh(request, env, () => { throw new Error("Do not process Stripe on auth failure"); }, async () => {throw new Error("Clerk unavailable");});
+    assert.equal(failure.status,503);
+  }
+});
+
 test("duplicate acceptance links return the matching creator to their existing profile", async () => {
   const { getCreatorDashboardAccountFromInvite } = await import("../app/_lib/creator-dashboard.ts");
   const insert = sqlite.prepare("INSERT INTO creator_onboarding_profiles (id, name, email, instagram_platform, bio, application_status, public_slug) VALUES (?, ?, ?, ?, ?, 'accepted', ?)");
