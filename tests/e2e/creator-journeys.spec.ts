@@ -1,4 +1,3 @@
-import { baseURL } from './environment.mjs';
 import { test, expect, type APIRequestContext, type Page } from '@playwright/test';
 import { readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';

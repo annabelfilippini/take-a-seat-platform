@@ -5,6 +5,21 @@ This is the central index for meaningful bugs. Existing feature notes retain
 their detailed historical evidence; link to them instead of duplicating it.
 Follow the [engineering release gate](engineering-release-gate.md).
 
+## 2026-09-25: Near-term slots had already-expired acceptance deadlines
+
+- **Reproduction:** The combined booking-release browser suite selected an 11:30
+  session at 11:17 with zero creator notice. Authorization succeeded but acceptance
+  expired the request because the session's response deadline was 11:00.
+- **Root cause:** Availability enforced creator notice only, while the new workflow
+  independently required acceptance more than 30 minutes before session start.
+- **Fix:** Share the response margin and filter the common slot generator used by
+  customer listings and server validation, including seed availability. Existing
+  longer creator notice remains effective; customer controls and layout are unchanged.
+- **Regression:** Fixed-clock coverage checks listing, forged submission, exact
+  cutoff and a previously listed slot becoming stale. Complete browser acceptance
+  and competing-decision journeys pass after the repair. Full validation: 90 Node
+  tests, 40 Playwright journeys, lint, TypeScript and deployment dry run pass.
+
 ## 2026-09-24: Browser test runs shared a destructive temporary directory
 
 - **Root cause:** Every server reset `/private/tmp/take-a-seat-e2e-app` and its D1

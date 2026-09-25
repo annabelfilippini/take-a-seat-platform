@@ -1,4 +1,5 @@
 import { getStripeSecretKey, STRIPE_API_VERSION } from "./stripe-connect";
+import { SESSION_RESPONSE_MARGIN_MS } from "./booking-policy";
 
 export type StripePaymentIntent = {
   id: string;
@@ -64,7 +65,7 @@ export function authorizationDeadline(intent: StripePaymentIntent, createdAt: st
   const charge = typeof intent.latest_charge === 'object' ? intent.latest_charge : null;
   const captureBefore = charge?.payment_method_details?.card?.capture_before;
   const deadline = typeof captureBefore === 'number' && Number.isFinite(captureBefore) ? captureBefore * 1000 : null;
-  return { captureBefore: deadline, respondBy: Math.min(Date.parse(createdAt) + 24 * 3600_000, startAt - 30 * 60_000, deadline === null ? Infinity : deadline - 3600_000) };
+  return { captureBefore: deadline, respondBy: Math.min(Date.parse(createdAt) + 24 * 3600_000, startAt - SESSION_RESPONSE_MARGIN_MS, deadline === null ? Infinity : deadline - 3600_000) };
 }
 export async function mutateStripeIntent(id: string, action: 'capture' | 'cancel') {
   const key = getStripeSecretKey();

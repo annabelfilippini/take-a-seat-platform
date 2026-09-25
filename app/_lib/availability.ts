@@ -1,4 +1,5 @@
 import { seatDuration } from "./offerings";
+import { SESSION_RESPONSE_MARGIN_MS } from "./booking-policy";
 import { availabilityDateBounds, availabilityWeekStart, rulesForAvailabilityWeek } from "./availability-weeks";
 import type { CreatorAvailabilityRule, Seat } from "./creators";
 
@@ -197,7 +198,12 @@ function getSourceAvailabilitySlots({
     ? getRuleAvailabilitySlots(availabilityRules, seat, windowStart, now, windowDays)
     : getFallbackAvailabilitySlots(creatorId).filter((slot) => slot.startsAtUtc >= now.getTime() && slot.startsAtUtc >= windowStart.getTime());
 
-  return sourceSlots.sort((first, second) => first.startsAtUtc - second.startsAtUtc);
+  // A request whose response deadline has already passed cannot be accepted.
+  // Apply the same cutoff to listed slots and server-side slot validation,
+  // including launch fixtures that do not have saved availability rules.
+  return sourceSlots
+    .filter((slot) => slot.startsAtUtc > now.getTime() + SESSION_RESPONSE_MARGIN_MS)
+    .sort((first, second) => first.startsAtUtc - second.startsAtUtc);
 }
 
 function getFallbackAvailabilitySlots(creatorId: string): SourceAvailabilitySlot[] {

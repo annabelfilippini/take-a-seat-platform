@@ -54,6 +54,11 @@ Stripe reads expand `latest_charge`. The response deadline is the earliest of:
 - one hour before Stripe's `payment_method_details.card.capture_before`,
 - 30 minutes before the scheduled session.
 
+The shared availability generator excludes sessions starting in 30 minutes or less,
+so a new request has time remaining before the session response deadline. The same
+rule rejects stale or forged submissions on the server. Longer creator notice still
+applies.
+
 The product SLA is not a claim about card network validity. Missing capture-deadline
 information never authorizes capture. Acceptance reads current PaymentIntent status,
 manual capture, metadata association, full amount and currency; unknown/unusable
