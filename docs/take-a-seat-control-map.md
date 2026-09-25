@@ -1,12 +1,15 @@
 # Take a Seat Control Map
 
-Fresh creator live QA on September 24 reproduced a Google OAuth callback session
-refresh failure. PR #43 is deployed (`93d8d23`); the real callback, refresh and
-fresh login now pass. Profile uploads and saved edits passed live. The new test
-card remains private pending Stripe setup in Annabel's other terminal. See
+Fresh creator live QA verified uploads, saved edits, returning login and the
+repaired Calendar callback. PR #45 is deployed from main `35cb5b3`, Worker
+`bb9598b8-dbe7-4005-a301-fc0070d92797`. On September 25 Annabel authorized the
+`take-a-seat-qa-test` card to be visible without Stripe: its saved draft was
+promoted as a one-time operational exception with all sessions inactive. The
+homepage, directory and public profile passed anonymous desktop/mobile checks;
+booking requests are rejected. Normal publication still requires Stripe. See
 [the current QA record](creator-live-qa-2026-09-24.md).
 
-Last updated: 2026-09-16
+Last updated: 2026-09-25
 
 This is the working source of truth for Take a Seat while the product is being
 organized. It should stay short, current, and operational.

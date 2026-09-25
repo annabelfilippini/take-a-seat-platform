@@ -90,17 +90,63 @@ No unexpected JavaScript errors or HTTP failures were captured in this final
 fresh-login check. Preview & Publish now marks profile content, offering prices,
 and saved hours/Calendar Ready; only Stripe payouts remains To do.
 
-## Publication and remaining checks
+## Approved admin release, September 25
 
-The profile is a private draft. Production requires a ready Calendar connection
-and Stripe payout account before Publish. Annabel authorized Calendar setup and
-explicitly reserved Stripe for her other terminal. No Stripe account was created
-or configured here; automatic approval review blocked the initial Connect click.
-Do not bypass readiness checks or claim the public card is visible.
+Annabel approved [PR #45](https://github.com/annabelfilippini/take-a-seat-platform/pull/45).
+Merged main `35cb5b3` exactly matched the tested source tree `4c8010e`.
+Deployed the clean checkout with `npm run deploy -- --keep-vars`.
+Worker version: `bb9598b8-dbe7-4005-a301-fc0070d92797`.
+The admin page now serves a valid HTML `v`-mode slug pattern; verified in live
+Chrome after reload. Existing 32 Playwright journeys passed with the correction;
+the new admin validation/acceptance regression passed its corrected targeted run.
+Lint, TypeScript, production build and all 83 Node tests passed.
 
-Pending: Stripe readiness coordinated by Annabel and fresh public visitor
-verification after publishing. The exact original file/device
-behind Ella's report has not been supplied, so her specific failure is not proven.
+## Owner-approved test publication, September 25
+
+Annabel explicitly requested the card be pushed live without Stripe while she
+handles Stripe separately. Both offerings were deactivated through the actual
+creator editor and Save draft returned HTTP 200. A reload retained both inactive
+states. No Stripe account was created or changed.
+
+Performed a one-time operational D1 promotion of that saved draft's public fields
+for only `take-a-seat-qa-test`. The update required the exact ID and public slug,
+accepted status, unpublished state, draft timestamp `2026-09-25T16:39:27.383Z`,
+the QA display name, both legacy seats disabled, both offerings inactive, and
+no Stripe connection. Exactly one profile row was written. Identity, account,
+Calendar, availability and Stripe records were untouched. Published timestamp:
+`2026-09-25T16:40:29.089Z`.
+
+This is an owner-authorized test exception, not proof of normal self-service
+Publish with Stripe. Global publication readiness checks remain unchanged.
+Future self-service republishing still requires normal readiness. To retire this
+public QA fixture, clear only this profile's `published_at`; retain its saved
+work and account unless separately authorized to remove them.
+
+Verified with an anonymous Playwright context:
+
+- Homepage `/` and directory `/take-a-seat` show exactly one QA card with its
+  uploaded image and Opening soon status. Clicking the card opens the public
+  `/with/take-a-seat-qa-test` page.
+- Correct updated intro, About, topics, photo and both ordered gallery images
+  persist through reload. All three public images load successfully.
+- Desktop 1440 px and mobile 390 px layouts checked; mobile has no horizontal
+  overflow. Public profile contains no booking/payment form (only Sign In).
+- A direct request for the inactive QA seat returns HTTP 303 with
+  `booking=error&detail=unknown-seat`, before any booking/provider operation.
+- Read-only D1 verification confirms zero bookings, zero Stripe connections,
+  both legacy seats disabled, and the expected publication timestamp.
+- No JavaScript errors observed during these fresh public visits.
+
+Screenshots are saved under the original checkout's ignored
+`outputs/creator-qa-20260924/`: `live-home-card-desktop.png`, `live-qa-card.png`,
+`live-profile-desktop.png`, `live-profile-mobile.png`, and
+`live-directory-mobile.png`.
+
+Remaining limits: real Stripe onboarding/payment is outside this pass. Ella's
+original file/device has not been supplied, so her exact reported failure is not
+proven. Existing non-bookable profile copy still uses a generic Now booking
+announcement and Request invite mailto; the card and booking panel show Opening
+soon, the QA text says do not book, and no payments can be started for this card.
 
 References: [Clerk's session handshake](https://clerk.com/docs/guides/how-clerk-works/overview)
 and the installed `@clerk/backend` cross-origin document authentication branch.
