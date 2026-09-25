@@ -1,4 +1,5 @@
 import { env } from 'cloudflare:workers';
+const baseURL = (env as unknown as Record<string, string>).NEXT_PUBLIC_SITE_URL || 'http://127.0.0.1:4173';
 export async function fixtureFetch(input: RequestInfo | URL, init?: RequestInit) {
   const url = String(input);
   const db = env.DB as D1Database;
@@ -24,11 +25,11 @@ export async function fixtureFetch(input: RequestInfo | URL, init?: RequestInit)
         payment_intent:{id:`pi_${booking.id}`,status:captured?'succeeded':'requires_capture',capture_method:'manual',amount_capturable:booking.offering_unit_amount}});
     }
     if (url.endsWith('/balance')) return Response.json({available:[{amount:12345,currency:'usd'}],pending:[{amount:5000,currency:'usd'}]});
-    if (url.endsWith('/login_links')) return Response.json({url:'http://127.0.0.1:4173/e2e-control?stripe-dashboard=1'});
+    if (url.endsWith('/login_links')) return Response.json({url:`${baseURL}/e2e-control?stripe-dashboard=1`});
     if (url.endsWith('/checkout/sessions')) {
       const body = new URLSearchParams(String(init?.body)); const booking = body.get('client_reference_id');
       await db.prepare('INSERT OR IGNORE INTO e2e_provider_events (id,kind,payload) VALUES (?,?,?)').bind(`checkout_${booking}`,'checkout',body.toString()).run();
-      return Response.json({id:`cs_${booking}`,url:`http://127.0.0.1:4173/e2e-control?checkout=${booking}`});
+      return Response.json({id:`cs_${booking}`,url:`${baseURL}/e2e-control?checkout=${booking}`});
     }
     const match = url.match(/payment_intents\/([^/]+)\/(capture|cancel)$/);
     if(match) {

@@ -138,3 +138,5 @@ Already handled during repository cleanup:
 The creator editor is `/creator/profile`, with authenticated draft preview at
 `/creator/preview`. See [storefront verification and deployment prerequisites](docs/creator-storefront-verification.md).
 Run `npm run test:e2e` for the isolated Playwright creator/customer journeys.
+Each invocation owns its temporary app and D1. Set `TAKE_A_SEAT_E2E_PORT=4273`
+when another task is using the default port 4173.
