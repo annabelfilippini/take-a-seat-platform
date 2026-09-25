@@ -5,6 +5,19 @@ This is the central index for meaningful bugs. Existing feature notes retain
 their detailed historical evidence; link to them instead of duplicating it.
 Follow the [engineering release gate](engineering-release-gate.md).
 
+## 2026-09-24: Admin creator-ID validation used an invalid HTML pattern
+
+- **Reproduction:** Production application acceptance logged an invalid regular
+  expression in Chrome for the public creator-ID input. Browser validation could
+  not enforce the advertised lowercase/hyphen format; server checks still applied.
+- **Root cause:** HTML pattern validation uses Unicode sets (`v` mode), where the
+  literal hyphen in `[a-z0-9-]` must be escaped.
+- **Fix:** Escape that literal hyphen in the JSX pattern string. Keep the same
+  accepted values and existing server validation.
+- **Protection:** Real Chromium checks invalid/valid slug boundaries and accepts
+  an application through the admin form while monitoring console/network errors.
+- **Release:** Prepared separately from the deployed Calendar repair; not yet deployed.
+
 ## 2026-09-24: Google Calendar callbacks rejected a signed-in new creator
 
 - **Reproduction:** A fresh production applicant accepted the actual emailed
