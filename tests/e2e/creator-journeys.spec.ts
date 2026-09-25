@@ -3,6 +3,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { createHmac } from 'node:crypto';
 import { encryptToken } from '../../app/_lib/token-encryption';
+import { baseURL } from './environment.mjs';
 const creatorId='onboard_e2e';
 async function sql(request:APIRequestContext, statement:string, args:unknown[] = []) {
   const response=await request.post('/e2e-control',{data:{sql:statement,args}});
@@ -62,9 +63,36 @@ test.beforeEach(async({request,page,context})=>{
 });
 test.afterEach(()=>expect([...observedPages.values()].flat(),'Unexpected browser errors or HTTP failures').toEqual([]));
 
+test('public application validates email, persists submission and creates both notification messages', async ({page,request}) => {
+  await page.goto('/creators/onboard');
+  await page.getByLabel('First name',{exact:true}).fill('Lifecycle QA');
+  await page.getByLabel('Last name',{exact:true}).fill('Applicant');
+  await page.getByLabel('Phone number',{exact:true}).fill('+1 202 555 0147');
+  await page.getByLabel('Email',{exact:true}).fill('invalid-email');
+  await page.getByRole('button',{name:'Submit application',exact:true}).click();
+  expect(await page.getByLabel('Email',{exact:true}).evaluate((input:HTMLInputElement)=>input.validity.typeMismatch)).toBeTruthy();
+  expect(await sql(request,"SELECT id FROM creator_onboarding_profiles WHERE name='Lifecycle QA Applicant'")).toHaveLength(0);
+  await page.getByLabel('Email',{exact:true}).fill('lifecycle-qa@example.com');
+  await page.getByLabel('Expertise',{exact:true}).fill('Controlled lifecycle regression fixture.');
+  await page.getByRole('button',{name:'Submit application',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'Application in review.'})).toBeVisible();
+  const [application]=await sql(request,"SELECT id,application_status,published_at,profile_details FROM creator_onboarding_profiles WHERE email='lifecycle-qa@example.com'");
+  expect(application.application_status).toBe('in_review');
+  expect(application.published_at).toBeNull();
+  expect(application.profile_details).toBe('Controlled lifecycle regression fixture.');
+  const events=await sql(request,"SELECT payload FROM e2e_provider_events WHERE kind='email'");
+  expect(events).toHaveLength(2);
+  expect(events.map((event:{payload:string})=>JSON.parse(event.payload).subject)).toEqual(expect.arrayContaining([
+    'We received your Take a Seat application','New Take a Seat application: Lifecycle QA Applicant',
+  ]));
+  await page.reload();
+  await expect(page.getByRole('heading',{name:'Application in review.'})).toBeVisible();
+  expect(await sql(request,"SELECT id FROM creator_onboarding_profiles WHERE email='lifecycle-qa@example.com'")).toHaveLength(1);
+});
+
 test('admin acceptance validates a creator slug in the browser before submitting', async ({page,request}) => {
   await sql(request,"UPDATE creator_onboarding_profiles SET application_status='in_review' WHERE id=?",[creatorId]);
-  await page.context().addCookies([{name:'tas_local_admin',value:'1',url:'http://127.0.0.1:4173'}]);
+  await page.context().addCookies([{name:'tas_local_admin',value:'1',url:baseURL}]);
   await page.goto(`/admin/applications/${creatorId}`);
   const slug=page.locator('input[name="publicCreatorId"]');
   await expect(slug).toBeEnabled();
@@ -101,7 +129,7 @@ test('email account switch reloads Clerk before one-use redemption and preserves
 test('acceptance destination, complete profile persistence, original media, draft/publish isolation and fresh login',async({page,request,browser})=>{
   const errors=observe(page);
   await sql(request,"UPDATE creator_onboarding_profiles SET application_status='in_review' WHERE id=?",[creatorId]);
-  await page.context().addCookies([{name:'tas_local_admin',value:'1',url:'http://127.0.0.1:4173'}]);
+  await page.context().addCookies([{name:'tas_local_admin',value:'1',url:baseURL}]);
   const accepted=await request.post('/api/creators/applications/accept',{form:{creatorId,publicCreatorId:'e2e-creator'},headers:{cookie:'tas_local_admin=1'},maxRedirects:0});
   expect(accepted.headers().location).toContain("email=sent");
   const emails=await sql(request,"SELECT payload FROM e2e_provider_events WHERE kind='email'");
@@ -160,7 +188,7 @@ test('acceptance destination, complete profile persistence, original media, draf
   await page.screenshot({path:'.wrangler/creator-profile-mobile.png',fullPage:true});
   await page.setViewportSize({width:1280,height:900});
   await publish(page);
-  const customer=await browser.newPage(); observe(customer); await customer.goto('http://127.0.0.1:4173/with/e2e-creator');
+  const customer=await browser.newPage(); observe(customer); await customer.goto(`${baseURL}/with/e2e-creator`);
   await expect(customer.getByRole('heading',{name:'Studio Creator',exact:true})).toBeVisible();
   await page.getByRole('tab',{name:'Profile',exact:true}).click(); await page.getByLabel('Creator hero name').fill('New Studio Creator'); await save(page);
   await customer.reload(); await expect(customer.getByRole('heading',{name:'Studio Creator',exact:true})).toBeVisible();
@@ -174,7 +202,7 @@ test('acceptance destination, complete profile persistence, original media, draf
   await publish(page); await expect(customer.getByRole('heading',{name:'Studio Creator',exact:true})).toBeVisible();
   await customer.reload(); await expect(customer.getByRole('heading',{name:'New Studio Creator',exact:true})).toBeVisible();
   await page.goto('/e2e-control?logout=1'); await expect(page.getByText('Sign in to build your profile.')).toBeVisible();
-  const fresh=await browser.newPage(); observe(fresh); await fresh.goto('http://127.0.0.1:4173/e2e-control?login=1');
+  const fresh=await browser.newPage(); observe(fresh); await fresh.goto(`${baseURL}/e2e-control?login=1`);
   await expect(fresh.getByLabel('Creator hero name')).toHaveValue('New Studio Creator');
   await expect(fresh.getByLabel('Offering 1 description')).toHaveValue('For one specific outfit question.');
   await customer.close(); await fresh.close(); expect(errors).toEqual([]);
@@ -241,7 +269,7 @@ test('Stripe state reflects provider readiness rather than saved flag',async({pa
 test('protected customer flow, immutable purchase, request acceptance/decline, races and stale slots',async({page,request,browser})=>{
   const errors=observe(page); await seedDraft(request); await login(page); await publish(page);
   const customer=await browser.newPage({viewport:{width:1280,height:900}}); const customerErrors=observe(customer);
-  await customer.goto('http://127.0.0.1:4173/with/e2e-creator');
+  await customer.goto(`${baseURL}/with/e2e-creator`);
   await expect(customer.getByRole('button',{name:/Quick Styling Question/})).toContainText('$18');
   await expect(customer.getByRole('button',{name:/Quick Styling Question/})).toContainText('One specific outfit question.');
   await customer.getByRole('button',{name:'Find availability'}).click();
@@ -296,7 +324,7 @@ test('protected customer flow, immutable purchase, request acceptance/decline, r
   await page.goto(`/bookings/${declinedBooking.id}`);
   await expect(page.getByRole('button',{name:'Accept this appointment',exact:true})).toHaveCount(0);
   // A customer's loaded page remains valid; its stale time is rejected at submit.
-  await customer.goto('http://127.0.0.1:4173/with/e2e-creator');
+  await customer.goto(`${baseURL}/with/e2e-creator`);
   await customer.getByRole('button',{name:'Find availability'}).click(); await customer.locator('.customer-time-options button').last().click();
   await customer.getByRole('button',{name:'Continue',exact:true}).click();
   await customer.getByLabel('Name',{exact:true}).fill('Stale Customer'); await customer.getByLabel('Email address',{exact:true}).fill('stale@example.com'); await customer.getByLabel(/What do you want to talk about/).fill('A stale time.');
@@ -338,7 +366,7 @@ test('multiple offerings retain order and toggle Active without exposing inactiv
   expect(await page.evaluate(()=>document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
   await page.setViewportSize({width:1280,height:900});
   await publish(page);
-  const customer=await browser.newPage(); observe(customer); await customer.goto('http://127.0.0.1:4173/with/e2e-creator');
+  const customer=await browser.newPage(); observe(customer); await customer.goto(`${baseURL}/with/e2e-creator`);
   await expect(customer.getByRole('button',{name:/Closet planning/})).toContainText('45 min');
   await expect(customer.getByRole('button',{name:/Closet planning/})).toContainText('$65');
   await page.getByRole('tab',{name:'Profile',exact:true}).click();
@@ -405,7 +433,7 @@ test('photo pickers guide formats, resize camera photos and persist through retu
   await login(returning); await expect(returning.locator('.editable-profile-photo-frame img')).toHaveAttribute('src',source!);
   await fresh.close();
   await publish(page);
-  const customer=await browser.newContext(); const publicPhoto=await customer.request.get(`http://127.0.0.1:4173${source}`);
+  const customer=await browser.newContext(); const publicPhoto=await customer.request.get(`${baseURL}${source}`);
   expect(publicPhoto.status()).toBe(200); expect(publicPhoto.headers()['content-type']).toBe('image/jpeg');
   await customer.close();
 });
@@ -479,7 +507,7 @@ test('saved default timezone carries into untouched weeks before and after refre
 });
 
 async function prepareCustomer(page:Page, name:string) {
-  await page.goto('http://127.0.0.1:4173/with/e2e-creator');
+  await page.goto(`${baseURL}/with/e2e-creator`);
   await page.getByRole('button',{name:'Find availability'}).click();
   await page.locator('.customer-time-options button').first().click();
   await page.getByRole('button',{name:'Continue',exact:true}).click();
@@ -568,9 +596,9 @@ test('private media stays private, profile replacement persists and upload failu
   await save(page);
   const original=await page.locator('.editable-profile-photo-frame img').getAttribute('src');
   const customer=await browser.newContext();
-  expect((await customer.request.get(`http://127.0.0.1:4173${original}`)).status()).toBe(404);
+  expect((await customer.request.get(`${baseURL}${original}`)).status()).toBe(404);
   await publish(page);
-  expect((await customer.request.get(`http://127.0.0.1:4173${original}`)).status()).toBe(200);
+  expect((await customer.request.get(`${baseURL}${original}`)).status()).toBe(200);
   await page.getByRole('tab',{name:'Profile',exact:true}).click();
   expectHttpFailure(page,'/api/creators/media',503);
   await page.route('**/api/creators/media',route=>route.fulfill({status:503,json:{error:'Upload unavailable. Retry.'}}));
@@ -584,10 +612,10 @@ test('private media stays private, profile replacement persists and upload failu
   await expect(page.locator('.editable-profile-photo-frame img')).not.toHaveAttribute('src',original!);
   await save(page); const replacement=await page.locator('.editable-profile-photo-frame img').getAttribute('src');
   await page.reload(); await expect(page.locator('.editable-profile-photo-frame img')).toHaveAttribute('src',replacement!);
-  expect((await customer.request.get(`http://127.0.0.1:4173${replacement}`)).status()).toBe(404);
+  expect((await customer.request.get(`${baseURL}${replacement}`)).status()).toBe(404);
   await publish(page);
-  expect((await customer.request.get(`http://127.0.0.1:4173${replacement}`)).status()).toBe(200);
-  expect((await customer.request.get(`http://127.0.0.1:4173${original}`)).status()).toBe(404);
+  expect((await customer.request.get(`${baseURL}${replacement}`)).status()).toBe(200);
+  expect((await customer.request.get(`${baseURL}${original}`)).status()).toBe(404);
   await customer.close();
 });
 
@@ -669,7 +697,7 @@ test('repeated Publish clicks commit one coherent public version',async({page,re
 
 test('native gallery disclosure cannot mutate server markup while hydration is delayed',async({page,request})=>{
   await seedDraft(request);
-  await page.context().addCookies([{name:'tas_e2e_creator',value:'1',url:'http://127.0.0.1:4173'}]);
+  await page.context().addCookies([{name:'tas_e2e_creator',value:'1',url:baseURL}]);
   let release!:()=>void; const gate=new Promise<void>(resolve=>{release=resolve;});
   await page.route('**/*',async route=>{ if(route.request().resourceType()==='script') await gate; await route.continue(); });
   await page.goto('/creator/profile',{waitUntil:'commit'});
@@ -689,7 +717,7 @@ async function beginOAuth(page:Page) {
   const response=await page.request.get(`/api/google-calendar/oauth/start?creatorId=${creatorId}&returnTo=/creator/profile`,{maxRedirects:0});
   const url=new URL(response.headers().location);
   expect(url.origin).toBe('https://accounts.google.com');
-  expect(url.searchParams.get('redirect_uri')).toBe('http://127.0.0.1:4173/api/google-calendar/oauth/callback');
+  expect(url.searchParams.get('redirect_uri')).toBe(`${baseURL}/api/google-calendar/oauth/callback`);
   expect(url.searchParams.get('scope')?.split(' ')).toEqual(['https://www.googleapis.com/auth/calendar.freebusy','https://www.googleapis.com/auth/calendar.events.owned']);
   expect(url.searchParams.get('access_type')).toBe('offline');
   expect(url.searchParams.get('include_granted_scopes')).toBe('false');
@@ -774,7 +802,7 @@ test('Calendar callbacks reject denial, missing code, forged/stale/replayed stat
     const response=await page.request.get(path,{maxRedirects:0});
     expect(response.status()===403 || response.headers().location.includes('creator-access')).toBeTruthy();
   }
-  expect((await page.request.post('/api/google-calendar/disconnect',{headers:{origin:'http://127.0.0.1:4173'},form:{creatorId:other}})).status()).toBe(403);
+  expect((await page.request.post('/api/google-calendar/disconnect',{headers:{origin:baseURL},form:{creatorId:other}})).status()).toBe(403);
   expect((await page.request.post('/api/google-calendar/disconnect',{headers:{origin:'https://attacker.example'},form:{creatorId}})).status()).toBe(403);
   await page.request.get('/e2e-control?logout=1');
   expect((await page.request.get(`/api/google-calendar/oauth/start?creatorId=${creatorId}`,{maxRedirects:0})).headers().location).toContain('creator-access');
@@ -833,7 +861,7 @@ test('Calendar conflicts filter server slots, stale requests fail before Checkou
   expect(stale.headers().location).toContain('availability');
   expect(await sql(request,'SELECT * FROM customer_bookings')).toHaveLength(0);
   const saved=await sql(request,'SELECT * FROM creator_availability_rules');
-  const disconnected=await page.request.post('/api/google-calendar/disconnect',{headers:{origin:'http://127.0.0.1:4173'},form:{creatorId}}); expect(disconnected.ok()).toBeTruthy();
+  const disconnected=await page.request.post('/api/google-calendar/disconnect',{headers:{origin:baseURL},form:{creatorId}}); expect(disconnected.ok()).toBeTruthy();
   expect((await availableDays(request,month)).find(item=>item.date===day)!.slots).toEqual(original.slots);
   expect(await sql(request,'SELECT * FROM creator_availability_rules')).toEqual(saved);
 });
@@ -872,7 +900,7 @@ test('Calendar event confirmation, validated reschedule, retry, invitation and c
   let events=await sql(request,"SELECT * FROM e2e_provider_events WHERE kind='calendar'"); expect(events).toHaveLength(1);
   const event=JSON.parse(events[0].payload); expect(event.attendees[0].email).toBe('invite@example.com');
   expect(event.guestsCanModify).toBe(false); expect(event.extendedProperties.private.bookingId).toBe(booking.id);
-  const headers={origin:'http://127.0.0.1:4173'};
+  const headers={origin:baseURL};
   const path=`/api/bookings/${booking.id}/calendar`;
   const bad=await page.request.post(path,{headers,data:{appointmentStartAt:`${day}T03:00:00`,timezone:'America/Los_Angeles'}}); expect(bad.status()).toBe(503);
   expect((await sql(request,'SELECT appointment_start_at FROM customer_bookings'))[0].appointment_start_at).toBe(`${day}T09:00:00`);
@@ -950,9 +978,9 @@ test('Calendar interrupted event insertion never duplicates onto a reconnected a
   expect(await sql(request,"SELECT * FROM e2e_provider_events WHERE kind='capture'")).toHaveLength(1);
   await sql(request,"UPDATE customer_bookings SET status='cancelled',calendar_synced_revision=NULL");
   await providerState(request,'calendar-account','different');
-  expect((await page.request.post(`/api/bookings/${booking.id}/calendar`,{headers:{origin:'http://127.0.0.1:4173'}})).status()).toBe(503);
+  expect((await page.request.post(`/api/bookings/${booking.id}/calendar`,{headers:{origin:baseURL}})).status()).toBe(503);
   expect((await sql(request,'SELECT calendar_synced_revision FROM customer_bookings'))[0].calendar_synced_revision).toBeNull();
   const before=await sql(request,'SELECT * FROM customer_bookings');
-  expect((await page.request.post('/api/google-calendar/disconnect',{headers:{origin:'http://127.0.0.1:4173'},form:{creatorId}})).status()).toBe(200);
+  expect((await page.request.post('/api/google-calendar/disconnect',{headers:{origin:baseURL},form:{creatorId}})).status()).toBe(200);
   expect(await sql(request,'SELECT * FROM customer_bookings')).toEqual(before);
 });
