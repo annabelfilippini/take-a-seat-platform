@@ -63,6 +63,28 @@ test.beforeEach(async({request,page,context})=>{
 });
 test.afterEach(()=>expect([...observedPages.values()].flat(),'Unexpected browser errors or HTTP failures').toEqual([]));
 
+test('admin acceptance validates a creator slug in the browser before submitting', async ({page,request}) => {
+  await sql(request,"UPDATE creator_onboarding_profiles SET application_status='in_review' WHERE id=?",[creatorId]);
+  await page.context().addCookies([{name:'tas_local_admin',value:'1',url:'http://127.0.0.1:4173'}]);
+  await page.goto(`/admin/applications/${creatorId}`);
+  const slug=page.locator('input[name="publicCreatorId"]');
+  await expect(slug).toBeEnabled();
+  for (const value of ['Uppercase','has space','-leading','trailing-','a'.repeat(121)]) {
+    await slug.fill(value);
+    expect(await slug.evaluate((input:HTMLInputElement)=>input.validity.patternMismatch)).toBeTruthy();
+  }
+  for (const value of ['a','creator-24','a'.repeat(120)]) {
+    await slug.fill(value);
+    expect(await slug.evaluate((input:HTMLInputElement)=>input.checkValidity())).toBeTruthy();
+  }
+  await slug.fill('e2e-creator');
+  await page.getByRole('button',{name:'Accept and send setup email',exact:true}).click();
+  await expect(page.getByRole('button',{name:'Already accepted',exact:true})).toBeDisabled();
+  const [application]=await sql(request,'SELECT application_status,published_at FROM creator_onboarding_profiles WHERE public_slug=?',['e2e-creator']);
+  expect(application.application_status).toBe('accepted');
+  expect(application.published_at).toBeNull();
+});
+
 test('email account switch reloads Clerk before one-use redemption and preserves the saved profile',async({page,request})=>{
   await seedDraft(request);
   await page.goto('/creators/email-sign-in?invite=e2e-original-invite#ticket=e2e-email-ticket&email=creator%40example.com');
@@ -327,6 +349,9 @@ test('multiple offerings retain order and toggle Active without exposing inactiv
   await customer.reload(); await expect(customer.getByRole('button',{name:/Closet planning/})).toHaveCount(0);
   await expect(customer.getByRole('button',{name:/Quick Styling Question/})).toBeVisible();
   await page.reload(); await expect(page.locator('.creator-offering-card').nth(1).getByRole('checkbox',{name:'Active',exact:true})).not.toBeChecked();
+  // End the old editor document before removing its session. Otherwise its
+  // pending panel effects can issue unauthenticated fetches during navigation.
+  await page.goto('about:blank');
   await page.context().clearCookies(); await login(page);
   await expect(page.locator('.creator-offering-card').nth(1).getByRole('checkbox',{name:'Active',exact:true})).not.toBeChecked();
   await page.locator('.creator-offering-card').nth(1).getByRole('checkbox',{name:'Active',exact:true}).check(); await save(page); await publish(page);

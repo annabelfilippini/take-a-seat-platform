@@ -1,5 +1,11 @@
 # Take a Seat Control Map
 
+Fresh creator live QA on September 24 reproduced a Google OAuth callback session
+refresh failure. PR #43 is deployed (`93d8d23`); the real callback, refresh and
+fresh login now pass. Profile uploads and saved edits passed live. The new test
+card remains private pending Stripe setup in Annabel's other terminal. See
+[the current QA record](creator-live-qa-2026-09-24.md).
+
 Last updated: 2026-09-16
 
 **First creator release remains blocked.** Migration 0025 is applied; PR #37 is

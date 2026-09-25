@@ -40,6 +40,44 @@ Follow the [engineering release gate](engineering-release-gate.md).
 - **Related files:** app/_lib/zoom.ts, tests/stripe-lifecycle.test.mjs,
   docs/zoom-production-setup.md.
 
+## 2026-09-24: Admin creator-ID validation used an invalid HTML pattern
+
+- **Reproduction:** Production application acceptance logged an invalid regular
+  expression in Chrome for the public creator-ID input. Browser validation could
+  not enforce the advertised lowercase/hyphen format; server checks still applied.
+- **Root cause:** HTML pattern validation uses Unicode sets (`v` mode), where the
+  literal hyphen in `[a-z0-9-]` must be escaped.
+- **Fix:** Escape that literal hyphen in the JSX pattern string. Keep the same
+  accepted values and existing server validation.
+- **Protection:** Real Chromium checks invalid/valid slug boundaries and accepts
+  an application through the admin form while monitoring console/network errors.
+- **Release:** Prepared separately from the deployed Calendar repair; not yet deployed.
+
+## 2026-09-24: Google Calendar callbacks rejected a signed-in new creator
+
+- **Reproduction:** A fresh production applicant accepted the actual emailed
+  invitation, saved a profile, and completed Google consent. Two callback attempts
+  returned `calendar=error&detail=creator-access`. The second callback carried a
+  still-valid Clerk session cookie and came from Google's cross-site document.
+- **Root cause:** Clerk requires a handshake for cross-origin document navigation,
+  even with a valid session. The Worker refresh wrapper excluded the OAuth start
+  and callback routes. `getCalendarOwner` therefore treated the pending handshake
+  as signed out, before consuming OAuth state or exchanging Google's code. The
+  subsequent editor navigation refreshed the session, hiding the original cause.
+- **Fix:** Include only the two Calendar navigation GET routes in the existing
+  Clerk refresh wrapper. Preserve the complete callback URL and nonce through the
+  handshake, then pass the verified token into the original ownership checks.
+  Keep signed-out/failed authentication denied and leave other API calls alone.
+- **Protection:** Regression covers handshake-before-callback ordering, original
+  code/state/nonce retention, refreshed cookies, signed-out and provider failure,
+  and unchanged mutation/API handling. Existing Calendar browser journeys still
+  cover ownership, replay, denied scopes, persistence, and disconnect.
+- **Release:** PR #43 merged as `93d8d23` and deployed with explicit approval to
+  Worker `b71fc77e-a0b6-40d7-b881-aaccc3405449`. The live callback now completes
+  the Clerk handshake and connects Calendar; refresh and a fresh email-code login
+  retain the working connection. Test-card publication awaits Stripe. See
+  [fresh creator QA](creator-live-qa-2026-09-24.md).
+
 ## Existing incident records
 
 - [Creator onboarding lessons](creator-onboarding-lessons.md): original invite

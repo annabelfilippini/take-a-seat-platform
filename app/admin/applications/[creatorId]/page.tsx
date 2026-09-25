@@ -179,7 +179,7 @@ export default async function AdminApplicationPage({
                     defaultValue={suggestedPublicId}
                     disabled={application.applicationStatus === "accepted"}
                     name="publicCreatorId"
-                    pattern="[a-z0-9](?:[a-z0-9-]{0,118}[a-z0-9])?"
+                    pattern={"[a-z0-9](?:[a-z0-9\\-]{0,118}[a-z0-9])?"}
                     required
                   />
                   <small>/with/{suggestedPublicId}</small>
