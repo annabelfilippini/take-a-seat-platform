@@ -24,8 +24,10 @@ Follow the [engineering release gate](engineering-release-gate.md).
   code/state/nonce retention, refreshed cookies, signed-out and provider failure,
   and unchanged mutation/API handling. Existing Calendar browser journeys still
   cover ownership, replay, denied scopes, persistence, and disconnect.
-- **Release:** Prepared in an isolated main-based checkout. Not deployed; live
-  Calendar retest and marketplace publication remain pending. See
+- **Release:** PR #43 merged as `93d8d23` and deployed with explicit approval to
+  Worker `b71fc77e-a0b6-40d7-b881-aaccc3405449`. The live callback now completes
+  the Clerk handshake and connects Calendar; refresh and a fresh email-code login
+  retain the working connection. Test-card publication awaits Stripe. See
   [fresh creator QA](creator-live-qa-2026-09-24.md).
 
 ## Existing incident records
