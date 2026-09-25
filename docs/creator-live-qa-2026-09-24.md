@@ -31,6 +31,9 @@ No existing creator, including Ella, was edited.
 - Signed out through the account-switch UI and signed back in using the fresh
   alias and its actual emailed code. Saved name, updated intro and all three
   media URLs remained intact.
+- A 9,473,975-byte PNG test fixture uploaded through the live photo control,
+  resized to a 34,121-byte JPEG, saved and survived reload. The stored image
+  returned HTTP 200. This tests the large-file path, not native iPhone HEIC conversion.
 
 ## Found blocker and repair
 
@@ -66,9 +69,26 @@ Final candidate verification:
 - Anonymous live visitor sees no test card on `/` or `/take-a-seat`, and the
   unpublished `/with/take-a-seat-qa-test` returns 404, as expected.
 
-These checks do not establish live callback repair until deployment and real
-Google consent succeed. Preserve dashboard variables on deployment and recheck
-the active Worker version to avoid overwriting simultaneous work.
+## Approved release and live callback result
+
+Annabel explicitly approved merging and deploying the Calendar-only repair.
+[PR #43](https://github.com/annabelfilippini/take-a-seat-platform/pull/43) merged
+as `93d8d23`, whose source tree exactly matched tested `d984e7b`. Deployed from
+the clean main checkout with `npm run deploy -- --keep-vars`, preserving current
+dashboard variables and existing secrets. No Stripe configuration was changed.
+Worker version: `b71fc77e-a0b6-40d7-b881-aaccc3405449`.
+
+The exact Connect calendar flow was repeated on the same new live creator.
+Observed callback HTTP 307, Clerk handshake HTTP 307, then the original callback
+HTTP 303 to `calendar=connected`. The editor reported connected and the actual
+connection remained usable after a full reload. This verifies the root cause
+and deployed repair rather than merely navigating directly to the dashboard.
+
+A fourth isolated browser context then signed in through the actual email-code
+flow. Saved profile text, the resized image, and connected Calendar all remained.
+No unexpected JavaScript errors or HTTP failures were captured in this final
+fresh-login check. Preview & Publish now marks profile content, offering prices,
+and saved hours/Calendar Ready; only Stripe payouts remains To do.
 
 ## Publication and remaining checks
 
@@ -78,9 +98,8 @@ explicitly reserved Stripe for her other terminal. No Stripe account was created
 or configured here; automatic approval review blocked the initial Connect click.
 Do not bypass readiness checks or claim the public card is visible.
 
-Pending: repair release approval, actual Calendar callback success/persistence,
-fresh public visitor verification after publishing,
-and Stripe readiness coordinated by Annabel. The exact original file/device
+Pending: Stripe readiness coordinated by Annabel and fresh public visitor
+verification after publishing. The exact original file/device
 behind Ella's report has not been supplied, so her specific failure is not proven.
 
 References: [Clerk's session handshake](https://clerk.com/docs/guides/how-clerk-works/overview)

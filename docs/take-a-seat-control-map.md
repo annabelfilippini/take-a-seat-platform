@@ -1,8 +1,9 @@
 # Take a Seat Control Map
 
 Fresh creator live QA on September 24 reproduced a Google OAuth callback session
-refresh failure. A focused repair is prepared, not deployed; profile uploads and
-saved edits passed live. Publication awaits Calendar and Stripe readiness. See
+refresh failure. PR #43 is deployed (`93d8d23`); the real callback, refresh and
+fresh login now pass. Profile uploads and saved edits passed live. The new test
+card remains private pending Stripe setup in Annabel's other terminal. See
 [the current QA record](creator-live-qa-2026-09-24.md).
 
 Last updated: 2026-09-16
