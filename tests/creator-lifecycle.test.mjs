@@ -190,6 +190,61 @@ test("Clerk refresh redirects, forwards cookies, and authenticates the first ret
   }, async () => { throw new Error("Never redirect a submitted form"); });
 });
 
+test("Calendar navigations refresh Clerk before consuming OAuth state and retain the callback", async () => {
+  const { withClerkSessionRefresh } = await import("../app/_lib/clerk-session-refresh.ts");
+  const env = { CLERK_SECRET_KEY: "test-only", NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "test-only" };
+  for (const path of [
+    "/api/google-calendar/oauth/start?creatorId=calendar-owner&returnTo=%2Fcreator%2Fprofile",
+    "/api/google-calendar/oauth/callback?code=fixture-code&state=fixture-state&scope=calendar",
+  ]) {
+    const request = new Request(`https://takeaseatwith.com${path}`, {
+      headers: { "sec-fetch-dest": "document", "sec-fetch-site": "cross-site", referer: "https://accounts.google.com/", cookie: "tas_google_oauth_nonce=fixture-nonce; __session=fixture-old" },
+    });
+    let consumed = 0;
+    const redirect = await withClerkSessionRefresh(request, env, async () => {
+      consumed++;
+      return new Response("OAuth must not run before refresh");
+    }, async (incoming) => {
+      assert.equal(incoming.url, request.url);
+      return { headers: new Headers({ location: `https://clerk.example.test/v1/client/handshake?redirect_url=${encodeURIComponent(incoming.url)}` }), isAuthenticated: false, status: "handshake" };
+    });
+    assert.equal(redirect.status, 307);
+    assert.equal(consumed, 0);
+    assert.equal(new URL(redirect.headers.get("location")).searchParams.get("redirect_url"), request.url);
+    assert.equal(redirect.headers.getSetCookie().length, 0, "Keep the OAuth nonce during the handshake");
+
+    const response = await withClerkSessionRefresh(request, env, async (incoming) => {
+      consumed++;
+      assert.equal(incoming.url, request.url, "Preserve Google's code and signed state");
+      assert.equal(incoming.headers.get("authorization"), "Bearer fixture-verified");
+      assert.match(incoming.headers.get("cookie"), /tas_google_oauth_nonce=fixture-nonce/);
+      return new Response(null, { status: 303, headers: { location: "/creator/profile?calendar=connected", "set-cookie": "tas_google_oauth_nonce=; Max-Age=0" } });
+    }, async () => ({ headers: new Headers({ "set-cookie": "__session=fixture-new; HttpOnly" }), isAuthenticated: true, status: "signed-in", token: "fixture-verified" }));
+    assert.equal(consumed, 1);
+    assert.equal(response.status, 303);
+    assert.equal(response.headers.getSetCookie().length, 2);
+    assert.equal(response.headers.has("authorization"), false);
+
+    const failed = await withClerkSessionRefresh(request, env, () => { throw new Error("Do not consume OAuth state after failed authentication"); }, async () => { throw new Error("Clerk unavailable"); });
+    assert.equal(failed.status, 503);
+    const signedOut = await withClerkSessionRefresh(request, env, async (incoming) => {
+      assert.equal(incoming.headers.has("authorization"), false);
+      return new Response("Creator access denied", { status: 401 });
+    }, async () => ({ headers: new Headers(), isAuthenticated: false, status: "signed-out" }));
+    assert.equal(signedOut.status, 401);
+  }
+  for (const request of [
+    new Request("https://takeaseatwith.com/api/creators/profile", { method: "POST", body: "draft=retained" }),
+    new Request("https://takeaseatwith.com/api/google-calendar/disconnect", { method: "POST", body: "creatorId=calendar-owner" }),
+    new Request("https://takeaseatwith.com/api/google-calendar/status?creatorId=calendar-owner"),
+  ]) {
+    const body = await request.clone().text();
+    const response = await withClerkSessionRefresh(request, env, async (incoming) => new Response(await incoming.text()), async () => { throw new Error("Do not redirect API fetches or mutations"); });
+    assert.equal(response.status, 200);
+    assert.equal(await response.text(), body);
+  }
+});
+
 test("duplicate acceptance links return the matching creator to their existing profile", async () => {
   const { getCreatorDashboardAccountFromInvite } = await import("../app/_lib/creator-dashboard.ts");
   const insert = sqlite.prepare("INSERT INTO creator_onboarding_profiles (id, name, email, instagram_platform, bio, application_status, public_slug) VALUES (?, ?, ?, ?, ?, 'accepted', ?)");

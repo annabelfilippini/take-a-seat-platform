@@ -324,6 +324,9 @@ test('multiple offerings retain order and toggle Active without exposing inactiv
   await customer.reload(); await expect(customer.getByRole('button',{name:/Closet planning/})).toHaveCount(0);
   await expect(customer.getByRole('button',{name:/Quick Styling Question/})).toBeVisible();
   await page.reload(); await expect(page.locator('.creator-offering-card').nth(1).getByRole('checkbox',{name:'Active',exact:true})).not.toBeChecked();
+  // End the old editor document before removing its session. Otherwise its
+  // pending panel effects can issue unauthenticated fetches during navigation.
+  await page.goto('about:blank');
   await page.context().clearCookies(); await login(page);
   await expect(page.locator('.creator-offering-card').nth(1).getByRole('checkbox',{name:'Active',exact:true})).not.toBeChecked();
   await page.locator('.creator-offering-card').nth(1).getByRole('checkbox',{name:'Active',exact:true}).check(); await save(page); await publish(page);

@@ -1,5 +1,10 @@
 # Take a Seat Control Map
 
+Fresh creator live QA on September 24 reproduced a Google OAuth callback session
+refresh failure. A focused repair is prepared, not deployed; profile uploads and
+saved edits passed live. Publication awaits Calendar and Stripe readiness. See
+[the current QA record](creator-live-qa-2026-09-24.md).
+
 Last updated: 2026-09-16
 
 This is the working source of truth for Take a Seat while the product is being
