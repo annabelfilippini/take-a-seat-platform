@@ -15,6 +15,10 @@ See the [current release audit](first-creator-release-audit-2026-09-16.md).
 This is the working source of truth for Take a Seat while the product is being
 organized. It should stay short, current, and operational.
 
+Photo upload repair deployed September 22 from PR #41 / `369be0a`. All 82 Node
+and 32 browser tests pass; a production large-photo upload also passed. See [upload repair](profile-upload-repair-2026-09-22.md)
+for confirmed failure paths and the remaining original-file/device check.
+
 For email delivery, invitation, and admin/creator login troubleshooting, read
 [the onboarding lessons](creator-onboarding-lessons.md) before live testing.
 
@@ -93,6 +97,9 @@ App/runtime:
 
 - Framework: vinext.
 - Production URL: `https://takeaseatwith.com/`.
+- Link previews use `public/homepage-social-preview-v1.png`, a 1200 × 630 capture
+  of the homepage hero, configured in `app/layout.tsx`. Use a new filename when
+  changing this image; messaging services may retain previously cached cards.
 - Production target: Cloudflare Workers.
 - Production config: `wrangler.deploy.jsonc`.
 - Local Vite config: `vite.config.ts`.

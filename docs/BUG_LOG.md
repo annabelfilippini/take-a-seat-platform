@@ -877,3 +877,60 @@ September 14, 2026; regression of incomplete initial-interaction protection.
   mandatory. Existing fixtures now model Stripe's actual `amount_received` field.
 - **Related files:** bookings.ts, stripe-lifecycle.test.mjs, Calendar/browser fixtures.
 - **Feature/date:** September 16, adversarial payment review.
+
+## 2026-09-17: Shared homepage links showed an obsolete promotional image
+
+- **Bug / impact:** Messaging previews showed the old Amber clothing collage instead
+  of the homepage headline and towel-haired woman.
+- **Root cause:** Root Open Graph and Twitter metadata still explicitly selected
+  the old `public/og.png`; previews do not automatically capture the current homepage.
+- **Fix:** Select a versioned 1200 × 630 homepage hero capture and align descriptions
+  with the current headline. Existing messaging cards may remain cached.
+- **Regression prevention:** Browser coverage checks server-delivered metadata,
+  fetchable PNG dimensions, refresh, fresh mobile context, and homepage CTA navigation.
+- **Verification:** Lint, build and all 82 Node tests pass. The focused Playwright
+  journey passes; inspected desktop (1200 × 630) and mobile (390 × 844). Actual
+  Messages rendering remains unverified until deployment.
+- **Release:** Isolated from the pending booking branch; deployment requires approval.
+
+
+## 2026-09-17: Three checkout tests expired with the real clock
+
+- **Bug / impact:** The full Node suite rejected three valid-checkout fixtures at
+  the availability guard before exercising the intended Stripe behavior.
+- **Root cause:** Those tests hardcoded September 17 at 09:30 New York while using
+  the real current date; the fixture became a past appointment today.
+- **Fix / regression:** Freeze Date to September 14 within each affected test using
+  automatically restored Node test mocks. Production availability checks are unchanged.
+
+## 2026-09-22: Creator photo uploads rejected selectable files or stalled editing
+
+- **Report:** A creator could not add photos. Her original file/device/error is
+  unavailable, so her exact trigger remains unconfirmed.
+- **Confirmed root causes:** Wildcard file pickers offered unsupported formats;
+  MIME-only checks rejected missing metadata; camera photos over 8 MB had no
+  resize path; unbounded upload requests disabled the entire editor; errors
+  appeared away from the gallery picker.
+- **Fix:** Shared file preparation, explicit supported picker types, bounded
+  native photo conversion/resizing, a 60-second upload timeout, and local error
+  feedback. Existing ownership, signature, storage, draft, and publication
+  checks remain authoritative.
+- **Regression protection:** Playwright checks large-photo D1 persistence,
+  reload, returning login, publication, HEIC failure recovery, and a stalled
+  mobile upload followed by retry of the same file with text edits preserved.
+- **Evidence and limits:** [Upload repair](profile-upload-repair-2026-09-22.md).
+  Deployed September 22 from PR #41; production large-photo upload passed.
+  The creator's original-file retest remains pending.
+
+## 2026-09-22: Homepage navigation retained the positional hydration-ID bug
+
+- **Observed:** The full upload-repair suite reported a homepage hydration error:
+  server `_R_6a_` versus client `_R_p_` for the menu ID and `aria-controls`.
+- **Root cause:** `BookingPlatform` still used React `useId`, the same positional
+  pattern already repaired in `PageHeader` on September 14. Vinext's server and
+  client route trees can allocate different IDs.
+- **Fix:** Give the single homepage primary menu a stable page-specific ID.
+  Customer booking selection, layout, and payment behavior are untouched.
+- **Regression protection:** The homepage journey retains console/network
+  monitoring across refresh and now opens/closes the narrow-screen navigation
+  and checks its control association.

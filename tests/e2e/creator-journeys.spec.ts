@@ -349,6 +349,74 @@ test('duplicate and unsupported media show recovery without ghost items',async({
   await save(page); await page.reload(); await expect(page.locator('.editable-media-row')).toHaveCount(1);
 });
 
+test('photo pickers guide formats, resize camera photos and persist through returning login', async ({page,request,browser}) => {
+  await seedDraft(request); await login(page);
+  await page.getByText('Profile photo',{exact:true}).click();
+  const input=page.getByLabel('Upload profile picture',{exact:true});
+  await expect(input).toHaveAttribute('accept','image/jpeg,image/png,image/webp');
+  const pickerBox=await input.boundingBox();
+  const helpBox=await page.locator('.editable-profile-photo-controls .editable-upload-note').boundingBox();
+  expect(helpBox!.y).toBeGreaterThanOrEqual(pickerBox!.y+pickerBox!.height);
+  await input.setInputFiles({name:'phone.heic',mimeType:'image/heic',buffer:Buffer.from('unsupported HEIC fixture')});
+  const status=page.locator('.editable-profile-photo-editor [role="status"]');
+  await expect(status).toContainText("This browser couldn't convert that HEIC photo");
+  await status.scrollIntoViewIfNeeded();
+  await page.screenshot({path:'/private/tmp/tas-upload-desktop.png'});
+  await expect(input).toBeEnabled();
+  await input.setInputFiles({name:'photo.jpg',mimeType:'application/octet-stream',buffer:readFileSync(resolve('public/ella-profile.jpg'))});
+  await expect(status).toContainText('Upload ready.');
+  const original=readFileSync(resolve('public/amber-reference-trench.png'));
+  const large=Buffer.concat([original,Buffer.alloc(9*1024*1024)]);
+  await input.setInputFiles({name:'camera.png',mimeType:'image/png',buffer:large});
+  await expect(status).toContainText('Upload ready.');
+  const source=await page.locator('.editable-profile-photo-frame img').getAttribute('src');
+  expect(source).toMatch(/\/api\/creators\/media\//);
+  const stored=await sql(request,'SELECT bytes,mime FROM creator_media WHERE creator_id=?',[creatorId]);
+  expect(stored).toHaveLength(2);
+  for (const photo of stored) { expect(photo.bytes).toBeLessThanOrEqual(8*1024*1024); expect(photo.mime).toBe('image/jpeg'); }
+  await page.getByLabel('About section').fill('My camera photo and profile changes are saved.');
+  await save(page); await page.reload();
+  await expect(page.locator('.editable-profile-photo-frame img')).toHaveAttribute('src',source!);
+  await expect(page.getByLabel('About section')).toHaveValue('My camera photo and profile changes are saved.');
+  const fresh=await browser.newContext(); const returning=await fresh.newPage(); observe(returning);
+  await login(returning); await expect(returning.locator('.editable-profile-photo-frame img')).toHaveAttribute('src',source!);
+  await fresh.close();
+  await publish(page);
+  const customer=await browser.newContext(); const publicPhoto=await customer.request.get(`http://127.0.0.1:4173${source}`);
+  expect(publicPhoto.status()).toBe(200); expect(publicPhoto.headers()['content-type']).toBe('image/jpeg');
+  await customer.close();
+});
+
+test('stalled upload releases editing, shows a local error and retries the same file', async ({page,request}) => {
+  await seedDraft(request); await login(page); await page.setViewportSize({width:390,height:844});
+  await page.getByLabel('About section').fill('Keep these unsaved edits.');
+  await page.getByText('Photos and videos',{exact:true}).first().click();
+  await page.clock.install();
+  let release!:()=>void; const gate=new Promise<void>(resolve=>{release=resolve;});
+  await page.route('**/api/creators/media',async ()=>{await gate;});
+  const input=page.getByLabel('Upload new media file');
+  await expect(input).toHaveAttribute('accept','image/jpeg,image/png,image/webp,video/mp4,video/webm');
+  const pending=page.waitForRequest('**/api/creators/media');
+  await input.setInputFiles(resolve('public/amber-reference-trench.png')); await pending;
+  await expect(input).toBeDisabled();
+  await page.clock.runFor(60_001);
+  const status=page.locator('.editable-gallery-column [role="status"]');
+  await expect(status).toContainText('The upload took too long.');
+  await status.scrollIntoViewIfNeeded();
+  await page.screenshot({path:'/private/tmp/tas-upload-mobile.png'});
+  await expect(input).toBeEnabled();
+  await expect(page.getByLabel('About section')).toHaveValue('Keep these unsaved edits.');
+  await expect(page.getByRole('button',{name:'Add media',exact:true})).toBeDisabled();
+  release(); await page.unroute('**/api/creators/media');
+  await input.setInputFiles(resolve('public/amber-reference-trench.png'));
+  await expect(status).toContainText('Upload ready.');
+  await page.getByRole('button',{name:'Add media',exact:true}).click();
+  await expect(page.locator('.editable-media-row')).toHaveCount(1);
+  await save(page); await page.reload();
+  await expect(page.locator('.editable-media-row')).toHaveCount(1);
+  await expect(page.getByLabel('About section')).toHaveValue('Keep these unsaved edits.');
+});
+
 test('slow save preserves newer edits and double clicks send one write', async ({page,request}) => {
   const errors=observe(page); await seedDraft(request); await login(page);
   let release!: () => void;
