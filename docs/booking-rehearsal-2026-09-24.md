@@ -1,6 +1,6 @@
 # Booking rehearsal preparation
 
-September 24, 2026. Automated preparation passes. The complete real-provider
+Updated September 25, 2026. Automated preparation passes. The complete real-provider
 booking rehearsal is still blocked by credentials and development-provider setup.
 
 ## Isolated candidate
@@ -47,13 +47,16 @@ was retrieved privately from the authenticated sandbox dashboard and saved only
 in this worktree's ignored `.dev.vars`, mode 0600. Read-only API checks confirm
 the intended platform `acct_1TcSNS1B3wHKPpd6` and active, test-mode, card-only
 configuration `pmc_1UGPTd1B3wHKPpd6A9yy9PLM`. That configuration is set locally.
-Accounts v2 list returns HTTP 403: creator Connect remains blocked.
+That older key returned HTTP 403 for Accounts v2 list.
 
-A separate **Take a Seat local booking rehearsal 2026-09-24** restricted key is
-staged in Stripe's test dashboard but NOT created. No existing key was edited.
-Creating it needs confirmation because it grants persistent API access.
+A separate **Take a Seat local booking rehearsal 2026-09-24** restricted key was
+created on September 25 after Annabel's explicit confirmation. It replaced the
+older key only in this worktree's ignored `.dev.vars`, with mode 0600. No existing
+Stripe key was edited. The new key passed all three read-only API checks with
+HTTP 200: correct platform account, active test card-only payment configuration,
+and Accounts v2 list. The previous Connect read-access blocker is resolved.
 
-| Staged resource | Platform permission | Connect permission |
+| Granted resource | Platform permission | Connect permission |
 | --- | --- | --- |
 | Accounts v2 | Read | Read, linked by Stripe |
 | Recipient Configuration | Write | Write, linked by Stripe |
@@ -65,16 +68,17 @@ Creating it needs confirmation because it grants persistent API access.
 | Webhook Endpoints, Event Destinations | Read | n/a |
 | Balance | None | Read |
 
-Other resources remain None. Recheck actual API permissions after creation;
-read checks do not prove onboarding/capture/refund writes. Do not silently widen
+Other resources remain None. These read checks do not prove
+onboarding/capture/refund writes. Do not silently widen
 permissions or substitute an unrestricted key. The key is for the local rehearsal
 app and cannot operate live-mode objects.
 
 ## Remaining preparation
 
-1. Approve/create the staged restricted test key and verify Connect permissions.
+1. Restricted test key creation and read-access checks are complete. Exercise
+   onboarding, Checkout, capture and refund writes during the actual rehearsal.
 2. Configure a local Stripe event listener and its signing secret. The listener
-   needs appropriate CLI authorization, which is not included in the staged app
+   needs appropriate CLI authorization, which is not included in the restricted app
    key. Keep existing shared-test and production webhook destinations unchanged.
 3. Supply Clerk development credentials and a test creator identity. Do not use
    production identities or expose fixture authentication.
@@ -110,5 +114,7 @@ Fixture screenshots are retained in the original checkout, outside Git:
 - `.playwright-mcp/booking-rehearsal-2026-09-24/booking-confirmed-mobile.png`
 - `.playwright-mcp/booking-rehearsal-2026-09-24/booking-requests-mobile.png`
 
-No real customer was charged, emailed or booked. No real-provider booking,
-secret rotation, new key, deployment or production change was made.
+No real customer was charged, emailed or booked. One approved restricted test key
+was created. No real-provider booking, existing-key rotation, deployment or
+production change was made. The overall preflight remains incomplete because
+webhook, Clerk, Google, Zoom and Resend configuration is still missing locally.
