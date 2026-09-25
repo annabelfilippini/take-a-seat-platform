@@ -150,3 +150,6 @@ central Zoom S2S credentials/licensed host pool, migration 0025 and the Worker c
 Migration 0025 is now applied to production; the application release remains blocked.
 See the [first creator release audit](docs/first-creator-release-audit-2026-09-16.md)
 for actual provider state and remaining launch steps.
+
+Each invocation owns its temporary app and D1. Set `TAKE_A_SEAT_E2E_PORT=4273`
+when another task is using the default port 4173.

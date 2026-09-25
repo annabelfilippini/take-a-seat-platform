@@ -40,6 +40,54 @@ Follow the [engineering release gate](engineering-release-gate.md).
 - **Related files:** app/_lib/zoom.ts, tests/stripe-lifecycle.test.mjs,
   docs/zoom-production-setup.md.
 
+## 2026-09-25: Existing homepage creator could not load available times
+
+- **Reproduction:** Annabel's public card opened normally, but Find availability
+  repeatedly returned HTTP 503 and blocked payment progression. The creator's
+  Availability tab correctly required Calendar reconnection.
+- **Cause:** The stored Calendar grant was no longer usable. The connection was
+  ten days old and Google Cloud still showed External / Testing; Google's
+  documented seven-day refresh-token lifetime is the likely cause. The exact
+  token-endpoint error was not exported. Both required scopes were present.
+- **Repair and verification:** The owner completed ordinary creator email-code
+  login and Google reauthorization. The real free/busy probe passed and customer
+  times reappeared without changing code or availability. Actual sandbox booking,
+  capture, fee, webhook, Calendar invitation and decline then passed.
+- **Remaining:** Reconnection is temporary while OAuth remains Testing. Reviewed
+  production OAuth setup/verification is required before marketplace launch.
+  Existing local tests cover revoked/expired grants and fail-closed availability.
+- **Evidence:** [Homepage rehearsal](homepage-booking-rehearsal-2026-09-25.md).
+
+## 2026-09-25: Stripe hosted returns skipped the Clerk session handshake
+
+- **Reproduction:** On production Worker `bb9598b8-dbe7-4005-a301-fc0070d92797`,
+  a fresh accepted QA creator followed its Connect return URL from the app and
+  then from a different origin. The first reached the expected missing-connection
+  guard; the cross-origin navigation returned `creator-auth`, despite the same
+  signed-in browser opening the saved editor afterward. This isolates callback
+  authentication; it is not evidence of completed Stripe onboarding.
+- **Root cause:** The Worker refresh wrapper included Calendar browser navigation
+  but omitted `/api/stripe/connect/start` and `/api/stripe/connect/return`.
+  Clerk can require a handshake on provider returns before route ownership checks.
+- **Fix:** Include those two GET routes in the existing wrapper. Preserve creator
+  and return parameters, verified identity, failure denial and ownership checks.
+  No webhook, Checkout, POST or provider configuration changes.
+- **Protection:** Regression first failed (200 instead of handshake 307), then
+  passed after repair. Covers return and expired-link refresh, original query,
+  cookies, signed-out access and authentication outages.
+- **Release:** Local candidate only; production remains affected until an approved
+  deployment and actual hosted-return retest. See [lifecycle QA](creator-lifecycle-qa-2026-09-25.md).
+
+## 2026-09-25: Browser-test worktrees shared a destructive temporary directory
+
+- **Root cause:** Every test-server startup removed the same temporary D1/source
+  directory and hardcoded port 4173 across the browser and provider fixtures.
+- **Fix:** Reuse the isolation approach already prepared by the booking rehearsal:
+  unique temporary directory per invocation, shared validated
+  `TAKE_A_SEAT_E2E_PORT`, consistent callback/Checkout URLs, own-directory cleanup.
+- **Verification:** Complete suite passed on port 4273 while the ordinary isolated
+  sandbox app ran on 4274. Real credentials never enter the fixture server.
+
 ## 2026-09-24: Admin creator-ID validation used an invalid HTML pattern
 
 - **Reproduction:** Production application acceptance logged an invalid regular

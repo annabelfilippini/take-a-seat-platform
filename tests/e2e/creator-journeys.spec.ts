@@ -4,6 +4,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { createHmac } from 'node:crypto';
 import { encryptToken } from '../../app/_lib/token-encryption';
+import { baseURL } from './environment.mjs';
 const creatorId='onboard_e2e';
 async function sql(request:APIRequestContext, statement:string, args:unknown[] = []) {
   const response=await request.post('/e2e-control',{data:{sql:statement,args}});
@@ -63,9 +64,36 @@ test.beforeEach(async({request,page,context})=>{
 });
 test.afterEach(()=>expect([...observedPages.values()].flat(),'Unexpected browser errors or HTTP failures').toEqual([]));
 
+test('public application validates email, persists submission and creates both notification messages', async ({page,request}) => {
+  await page.goto('/creators/onboard');
+  await page.getByLabel('First name',{exact:true}).fill('Lifecycle QA');
+  await page.getByLabel('Last name',{exact:true}).fill('Applicant');
+  await page.getByLabel('Phone number',{exact:true}).fill('+1 202 555 0147');
+  await page.getByLabel('Email',{exact:true}).fill('invalid-email');
+  await page.getByRole('button',{name:'Submit application',exact:true}).click();
+  expect(await page.getByLabel('Email',{exact:true}).evaluate((input:HTMLInputElement)=>input.validity.typeMismatch)).toBeTruthy();
+  expect(await sql(request,"SELECT id FROM creator_onboarding_profiles WHERE name='Lifecycle QA Applicant'")).toHaveLength(0);
+  await page.getByLabel('Email',{exact:true}).fill('lifecycle-qa@example.com');
+  await page.getByLabel('Expertise',{exact:true}).fill('Controlled lifecycle regression fixture.');
+  await page.getByRole('button',{name:'Submit application',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'Application in review.'})).toBeVisible();
+  const [application]=await sql(request,"SELECT id,application_status,published_at,profile_details FROM creator_onboarding_profiles WHERE email='lifecycle-qa@example.com'");
+  expect(application.application_status).toBe('in_review');
+  expect(application.published_at).toBeNull();
+  expect(application.profile_details).toBe('Controlled lifecycle regression fixture.');
+  const events=await sql(request,"SELECT payload FROM e2e_provider_events WHERE kind='email'");
+  expect(events).toHaveLength(2);
+  expect(events.map((event:{payload:string})=>JSON.parse(event.payload).subject)).toEqual(expect.arrayContaining([
+    'We received your Take a Seat application','New Take a Seat application: Lifecycle QA Applicant',
+  ]));
+  await page.reload();
+  await expect(page.getByRole('heading',{name:'Application in review.'})).toBeVisible();
+  expect(await sql(request,"SELECT id FROM creator_onboarding_profiles WHERE email='lifecycle-qa@example.com'")).toHaveLength(1);
+});
+
 test('admin acceptance validates a creator slug in the browser before submitting', async ({page,request}) => {
   await sql(request,"UPDATE creator_onboarding_profiles SET application_status='in_review' WHERE id=?",[creatorId]);
-  await page.context().addCookies([{name:'tas_local_admin',value:'1',url:'http://127.0.0.1:4173'}]);
+  await page.context().addCookies([{name:'tas_local_admin',value:'1',url:baseURL}]);
   await page.goto(`/admin/applications/${creatorId}`);
   const slug=page.locator('input[name="publicCreatorId"]');
   await expect(slug).toBeEnabled();
