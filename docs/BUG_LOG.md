@@ -5,6 +5,29 @@ This is the central index for meaningful bugs. Existing feature notes retain
 their detailed historical evidence; link to them instead of duplicating it.
 Follow the [engineering release gate](engineering-release-gate.md).
 
+## 2026-09-24: Google Calendar callbacks rejected a signed-in new creator
+
+- **Reproduction:** A fresh production applicant accepted the actual emailed
+  invitation, saved a profile, and completed Google consent. Two callback attempts
+  returned `calendar=error&detail=creator-access`. The second callback carried a
+  still-valid Clerk session cookie and came from Google's cross-site document.
+- **Root cause:** Clerk requires a handshake for cross-origin document navigation,
+  even with a valid session. The Worker refresh wrapper excluded the OAuth start
+  and callback routes. `getCalendarOwner` therefore treated the pending handshake
+  as signed out, before consuming OAuth state or exchanging Google's code. The
+  subsequent editor navigation refreshed the session, hiding the original cause.
+- **Fix:** Include only the two Calendar navigation GET routes in the existing
+  Clerk refresh wrapper. Preserve the complete callback URL and nonce through the
+  handshake, then pass the verified token into the original ownership checks.
+  Keep signed-out/failed authentication denied and leave other API calls alone.
+- **Protection:** Regression covers handshake-before-callback ordering, original
+  code/state/nonce retention, refreshed cookies, signed-out and provider failure,
+  and unchanged mutation/API handling. Existing Calendar browser journeys still
+  cover ownership, replay, denied scopes, persistence, and disconnect.
+- **Release:** Prepared in an isolated main-based checkout. Not deployed; live
+  Calendar retest and marketplace publication remain pending. See
+  [fresh creator QA](creator-live-qa-2026-09-24.md).
+
 ## Existing incident records
 
 - [Creator onboarding lessons](creator-onboarding-lessons.md): original invite
