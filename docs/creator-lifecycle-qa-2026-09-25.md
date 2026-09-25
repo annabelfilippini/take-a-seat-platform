@@ -1,5 +1,10 @@
 # Creator lifecycle QA, September 25, 2026
 
+Follow-up: the [homepage booking rehearsal](homepage-booking-rehearsal-2026-09-25.md)
+subsequently verified the real sandbox payment/Calendar chain and decline on the
+existing Annabel card. The additional QA creator is tracked separately there.
+The results below describe the earlier fresh-creator lifecycle pass.
+
 **Partial pass; marketplace launch is not certified.** Production application,
 email, original invitation, private editing and returning login passed. A
 production Stripe callback authentication defect was reproduced and repaired

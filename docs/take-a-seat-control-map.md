@@ -2,8 +2,13 @@
 
 September 25 lifecycle QA found a Stripe hosted-return Clerk handshake omission;
 the repair is local and not deployed. Production applications, delivered email,
-original invites and fresh-login profile persistence passed. Full provider booking
-remains unverified. See [lifecycle findings](creator-lifecycle-qa-2026-09-25.md).
+original invites and fresh-login profile persistence passed. A subsequent real
+homepage sandbox rehearsal passed authorization, capture, fee, transfer, webhook,
+Calendar invitation and decline on Annabel's existing card after Calendar
+reconnection. An additional QA card awaits its separate recipient onboarding.
+Google OAuth remains External/Testing, so seven-day grant expiry is still a launch
+blocker. See [booking rehearsal](homepage-booking-rehearsal-2026-09-25.md) and
+[lifecycle findings](creator-lifecycle-qa-2026-09-25.md).
 
 Fresh creator live QA on September 24 reproduced a Google OAuth callback session
 refresh failure. PR #43 is deployed (`93d8d23`); the real callback, refresh and
