@@ -41,7 +41,8 @@ locally. Complete provider booking remains blocked.
 | Existing published QA card | PASS, read-only production | Directory card opened the other task's `take-a-seat-qa-test` profile; content/images consistent, booking disabled, mobile no overflow and no observed JS/HTTP errors. It was left unchanged. |
 | Connect start | PASS, real Stripe test mode | Actual local app button created one test recipient, saved it to local D1 and redirected to Stripe hosted onboarding. |
 | Connect cancellation/retry | PASS, real Stripe test mode | Stripe Return to Take a Seat returned `stripe-transfers` setup-needed. Retry reached a fresh hosted link for the same stored account; `livemode=0`, `connected_at=null`. |
-| Completed Connect onboarding | BLOCKED | Hosted next step includes Stripe terms; legal acceptance is reserved for the owner. No identity/bank data or attestations were invented. |
+| Existing completed Connect onboarding | PASS, current read-only sandbox check | The owner's existing Annabel sandbox recipient, created September 11, has active transfers and payouts. Its onboarding does not need repeating. |
+| Fresh QA recipient onboarding | INCOMPLETE | The additional recipient created by this task remains restricted. Its hosted next step includes Stripe terms; no identity/bank data or attestations were invented. This is distinct from the already-completed owner recipient. |
 | Cross-origin Stripe callback auth | FAIL in production; FIXED locally | Same session and return parameters passed the same-origin ownership boundary but failed from another origin with `creator-auth`. Details below. |
 | Google OAuth for this creator | PASS, production | After explicit owner approval, the actual Connect calendar flow returned `calendar=connected`. HTTP 200 status reports connected, requiring both scopes, a stored refresh token and a successful real Google free/busy probe. Full reload and another authenticated context retained it. |
 | Calendar/availability/booking edge cases | PASS, local fixtures | Full suite covers OAuth nonce/owner/replay/partial grants, refresh/revocation, busy filtering, saved hours, timezone/DST, pre-capture conflict checks and retry-safe event operations. These are not new Google delivery evidence. |
@@ -100,6 +101,14 @@ Rechecked September 25, not inferred from historical tests:
 - Stripe/Calendar/Zoom secret **names** exist in production. Actual live Worker
   credential mode and signing-secret match were not inspected or established.
 - PR #37 still open/draft at `e9c54d5889ae1ec4d5d0451a259c1fa9d5547857`.
+- The owner correctly recalled prior completed Stripe setup. Accounts v2 confirms
+  the existing Annabel sandbox recipient has active transfers and payouts, while
+  this task's additional local QA recipient remains restricted. Both are test-mode
+  accounts; existing onboarding is not a remaining prerequisite.
+- [September 14 provider rehearsal](marketplace-live-rehearsal-2026-09-14.md)
+  already records actual sandbox authorization, capture, 15% fee, webhook delivery,
+  Calendar/Meet invitations and decline. That historical success is retained as
+  evidence; it does not certify the current code or the newer Zoom candidate.
 - Original checkout's old test key returned 401. The separate rehearsal's newer
   restricted key passed read-only checks for the intended platform, active
   test card-only configuration and Accounts v2. No key was created or widened here.
@@ -114,8 +123,11 @@ Rechecked September 25, not inferred from historical tests:
    natural token expiry/refresh and booking invitations still need the complete
    booking rehearsal. Disconnect/revoke was not exercised on this shared owner
    Google account because it could affect other existing test connections.
-2. Owner completes required Stripe hosted terms/onboarding for the test recipient;
-   refresh real transfer readiness and retest the app return/expired-link path.
+2. Use the already-ready sandbox recipient for a separately identified downstream
+   rehearsal where appropriate, preserving its existing ownership and configuration.
+   Do not request repeat owner onboarding. Completing the additional fresh recipient
+   is needed only to prove fresh-creator hosted onboarding end to end; that case
+   remains unverified, including the app return/expired-link path.
 3. Finish the dedicated real-provider rehearsal configuration using the existing
    restricted test key, without changing live settings. Configure a local Stripe
    listener with its actual signing secret and controlled Calendar/email identities.
