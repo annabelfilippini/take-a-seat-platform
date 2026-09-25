@@ -76,6 +76,17 @@ Non-secret references:
   booking on that exact card. Its saved profile and approved Calendar are ready;
   its separate Stripe recipient was created through the actual deployed Connect
   button and is awaiting owner completion of hosted test onboarding/terms.
+  The draft is now clearly labeled **Take a Seat Booking QA**, with one active
+  **Sandbox test call**, 15 minutes at $1, and test-only copy. Saved content was
+  independently recovered through a fresh email-code login. Non-binding Stripe
+  test business details advanced to test bank selection. After the isolated QA
+  browser disconnected, the existing recipient's setup was reopened in the
+  in-app browser. The owner completed phone verification; the page remains at
+  Bank details (40%), awaiting test-bank selection and final review. The embedded
+  frame rejected both semantic and coordinate browser controls, so this remaining
+  hosted step was handed to the owner. No duplicate recipient or real bank
+  information was supplied. Publication and a booking on this additional card
+  remain unverified.
 - The extra already-captured acceptance replay was rejected by automatic approval
   review as a possible duplicate capture/notification. It was not executed or
   bypassed. Read-only counts passed; destructive replay is not claimed as tested.
