@@ -5,6 +5,19 @@ This is the central index for meaningful bugs. Existing feature notes retain
 their detailed historical evidence; link to them instead of duplicating it.
 Follow the [engineering release gate](engineering-release-gate.md).
 
+## 2026-09-24: Browser test runs shared a destructive temporary directory
+
+- **Root cause:** Every server reset `/private/tmp/take-a-seat-e2e-app` and its D1
+  state, while the server, fixtures and journeys hardcoded port 4173. Separate
+  worktrees could overwrite an active test server's app/database.
+- **Fix:** Allocate a unique directory per invocation; parameterize the loopback
+  port consistently; remove only the invocation's own directory on shutdown.
+- **Verification:** All 38 Playwright journeys passed on nondefault port 4187,
+  including cross-context URLs, Checkout redirects, OAuth and database persistence.
+  This run did not deliberately disrupt a second suite to reproduce data loss.
+- **Files:** tests/e2e/environment.mjs, server.mjs, providers.ts,
+  creator-journeys.spec.ts and playwright.config.ts.
+
 ## 2026-09-16: Zoom silently allowed joining earlier than the reserved host window
 
 - **Bug / impact:** Real Zoom returned `jbh_time=0` (join anytime) although the
