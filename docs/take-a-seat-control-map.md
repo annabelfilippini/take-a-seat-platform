@@ -1,50 +1,25 @@
 # Take a Seat Control Map
 
-September 25 lifecycle QA found a Stripe hosted-return Clerk handshake omission;
-the repair is local and not deployed. Production applications, delivered email,
-original invites and fresh-login profile persistence passed. A subsequent real
-homepage sandbox rehearsal passed authorization, capture, fee, transfer, webhook,
-Calendar invitation and decline on Annabel's existing card after Calendar
-reconnection. An additional QA card awaits its separate recipient onboarding.
-Google OAuth remains External/Testing, so seven-day grant expiry is still a launch
-blocker. See [booking rehearsal](homepage-booking-rehearsal-2026-09-25.md) and
-[lifecycle findings](creator-lifecycle-qa-2026-09-25.md).
+Last updated: 2026-09-27
 
-Fresh creator live QA on September 24 reproduced a Google OAuth callback session
-refresh failure. PR #43 is deployed (`93d8d23`); the real callback, refresh and
-fresh login now pass. Profile uploads and saved edits passed live. The new test
-card remains private pending Stripe setup in Annabel's other terminal. See
-[the current QA record](creator-live-qa-2026-09-24.md).
+**Production launch is still gated; the combined candidate is not deployed.**
+Draft PR #37 includes current main, the Stripe return-session repair, central Zoom,
+scheduled recovery and full-refund cancellation. Real sandbox authorization/capture,
+Zoom creation at the correct time, Calendar invitation and branded email delivery
+have passed, including complete refund/decline and cleanup. The candidate passes
+92 Node tests, 40 Playwright journeys, lint, TypeScript and deploy dry run.
+Real tests also found and fixed timestamp, return-URL and renamed-title
+cleanup bugs. Use the [current rehearsal report](launch-rehearsal-2026-09-25.md)
+for current results and remaining checks; older evidence below is historical.
 
-Last updated: 2026-09-25
+Still required: unattended two-participant Zoom join, production Google OAuth
+readiness, first live Stripe recipient and coordinated live configuration/webhook,
+then exact-candidate deployment approval and post-deploy verification. Development
+Google and test CLI approvals are complete. Migration 0025 is applied. No real money
+has moved in this rehearsal.
 
-Latest preparation: the combined current-main/Zoom/Stripe-return candidate passes
-90 Node and 40 Playwright tests, lint, TypeScript and deploy dry run. A reproduced
-near-term booking deadline bug is fixed. The existing Meet flow passed a real
-sandbox booking today; the combined Zoom provider rehearsal and live cutover remain
-pending. Development Google project is created, with OAuth/CLI owner approval steps
-in progress. See [current rehearsal](launch-rehearsal-2026-09-25.md) before using the
-historical release evidence below.
-
-**First creator release remains blocked.** Migration 0025 is applied; PR #37 is
-still draft and undeployed. Main `5012acc` was merged into the candidate and all
-87 Node / 35 Playwright tests, lint, TypeScript and build pass. Google domain ownership
-is verified; Ella is already eligible under External/Testing, with temporary grants
-and no public OAuth approval. Zoom API checks pass; guest legal acceptance/join test
-remains open. Sandbox card-only Checkout, manual capture and full refund passed.
-Live Stripe webhook is disabled, no live Connect recipient exists, payment-method
-runtime config is missing, and the deployed Worker has no scheduled handler/cron.
-See the [current release audit](first-creator-release-audit-2026-09-16.md).
-
-This is the working source of truth for Take a Seat while the product is being
-organized. It should stay short, current, and operational.
-
-Photo upload repair deployed September 22 from PR #41 / `369be0a`. All 82 Node
-and 32 browser tests pass; a production large-photo upload also passed. See [upload repair](profile-upload-repair-2026-09-22.md)
-for confirmed failure paths and the remaining original-file/device check.
-
-For email delivery, invitation, and admin/creator login troubleshooting, read
-[the onboarding lessons](creator-onboarding-lessons.md) before live testing.
+For email delivery and invitation/login troubleshooting, read
+[the onboarding lessons](creator-onboarding-lessons.md).
 
 ## Product North Star
 
