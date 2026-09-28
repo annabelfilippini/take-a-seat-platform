@@ -5,6 +5,54 @@ This is the central index for meaningful bugs. Existing feature notes retain
 their detailed historical evidence; link to them instead of duplicating it.
 Follow the [engineering release gate](engineering-release-gate.md).
 
+## 2026-09-27: Renamed Zoom titles blocked cancellation delivery
+
+- **Reproduction:** A fresh real meeting was verified and persisted at creation.
+  Later its title matched the Google Calendar event title instead of the original
+  booking marker. Refund succeeded, but cleanup rejected the changed title.
+- **Root cause:** Synchronization treated mutable display text as permanent
+  identity, even after storing the verified meeting ID and host. The actor that
+  changed the provider title was not established; no title change is needed to
+  reproduce this with the provider fixture.
+- **Fix:** Subsequent synchronization validates the persisted meeting ID and host.
+  Creation and recovery of an unknown meeting still require the exact marker.
+  No client can supply these persisted provider identity fields.
+- **Regression:** Domain tests reject foreign host/ID before any mutation, permit
+  renamed-title rescheduling/cancellation, and prevent repeat deletion. The complete
+  browser cancellation journey now changes the provider title before refund.
+
+## 2026-09-27: Checkout return URL encoded Stripe’s session template
+
+- **Reproduction:** Real hosted sandbox checkout returned with the literal encoded
+  placeholder as `session_id`, causing `checkout-confirmation` in the return URL.
+  Signed webhooks independently persisted authorization, so the page still showed
+  the correct payment state; that masked the broken return reconciliation.
+- **Root cause:** `URLSearchParams` encoded the braces in `{CHECKOUT_SESSION_ID}`
+  before sending the success URL to Stripe, preventing template substitution.
+- **Fix:** Restore only that exact template after serializing the URL. Other query
+  values retain URL encoding, and signed webhooks remain authoritative.
+- **Regression:** Both checkout route tests assert the outgoing literal template;
+  browser provider fixtures reject its encoded form.
+- **Reference:** [Stripe’s hosted success URL](https://docs.stripe.com/payments/checkout/custom-success-page?payment-ui=stripe-hosted).
+
+## 2026-09-25: Zoom interpreted fractional UTC timestamps as local time
+
+- **Reproduction:** Real sandbox acceptance captured payment but withheld the
+  invitation when Zoom returned September 26 at 20:00 Los Angeles for a 13:00
+  booking. The requested timestamp was `2026-09-26T20:00:00.000Z` with the
+  creator timezone; Zoom returned `2026-09-27T03:00:00Z`.
+- **Root cause:** Creation and rescheduling used JavaScript's fractional-second
+  ISO format rather than Zoom's documented whole-second UTC format. Provider
+  fixtures simply echoed requests, hiding Zoom's interpretation.
+- **Fix:** Format UTC timestamps with whole seconds in both write paths. Preserve
+  the strict provider readback check and reuse the existing meeting on recovery.
+  Correcting the owned rehearsal meeting with `2026-09-26T20:00:00Z` returned the
+  exact booked time, duration and five-minute early-join limit from the real API.
+- **Regression:** Actual domain create/reschedule tests cover Los Angeles daylight
+  and standard time. Browser fixtures reject fractional UTC timestamps.
+- **Reference:** [Zoom meeting API](https://developers.zoom.us/docs/api/meetings/).
+  See the launch rehearsal report for final verification and remaining gates.
+
 ## 2026-09-25: Near-term slots had already-expired acceptance deadlines
 
 - **Reproduction:** The combined booking-release browser suite selected an 11:30

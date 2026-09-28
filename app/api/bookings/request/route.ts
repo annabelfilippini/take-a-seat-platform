@@ -400,7 +400,9 @@ function addBookingParams(
     target.searchParams.set("booking_id", bookingId);
   }
 
-  return target.toString();
+  // Stripe substitutes this literal template before redirecting the customer.
+  // URLSearchParams encodes its braces, which prevents that substitution.
+  return target.toString().replace("%7BCHECKOUT_SESSION_ID%7D", "{CHECKOUT_SESSION_ID}");
 }
 
 function buildStripeIntegrationIdentifier() {

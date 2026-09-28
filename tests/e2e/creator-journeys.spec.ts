@@ -1058,6 +1058,7 @@ test('creator cancellation refunds once, deletes only its meeting and invitation
   await seedDraft(request); await login(page); await publish(page);
   const booking=await workflowRequest(request);
   const result=await page.request.post('/api/creators/requests',{form:{bookingId:booking.id,action:'accept'}}); expect(result.ok()).toBeTruthy();
+  await sql(request,"UPDATE e2e_provider_events SET payload=json_set(payload,'$.topic','Calendar-synced title') WHERE kind='zoom'");
   await page.getByRole('tab',{name:'Requests',exact:true}).click(); await page.getByRole('button',{name:'Refresh requests'}).click();
   page.once('dialog',dialog=>dialog.accept()); await page.getByRole('button',{name:'Cancel & refund',exact:true}).click(); await expect(page.locator('.creator-request-card:visible')).toContainText('Cancelled and refunded');
   await maintenance(request);

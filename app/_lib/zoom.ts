@@ -33,6 +33,11 @@ export function zoomInterval(booking: CustomerBooking) {
   if (!start || !end || end <= start) throw new Error('Invalid meeting time.');
   return { start, end };
 }
+function zoomStartTime(start: number) {
+  // Zoom's UTC format requires whole seconds. Fractional seconds can be
+  // interpreted as local wall time when a timezone is also supplied.
+  return new Date(start).toISOString().replace(/\.\d{3}Z$/, 'Z');
+}
 export async function reserveZoomHost(booking: CustomerBooking) {
   const { getDb } = await import('../../db');
   const db = getDb(), { start, end } = zoomInterval(booking);
@@ -107,7 +112,7 @@ export async function ensureBookingZoom(id: string, guard: () => Promise<void>) 
     await guard();
     await db.update(customerBookings).set({ zoomCreateAttemptAt: Date.now() }).where(eq(customerBookings.id, id));
     const response = await zoomFetch(`/users/${encodeURIComponent(booking.zoomHostId)}/meetings`, access, {
-      method: 'POST', body: JSON.stringify({ topic: marker, type: 2, start_time: new Date(start).toISOString(), timezone: booking.timezone,
+      method: 'POST', body: JSON.stringify({ topic: marker, type: 2, start_time: zoomStartTime(start), timezone: booking.timezone,
         duration: (end - start) / 60000, agenda: `Take a Seat session with ${booking.creatorName}`,
         password: crypto.randomUUID().replaceAll('-', '').slice(0, 10),
         settings: { use_pmi: false, join_before_host: true, jbh_time: 5, waiting_room: false, meeting_authentication: false, auto_recording: 'none' },
@@ -142,11 +147,13 @@ export async function syncBookingZoom(booking: CustomerBooking, guard: () => Pro
   } else {
     if (!response.ok) throw new Error('Zoom synchronization needs a retry.');
     const meeting = await response.json() as ZoomMeeting;
-    if (meeting.host_id !== booking.zoomHostId || meeting.topic !== await topic(booking.id) || String(meeting.id) !== booking.zoomMeetingId) throw new Error('Zoom meeting ownership did not match.');
+    // This ID was persisted only after creation/recovery verified the booking marker.
+    // Calendar integrations can rename topics later; identity remains the saved ID + host.
+    if (meeting.host_id !== booking.zoomHostId || String(meeting.id) !== booking.zoomMeetingId) throw new Error('Zoom meeting ownership did not match.');
     await guard();
     const { start, end } = zoomInterval(booking);
     const changed = await zoomFetch(path, access, { method: booking.status === 'cancelled' ? 'DELETE' : 'PATCH',
-      body: booking.status === 'cancelled' ? undefined : JSON.stringify({ start_time: new Date(start).toISOString(), duration: (end - start) / 60000, timezone: booking.timezone }),
+      body: booking.status === 'cancelled' ? undefined : JSON.stringify({ start_time: zoomStartTime(start), duration: (end - start) / 60000, timezone: booking.timezone }),
     });
     if (!changed.ok) throw new Error('Zoom synchronization will retry automatically.');
   }

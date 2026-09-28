@@ -113,6 +113,72 @@ test('Zoom rejects ignored early-join limits and recovers the same meeting after
   }finally{globalThis.fetch=original}
 });
 
+test('Zoom creation and rescheduling use documented UTC seconds across daylight saving changes', async () => {
+  const {ensureBookingZoom,syncBookingZoom}=await import('../app/_lib/zoom.ts');
+  const {withBookingLock}=await import('../app/_lib/booking-lock.ts');
+  const original=globalThis.fetch;
+  let meeting;
+  const requests=[];
+  globalThis.fetch=async(url,options={})=>{
+    if(String(url)==='https://zoom.us/oauth/token')return Response.json({access_token:'fixture-token'});
+    if(options.method==='POST'||options.method==='PATCH'){
+      const body=JSON.parse(options.body);
+      assert.match(body.start_time,/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
+      requests.push({method:options.method,start:body.start_time,timezone:body.timezone,duration:body.duration});
+      meeting={...meeting,...body,id:987654322,host_id:'host_test',join_url:'https://zoom.us/j/987654322?pwd=fixture'};
+      return options.method==='PATCH'?new Response(null,{status:204}):Response.json(meeting,{status:201});
+    }
+    return Response.json(meeting);
+  };
+  try{
+    const id=seed('zoom-utc-seconds');
+    sqlite.prepare("UPDATE customer_bookings SET status='paid',zoom_host_id='host_test',appointment_start_at='2026-09-26T13:00:00',appointment_end_at='2026-09-26T13:15:00',timezone='America/Los_Angeles' WHERE id=?").run(id);
+    await withBookingLock(id,guard=>ensureBookingZoom(id,guard));
+    assert.equal((await getCustomerBooking(id)).zoomMeetingId,'987654322');
+    sqlite.prepare("UPDATE customer_bookings SET appointment_start_at='2026-12-01T13:00:00',appointment_end_at='2026-12-01T13:15:00' WHERE id=?").run(id);
+    await withBookingLock(id,async guard=>syncBookingZoom(await getCustomerBooking(id),guard));
+    assert.deepEqual(requests,[
+      {method:'POST',start:'2026-09-26T20:00:00Z',timezone:'America/Los_Angeles',duration:15},
+      {method:'PATCH',start:'2026-12-01T21:00:00Z',timezone:'America/Los_Angeles',duration:15},
+    ]);
+  }finally{globalThis.fetch=original}
+});
+
+test('Zoom synchronization tolerates renamed titles but rejects a different persisted host or meeting ID', async () => {
+  const {ensureBookingZoom,syncBookingZoom}=await import('../app/_lib/zoom.ts');
+  const {withBookingLock}=await import('../app/_lib/booking-lock.ts');
+  const original=globalThis.fetch;
+  let meeting; const mutations=[];
+  globalThis.fetch=async(url,options={})=>{
+    if(String(url)==='https://zoom.us/oauth/token')return Response.json({access_token:'fixture-token'});
+    if(options.method==='POST') {
+      meeting={...JSON.parse(options.body),id:987654323,host_id:'host_test',join_url:'https://zoom.us/j/987654323?pwd=fixture'};
+      return Response.json(meeting,{status:201});
+    }
+    if(['PATCH','DELETE'].includes(options.method)) {
+      mutations.push(options.method);
+      return new Response(null,{status:204});
+    }
+    return Response.json(meeting);
+  };
+  try {
+    const id=seed('zoom-renamed');
+    sqlite.prepare("UPDATE customer_bookings SET status='paid',zoom_host_id='host_test' WHERE id=?").run(id);
+    await withBookingLock(id,guard=>ensureBookingZoom(id,guard));
+    meeting.topic='Calendar event title changed after creation';
+    sqlite.prepare("UPDATE customer_bookings SET appointment_start_at='2026-10-01T10:00:00',appointment_end_at='2026-10-01T10:15:00' WHERE id=?").run(id);
+    const sync=()=>withBookingLock(id,async guard=>syncBookingZoom(await getCustomerBooking(id),guard));
+    meeting.host_id='another-host'; await assert.rejects(sync,/ownership/);
+    meeting.host_id='host_test'; meeting.id=111111111; await assert.rejects(sync,/ownership/);
+    assert.deepEqual(mutations,[]);
+    meeting.id=987654323; await sync();
+    sqlite.prepare("UPDATE customer_bookings SET status='cancelled' WHERE id=?").run(id);
+    await sync(); await sync();
+    assert.deepEqual(mutations,['PATCH','DELETE']);
+    assert.equal((await getCustomerBooking(id)).zoomSyncedRevision,'cancelled');
+  } finally {globalThis.fetch=original;}
+});
+
 async function event(type, object, timestamp = Math.floor(Date.now() / 1000)) {
   const body = JSON.stringify({ id: "evt_lifecycle", type, data: { object } });
   const signature = createHmac("sha256", process.env.STRIPE_WEBHOOK_SECRET).update(`${timestamp}.${body}`).digest("hex");

@@ -30,6 +30,9 @@ export async function fixtureFetch(input: RequestInfo | URL, init?: RequestInit)
     if (url.endsWith('/login_links')) return Response.json({url:`${baseURL}/e2e-control?stripe-dashboard=1`});
     if (url.endsWith('/checkout/sessions')) {
       const body = new URLSearchParams(String(init?.body)); const booking = body.get('client_reference_id');
+      if (!/[?&]session_id=\{CHECKOUT_SESSION_ID\}(?:&|$)/.test(body.get('success_url') || '')) {
+        return Response.json({error:'Checkout return URL must preserve the literal session template'}, {status:400});
+      }
       await db.prepare('INSERT OR IGNORE INTO e2e_provider_events (id,kind,payload) VALUES (?,?,?)').bind(`checkout_${booking}`,'checkout',body.toString()).run();
       return Response.json({id:`cs_${booking}`,url:`${baseURL}/e2e-control?checkout=${booking}`});
     }
@@ -67,6 +70,10 @@ export async function fixtureFetch(input: RequestInfo | URL, init?: RequestInit)
   if (url === 'https://zoom.us/oauth/token') return Response.json({access_token:'e2e_zoom_access'});
   if (url.startsWith('https://api.zoom.us/v2/')) {
     const body = JSON.parse(String(init?.body || '{}'));
+    if ((init?.method === 'POST' || init?.method === 'PATCH') &&
+      !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(String(body.start_time))) {
+      return Response.json({message:'Zoom requires UTC timestamps with whole seconds'}, {status:400});
+    }
     if (url.includes('/users/')) {
       if (init?.method === 'POST') {
         if (await setting('zoom') === 'fail') return Response.json({}, {status:429});

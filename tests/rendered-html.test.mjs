@@ -1388,6 +1388,7 @@ test("creates Stripe Checkout destination charges with a platform fee", async (c
   assert.equal(headers.get("stripe-version"), "2026-08-26.dahlia");
 
   const body = stripeRequest.init.body;
+  assert.match(body.get("success_url") ?? "", /[?&]session_id=\{CHECKOUT_SESSION_ID\}(?:&|$)/);
   assert.equal(body.get("mode"), "payment");
   assert.equal(body.get("payment_intent_data[capture_method]"), "manual");
   assert.ok(Math.abs(Number(body.get("expires_at")) - Math.floor(Date.now() / 1000) - 1800) < 10);
@@ -1520,6 +1521,7 @@ test("sends public booking requests to Stripe Checkout for payment authorization
   assert.equal(stripeRequest.input, "https://api.stripe.com/v1/checkout/sessions");
 
   const body = stripeRequest.init.body;
+  assert.match(body.get("success_url") ?? "", /[?&]session_id=\{CHECKOUT_SESSION_ID\}(?:&|$)/);
   assert.equal(body.get("mode"), "payment");
   assert.equal(body.get("payment_intent_data[capture_method]"), "manual");
   assert.ok(Math.abs(Number(body.get("expires_at")) - Math.floor(Date.now() / 1000) - 1800) < 10);
