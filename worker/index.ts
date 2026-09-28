@@ -30,6 +30,10 @@ interface ExecutionContext {
 // const imageConfig: ImageConfig = { dangerouslyAllowSVG: true };
 
 const worker = {
+  async scheduled(_controller: ScheduledController, _env: Env, ctx: ExecutionContext) {
+    const { runBookingMaintenance } = await import('../app/_lib/booking-workflow');
+    ctx.waitUntil(runBookingMaintenance());
+  },
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     return withSecureOrigin(request, async (secureRequest) => {
       const url = new URL(secureRequest.url);

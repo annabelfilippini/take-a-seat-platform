@@ -1,22 +1,25 @@
 # Take a Seat Control Map
 
-Fresh creator live QA on September 24 reproduced a Google OAuth callback session
-refresh failure. PR #43 is deployed (`93d8d23`); the real callback, refresh and
-fresh login now pass. Profile uploads and saved edits passed live. The new test
-card remains private pending Stripe setup in Annabel's other terminal. See
-[the current QA record](creator-live-qa-2026-09-24.md).
+Last updated: 2026-09-27
 
-Last updated: 2026-09-16
+**Production launch is still gated; the combined candidate is not deployed.**
+Draft PR #37 includes current main, the Stripe return-session repair, central Zoom,
+scheduled recovery and full-refund cancellation. Real sandbox authorization/capture,
+Zoom creation at the correct time, Calendar invitation and branded email delivery
+have passed, including complete refund/decline and cleanup. The candidate passes
+92 Node tests, 40 Playwright journeys, lint, TypeScript and deploy dry run.
+Real tests also found and fixed timestamp, return-URL and renamed-title
+cleanup bugs. Use the [current rehearsal report](launch-rehearsal-2026-09-25.md)
+for current results and remaining checks; older evidence below is historical.
 
-This is the working source of truth for Take a Seat while the product is being
-organized. It should stay short, current, and operational.
+Still required: unattended two-participant Zoom join, production Google OAuth
+readiness, first live Stripe recipient and coordinated live configuration/webhook,
+then exact-candidate deployment approval and post-deploy verification. Development
+Google and test CLI approvals are complete. Migration 0025 is applied. No real money
+has moved in this rehearsal.
 
-Photo upload repair deployed September 22 from PR #41 / `369be0a`. All 82 Node
-and 32 browser tests pass; a production large-photo upload also passed. See [upload repair](profile-upload-repair-2026-09-22.md)
-for confirmed failure paths and the remaining original-file/device check.
-
-For email delivery, invitation, and admin/creator login troubleshooting, read
-[the onboarding lessons](creator-onboarding-lessons.md) before live testing.
+For email delivery and invitation/login troubleshooting, read
+[the onboarding lessons](creator-onboarding-lessons.md).
 
 ## Product North Star
 
@@ -222,9 +225,9 @@ Calendar:
   Additive migrations 0021–0024 are applied remotely; required secret names and
   live desktop/mobile booking-calendar smoke checks passed. See
   [implementation and release evidence](google-calendar-implementation.md).
-- The last recorded Google Console observation was External/Testing, with domain
-  verification and sensitive-scope submission pending. Recheck current state;
-  this work makes no Console changes. Exact values, separated production/dev
+- The September 16 Google Console observation is External/Testing. Domain ownership
+  is verified; first-creator test-user eligibility is confirmed, but sensitive-scope
+  production approval remains pending. Exact values, separated production/dev
   projects, reviewer instructions and video script are in
   [Google production setup](google-oauth-production-readiness-2026-09-16.md).
 - Booking request and Stripe Checkout routes server-validate submitted times
@@ -489,3 +492,15 @@ have:
 - The test card was removed from public view and its temporary ownership link
   cleared. Its application remains a private draft. See
   `docs/creator-acceptance-repair.md` for release evidence and verification limits.
+
+
+## Booking confirmation implementation (not deployed)
+
+September 16 work on `codex/booking-confirmation` adds central Zoom, Stripe-derived
+response deadlines, full-refund creator cancellation and scheduled delivery recovery.
+Migration 0025 and new Zoom/card-only payment configuration secrets are required.
+The approved customer session/time selection is unchanged. The five-scope Zoom app,
+one licensed host and all four Worker secrets are configured; real API checks pass.
+Guest joining and the combined real-provider workflow remain release gates. See [workflow](booking-confirmation-workflow.md) and
+[exact setup / test evidence](zoom-production-setup.md). Earlier production Calendar
+and Stripe evidence above does not certify this new Zoom workflow.

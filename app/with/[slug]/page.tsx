@@ -172,7 +172,7 @@ export function CreatorProfileContent({ creator, searchParams, previewOnly = fal
           {isBookable ? (
             <>
               <h2>Choose a call</h2>
-              <p>Private video call on Google Meet.</p>
+              <p>Private video call on Zoom.</p>
               {bookingNotice ? (
                 <p className="booking-notice booking-status-notice">
                   {bookingNotice}

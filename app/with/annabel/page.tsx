@@ -99,7 +99,7 @@ export default function AnnabelProfile() {
 
         <aside className="reserve-panel" id="reserve" aria-label="Test a booking with Annabel">
           <h2>Choose a test call</h2>
-          <p>Private video call on Google Meet.</p>
+          <p>Private video call on Zoom.</p>
           <div className="seat-options">
             {creator.seats.map((seat) => (
               <article className="seat-option" key={seat.id}>

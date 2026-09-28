@@ -42,7 +42,7 @@ export default async function BookingPage({
   const canApprove = await canApproveBooking(booking);
   const creator = await getCreatorApplication(booking.creatorId);
   const creatorHref = `/with/${encodeURIComponent(creator?.publicSlug || booking.creatorId)}`;
-  const googleCalendarHref = getGoogleCalendarTemplateUrl(booking);
+
   const calendarFileHref = `/api/bookings/${encodeURIComponent(
     booking.id,
   )}/calendar`;
@@ -99,9 +99,8 @@ export default async function BookingPage({
           </dl>
 
           {booking.status === "approved" ? <div className="creator-connect-actions">
-            <a className="seat-primary-button" href={googleCalendarHref}>
-              Add to Google Calendar
-            </a>
+            {booking.meetingUrl && <a className="seat-primary-button" href={booking.meetingUrl}>Join Zoom</a>}
+            <p>Accept the Google Calendar invitation to add the session to your calendar.</p>
             <a className="seat-secondary-button" href={calendarFileHref}>
               Download calendar file
             </a>
@@ -114,7 +113,7 @@ export default async function BookingPage({
           ) : null}
         </article>
 
-        {canApprove && booking.status !== "declined" ? (
+        {canApprove && booking.status === "payment_authorized" ? (
           <aside className="creator-invite" aria-label="Approve booking">
             <span>Creator approval</span>
             <h2>Accept this appointment</h2>
@@ -157,38 +156,21 @@ async function canApproveBooking(booking: CustomerBooking) {
   return user ? canManageCreatorProfile(booking.creatorId, user) : false;
 }
 
-function getGoogleCalendarTemplateUrl(booking: CustomerBooking) {
-  const target = new URL("https://calendar.google.com/calendar/render");
-  target.searchParams.set("action", "TEMPLATE");
-  target.searchParams.set("text", `${booking.seatName} with ${booking.creatorName}`);
-  target.searchParams.set(
-    "dates",
-    `${formatLocalDateTimeForGoogle(booking.appointmentStartAt)}/${formatLocalDateTimeForGoogle(
-      booking.appointmentEndAt,
-    )}`,
-  );
-  target.searchParams.set("ctz", booking.timezone);
-  target.searchParams.set(
-    "details",
-    "Take a Seat booking request. The creator will send the official invite after approval.",
-  );
-
-  return target.toString();
-}
-
-function formatLocalDateTimeForGoogle(value: string) {
-  return value.replace(/[-:]/g, "");
-}
-
 function getStatus(value: string | string[] | undefined) {
   return typeof value === "string" ? value : null;
 }
 
 function formatStatus(value: string) {
+  if (value === "approved") return "Confirmed";
   return value.replace(/_/g, " ");
 }
 
 function getBookingHeading(status: string) {
+  if (status === 'expired' || status === 'expiration_processing') return 'Request expired.';
+  if (status === 'approval_processing') return 'Confirmation in progress.';
+  if (status === 'decline_processing') return 'Releasing payment authorization.';
+  if (status === 'cancelled') return 'Session cancelled and refunded.';
+  if (status === 'cancellation_processing') return 'Cancellation in progress.';
   if (status === "declined") return "Request declined.";
   if (status === "checkout_expired") return "Checkout expired.";
   if (status === "payment_canceled") return "Payment authorization ended.";
@@ -212,6 +194,7 @@ function getBookingHeading(status: string) {
 }
 
 function getCalendarNotice(calendarStatus: string) {
+  if (calendarStatus === "processing") return "Your request is processing. Updates will appear here automatically when you refresh.";
   if (calendarStatus === "accepted") {
     return "Appointment accepted.";
   }
@@ -259,6 +242,11 @@ function requestUrlFromHeaders(requestHeaders: Headers, path: string) {
 }
 
 function getPaymentDescription(status: string) {
+  if (status === 'expired') return 'This request is no longer active. Your authorization has been cancelled and no payment was captured.';
+  if (status === 'expiration_processing' || status === 'decline_processing') return 'This request cannot be accepted. We are confirming release of your payment authorization with Stripe.';
+  if (status === 'approval_processing') return 'The creator accepted your request. We are verifying payment and setting up your session. Please refresh shortly.';
+  if (status === 'cancellation_processing') return 'We are processing your full refund. Your cancellation will be confirmed once Stripe verifies it.';
+  if (status === 'cancelled') return 'Your full payment has been refunded. Your bank may take several days to show it.';
   if (status === "declined") {
     return "The creator could not accept this request. Your payment authorization has been canceled and no payment was captured. You can choose another time from the creator's profile.";
   }
@@ -269,7 +257,7 @@ function getPaymentDescription(status: string) {
     return "Your payment has been captured and your appointment is confirmed.";
   }
   if (status === "paid") {
-    return "Your payment has been captured. Your appointment is confirmed when the creator's calendar invite is sent.";
+    return "Your payment has been captured and your time is reserved. Meeting details are being prepared automatically.";
   }
   if (status === "payment_authorized") {
     return "Your payment is authorized. You are charged only if the creator accepts before the authorization expires.";

@@ -34,7 +34,7 @@ export function offeringSeats(offerings: Offering[], name: string, currency: str
     id: item.id, name: item.title, durationMinutes: item.durationMinutes,
     price: new Intl.NumberFormat('en-US', { style: 'currency', currency: currency.toUpperCase(), maximumFractionDigits: 2 }).format(item.unitAmount / 100),
     unitAmount: item.unitAmount, currency: currency.toLowerCase(), description: item.description,
-    host: name, format: 'Google Meet', stripePriceEnv: '',
+    host: name, format: 'Zoom', stripePriceEnv: '',
   }));
 }
 

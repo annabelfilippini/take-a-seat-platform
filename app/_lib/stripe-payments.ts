@@ -1,9 +1,14 @@
 import { getStripeSecretKey, STRIPE_API_VERSION } from "./stripe-connect";
+import { SESSION_RESPONSE_MARGIN_MS } from "./booking-policy";
 
 export type StripePaymentIntent = {
   id: string;
   status: string;
   amount_capturable?: number;
+  amount?: number;
+  amount_received?: number;
+  currency?: string;
+  latest_charge?: { payment_method_details?: { type?: string; card?: { capture_before?: number } } } | string | null;
   capture_method?: string;
   metadata?: { booking_id?: string };
 };
@@ -18,7 +23,7 @@ export type StripeCheckoutSession = {
 };
 
 export async function retrieveStripePaymentIntent(id: string) {
-  return stripeRead<StripePaymentIntent>(`/v1/payment_intents/${encodeURIComponent(id)}`);
+  return stripeRead<StripePaymentIntent>(`/v1/payment_intents/${encodeURIComponent(id)}?expand[]=latest_charge`);
 }
 
 export async function retrieveStripeCheckoutSession(id: string) {
@@ -47,8 +52,28 @@ async function stripeRead<T>(path: string): Promise<T> {
   const key = getStripeSecretKey();
   if (!key) throw new Error("Stripe secret is unavailable");
   const response = await fetch(`https://api.stripe.com${path}`, {
+    signal: AbortSignal.timeout(15000),
     headers: { authorization: `Bearer ${key}`, "stripe-version": STRIPE_API_VERSION },
   });
   if (!response.ok) throw new Error(`Stripe verification failed with ${response.status}`);
   return response.json() as Promise<T>;
+}
+
+// Product response SLA, not an assumption about a card network's validity.
+// Missing capture_before never grants permission to capture: acceptance fails closed.
+export function authorizationDeadline(intent: StripePaymentIntent, createdAt: string, startAt: number) {
+  const charge = typeof intent.latest_charge === 'object' ? intent.latest_charge : null;
+  const captureBefore = charge?.payment_method_details?.card?.capture_before;
+  const deadline = typeof captureBefore === 'number' && Number.isFinite(captureBefore) ? captureBefore * 1000 : null;
+  return { captureBefore: deadline, respondBy: Math.min(Date.parse(createdAt) + 24 * 3600_000, startAt - SESSION_RESPONSE_MARGIN_MS, deadline === null ? Infinity : deadline - 3600_000) };
+}
+export async function mutateStripeIntent(id: string, action: 'capture' | 'cancel') {
+  const key = getStripeSecretKey();
+  if (!key) throw new Error('Stripe is unavailable.');
+  const response = await fetch(`https://api.stripe.com/v1/payment_intents/${encodeURIComponent(id)}/${action}`, {
+    method: 'POST', signal: AbortSignal.timeout(15000),
+    headers: { authorization: `Bearer ${key}`, 'stripe-version': STRIPE_API_VERSION, 'idempotency-key': `take-a-seat-${action}-${id}` },
+  });
+  if (!response.ok) throw new Error('Payment processing will retry automatically.');
+  return response.json() as Promise<StripePaymentIntent>;
 }

@@ -117,7 +117,7 @@ export default function AmberProfile() {
 
         <aside className="reserve-panel" id="reserve" aria-label="Reserve a seat with Amber">
           <h2>Choose a call</h2>
-          <p>Private video call on Google Meet.</p>
+          <p>Private video call on Zoom.</p>
           <div className="seat-options">
             {seats.map((seat) => (
               <article className="seat-option" key={seat.name}>

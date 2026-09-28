@@ -178,6 +178,19 @@ export const customerBookings = sqliteTable(
     offeringCurrency: text("offering_currency"),
     offeringDescription: text("offering_description"),
     creatorDecision: text("creator_decision"),
+    respondBy: integer("respond_by"),
+    captureBefore: integer("capture_before"),
+    workflowStep: text("workflow_step"),
+    workflowRetryAt: integer("workflow_retry_at"),
+    workflowAttempts: integer("workflow_attempts").notNull().default(0),
+    workflowError: text("workflow_error"),
+    workflowLock: text("workflow_lock"),
+    workflowLockUntil: integer("workflow_lock_until"),
+    zoomHostId: text("zoom_host_id"),
+    zoomMeetingId: text("zoom_meeting_id"),
+    zoomCreateAttemptAt: integer("zoom_create_attempt_at"),
+    zoomSyncedRevision: text("zoom_synced_revision"),
+    stripeRefundId: text("stripe_refund_id"),
     decisionNotifiedAt: text("decision_notified_at"),
     customerName: text("customer_name"),
     customerEmail: text("customer_email").notNull(),
@@ -265,4 +278,19 @@ export const googleOAuthAttempts = sqliteTable("google_oauth_attempts", {
   creatorId: text("creator_id").notNull(),
   actorId: text("actor_id").notNull(),
   expiresAt: integer("expires_at").notNull(),
+});
+
+// One reserved interval per booking, assigned atomically across all creators.
+export const zoomHostReservations = sqliteTable("zoom_host_reservations", {
+  bookingId: text("booking_id").primaryKey(),
+  hostId: text("host_id").notNull(),
+  startAt: integer("start_at").notNull(),
+  endAt: integer("end_at").notNull(),
+});
+export const bookingDeliveries = sqliteTable("booking_deliveries", {
+  id: text("id").primaryKey(),
+  bookingId: text("booking_id").notNull(),
+  firstAttemptAt: integer("first_attempt_at").notNull(),
+  sentAt: integer("sent_at"),
+  payload: text("payload").notNull(),
 });

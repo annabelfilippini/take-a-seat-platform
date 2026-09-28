@@ -219,7 +219,7 @@ export function getCreatorNotificationPreferenceInput(
   };
 }
 
-async function createCreatorBookingNotification(booking: CustomerBooking) {
+export async function createCreatorBookingNotification(booking: CustomerBooking) {
   const { getDb } = await import("../../db");
   const db = getDb();
   const now = new Date().toISOString();

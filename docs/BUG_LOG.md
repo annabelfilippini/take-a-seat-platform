@@ -5,6 +5,152 @@ This is the central index for meaningful bugs. Existing feature notes retain
 their detailed historical evidence; link to them instead of duplicating it.
 Follow the [engineering release gate](engineering-release-gate.md).
 
+## 2026-09-27: Renamed Zoom titles blocked cancellation delivery
+
+- **Reproduction:** A fresh real meeting was verified and persisted at creation.
+  Later its title matched the Google Calendar event title instead of the original
+  booking marker. Refund succeeded, but cleanup rejected the changed title.
+- **Root cause:** Synchronization treated mutable display text as permanent
+  identity, even after storing the verified meeting ID and host. The actor that
+  changed the provider title was not established; no title change is needed to
+  reproduce this with the provider fixture.
+- **Fix:** Subsequent synchronization validates the persisted meeting ID and host.
+  Creation and recovery of an unknown meeting still require the exact marker.
+  No client can supply these persisted provider identity fields.
+- **Regression:** Domain tests reject foreign host/ID before any mutation, permit
+  renamed-title rescheduling/cancellation, and prevent repeat deletion. The complete
+  browser cancellation journey now changes the provider title before refund.
+
+## 2026-09-27: Checkout return URL encoded Stripe’s session template
+
+- **Reproduction:** Real hosted sandbox checkout returned with the literal encoded
+  placeholder as `session_id`, causing `checkout-confirmation` in the return URL.
+  Signed webhooks independently persisted authorization, so the page still showed
+  the correct payment state; that masked the broken return reconciliation.
+- **Root cause:** `URLSearchParams` encoded the braces in `{CHECKOUT_SESSION_ID}`
+  before sending the success URL to Stripe, preventing template substitution.
+- **Fix:** Restore only that exact template after serializing the URL. Other query
+  values retain URL encoding, and signed webhooks remain authoritative.
+- **Regression:** Both checkout route tests assert the outgoing literal template;
+  browser provider fixtures reject its encoded form.
+- **Reference:** [Stripe’s hosted success URL](https://docs.stripe.com/payments/checkout/custom-success-page?payment-ui=stripe-hosted).
+
+## 2026-09-25: Zoom interpreted fractional UTC timestamps as local time
+
+- **Reproduction:** Real sandbox acceptance captured payment but withheld the
+  invitation when Zoom returned September 26 at 20:00 Los Angeles for a 13:00
+  booking. The requested timestamp was `2026-09-26T20:00:00.000Z` with the
+  creator timezone; Zoom returned `2026-09-27T03:00:00Z`.
+- **Root cause:** Creation and rescheduling used JavaScript's fractional-second
+  ISO format rather than Zoom's documented whole-second UTC format. Provider
+  fixtures simply echoed requests, hiding Zoom's interpretation.
+- **Fix:** Format UTC timestamps with whole seconds in both write paths. Preserve
+  the strict provider readback check and reuse the existing meeting on recovery.
+  Correcting the owned rehearsal meeting with `2026-09-26T20:00:00Z` returned the
+  exact booked time, duration and five-minute early-join limit from the real API.
+- **Regression:** Actual domain create/reschedule tests cover Los Angeles daylight
+  and standard time. Browser fixtures reject fractional UTC timestamps.
+- **Reference:** [Zoom meeting API](https://developers.zoom.us/docs/api/meetings/).
+  See the launch rehearsal report for final verification and remaining gates.
+
+## 2026-09-25: Near-term slots had already-expired acceptance deadlines
+
+- **Reproduction:** The combined booking-release browser suite selected an 11:30
+  session at 11:17 with zero creator notice. Authorization succeeded but acceptance
+  expired the request because the session's response deadline was 11:00.
+- **Root cause:** Availability enforced creator notice only, while the new workflow
+  independently required acceptance more than 30 minutes before session start.
+- **Fix:** Share the response margin and filter the common slot generator used by
+  customer listings and server validation, including seed availability. Existing
+  longer creator notice remains effective; customer controls and layout are unchanged.
+- **Regression:** Fixed-clock coverage checks listing, forged submission, exact
+  cutoff and a previously listed slot becoming stale. Complete browser acceptance
+  and competing-decision journeys pass after the repair. Full validation: 90 Node
+  tests, 40 Playwright journeys, lint, TypeScript and deployment dry run pass.
+
+## 2026-09-24: Browser test runs shared a destructive temporary directory
+
+- **Root cause:** Every server reset `/private/tmp/take-a-seat-e2e-app` and its D1
+  state, while the server, fixtures and journeys hardcoded port 4173. Separate
+  worktrees could overwrite an active test server's app/database.
+- **Fix:** Allocate a unique directory per invocation; parameterize the loopback
+  port consistently; remove only the invocation's own directory on shutdown.
+- **Verification:** All 38 Playwright journeys passed on nondefault port 4187,
+  including cross-context URLs, Checkout redirects, OAuth and database persistence.
+  This run did not deliberately disrupt a second suite to reproduce data loss.
+- **Files:** tests/e2e/environment.mjs, server.mjs, providers.ts,
+  creator-journeys.spec.ts and playwright.config.ts.
+
+## 2026-09-16: Zoom silently allowed joining earlier than the reserved host window
+
+- **Bug / impact:** Real Zoom returned `jbh_time=0` (join anytime) although the
+  backend requested five minutes. A participant could occupy the single host before
+  the booking's reserved interval, blocking another creator's session.
+- **Root cause:** The host's custom early-join-limit checkbox was unchecked in Zoom.
+  The backend verified `join_before_host` but never checked the returned `jbh_time`.
+- **Fix:** Enabled the host's five-minute limit in Zoom and reject any returned
+  meeting whose early-join limit is not five minutes. Preserve the create-attempt
+  marker so correcting settings recovers the existing meeting rather than duplicating it.
+- **Regression protection:** Domain test simulates Zoom ignoring the requested limit,
+  verifies no participant link is published, then corrects settings and verifies
+  recovery/retry use the same meeting with exactly one create request.
+- **Verification:** Initial real-provider test proved the mismatch and safely deleted
+  its disposable meeting. Corrected real-provider rehearsal returned five minutes,
+  recovered one meeting after a lost create response, rescheduled it once and deleted
+  it once. Lint, TypeScript, production build, 87 Node tests and all 35 Playwright
+  journeys passed. Two-participant joining is separately blocked by an existing
+  owner meeting occupying the one licensed host; this does not invalidate API proof.
+- **Related files:** app/_lib/zoom.ts, tests/stripe-lifecycle.test.mjs,
+  docs/zoom-production-setup.md.
+
+## 2026-09-25: Existing homepage creator could not load available times
+
+- **Reproduction:** Annabel's public card opened normally, but Find availability
+  repeatedly returned HTTP 503 and blocked payment progression. The creator's
+  Availability tab correctly required Calendar reconnection.
+- **Cause:** The stored Calendar grant was no longer usable. The connection was
+  ten days old and Google Cloud still showed External / Testing; Google's
+  documented seven-day refresh-token lifetime is the likely cause. The exact
+  token-endpoint error was not exported. Both required scopes were present.
+- **Repair and verification:** The owner completed ordinary creator email-code
+  login and Google reauthorization. The real free/busy probe passed and customer
+  times reappeared without changing code or availability. Actual sandbox booking,
+  capture, fee, webhook, Calendar invitation and decline then passed.
+- **Remaining:** Reconnection is temporary while OAuth remains Testing. Reviewed
+  production OAuth setup/verification is required before marketplace launch.
+  Existing local tests cover revoked/expired grants and fail-closed availability.
+- **Evidence:** [Homepage rehearsal](homepage-booking-rehearsal-2026-09-25.md).
+
+## 2026-09-25: Stripe hosted returns skipped the Clerk session handshake
+
+- **Reproduction:** On production Worker `bb9598b8-dbe7-4005-a301-fc0070d92797`,
+  a fresh accepted QA creator followed its Connect return URL from the app and
+  then from a different origin. The first reached the expected missing-connection
+  guard; the cross-origin navigation returned `creator-auth`, despite the same
+  signed-in browser opening the saved editor afterward. This isolates callback
+  authentication; it is not evidence of completed Stripe onboarding.
+- **Root cause:** The Worker refresh wrapper included Calendar browser navigation
+  but omitted `/api/stripe/connect/start` and `/api/stripe/connect/return`.
+  Clerk can require a handshake on provider returns before route ownership checks.
+- **Fix:** Include those two GET routes in the existing wrapper. Preserve creator
+  and return parameters, verified identity, failure denial and ownership checks.
+  No webhook, Checkout, POST or provider configuration changes.
+- **Protection:** Regression first failed (200 instead of handshake 307), then
+  passed after repair. Covers return and expired-link refresh, original query,
+  cookies, signed-out access and authentication outages.
+- **Release:** Local candidate only; production remains affected until an approved
+  deployment and actual hosted-return retest. See [lifecycle QA](creator-lifecycle-qa-2026-09-25.md).
+
+## 2026-09-25: Browser-test worktrees shared a destructive temporary directory
+
+- **Root cause:** Every test-server startup removed the same temporary D1/source
+  directory and hardcoded port 4173 across the browser and provider fixtures.
+- **Fix:** Reuse the isolation approach already prepared by the booking rehearsal:
+  unique temporary directory per invocation, shared validated
+  `TAKE_A_SEAT_E2E_PORT`, consistent callback/Checkout URLs, own-directory cleanup.
+- **Verification:** Complete suite passed on port 4273 while the ordinary isolated
+  sandbox app ran on 4274. Real credentials never enter the fixture server.
+
 ## 2026-09-24: Admin creator-ID validation used an invalid HTML pattern
 
 - **Reproduction:** Production application acceptance logged an invalid regular
@@ -790,6 +936,109 @@ September 14, 2026; regression of incomplete initial-interaction protection.
   transitions, alongside creator/customer timezone and complete booking journeys.
 - **Related files:** availability.ts and creator-journeys.spec.ts.
 
+## 2026-09-16: Authorized requests never acquired a response deadline
+
+- **Bug / impact:** An authorization remained actionable indefinitely if cancellation
+  delivery was delayed; acceptance did not read the actual capture deadline.
+- **Root cause:** The original flow persisted authorization status but no provider
+  expiry or creator response SLA. Webhook-only expiry did not cover missed events.
+- **Fix:** Store Stripe charge capture-before and the earliest product/provider/session
+  response deadline. Server acceptance fails closed; scheduled reconciliation cancels
+  expired authorization before releasing its hold. Processing states remain blocking.
+- **Regression prevention:** Domain deadline/unknown expiry tests and Playwright
+  expiry, stale acceptance rejection, persisted customer copy and slot reuse.
+- **Related files:** stripe-payments.ts, bookings.ts, booking-workflow.ts, migration
+  0025, stripe-lifecycle.test.mjs, creator-journeys.spec.ts.
+- **Feature/date:** Booking confirmation; September 16, local implementation.
+
+## 2026-09-16: Paid booking delivery depended on another creator click
+
+- **Bug / impact:** Capture could succeed while Calendar failed, leaving an accepted
+  customer's session without an invitation until the creator retried manually.
+- **Root cause:** One route chained capture and Calendar; no durable delivery queue
+  or scheduled recovery owned the remaining steps. Same-action decision claims also
+  allowed concurrent downstream calls despite Stripe's capture idempotency key.
+- **Fix:** Shared fenced booking lease, explicit processing states and a D1 outbox
+  consumed by a five-minute Worker cron. Recover current Stripe state before capture;
+  persist Zoom, Calendar and immutable email delivery independently.
+- **Regression prevention:** Browser lost capture → lost Zoom → Calendar outage →
+  email outage chain, concurrent approvals, repeated scheduler runs, refresh and
+  returning login; domain abandoned-lease and opposing-decision tests.
+- **Related files:** booking-lock.ts, booking-workflow.ts, booking-communications.ts,
+  zoom.ts, worker/index.ts, requests routes and tests.
+- **Feature/date:** Booking confirmation; September 16, local implementation.
+
+## 2026-09-16: Calendar and exported ICS included private request notes
+
+- **Bug / impact:** Customer application content was copied into an invitation and
+  downloadable calendar file even though meeting logistics did not need it.
+- **Root cause:** The original event-description builder reused the full request
+  context. Calendar descriptions are participant-facing external content.
+- **Fix:** Keep private notes in the authenticated creator inbox; export only session
+  logistics and the shared participant URL. Only confirmed bookings export ICS.
+- **Regression prevention:** Browser checks event/email/customer page omit private
+  fixture content and host-only links while authenticated Requests retains the form.
+- **Related files:** google-calendar.ts, bookings.ts, booking calendar route, browser tests.
+- **Feature/date:** Booking privacy; September 16, local implementation.
+
+## 2026-09-16: New workflow review found split reschedule and uncertain-cancel windows
+
+- **Bug / impact:** The initial implementation moved Zoom capacity before committing
+  the new booking time; a crash could reserve the wrong interval. Cancellation after
+  a lost Zoom creation response could release capacity without deleting that meeting.
+- **Root cause:** Provider resource recovery and local host reservations were not yet
+  included in the same booking lifecycle boundary as reschedule/cancellation.
+- **Fix:** Move booking and host interval in one transactional D1 batch. Recover an
+  uncertain created Zoom meeting by its host/marker before cancellation cleanup and
+  capacity release. Never create another meeting to resolve uncertainty.
+- **Regression prevention:** Existing same-event reschedule journey plus new failure
+  recovery, host-capacity and cancellation regressions. No production exposure.
+- **Related files:** google-calendar.ts, zoom.ts, booking-workflow.ts, browser tests.
+- **Feature/date:** Found during adversarial implementation review, September 16.
+
+## 2026-09-16: Visual QA found stale meeting-provider copy
+
+- **Bug / impact:** The preserved customer calendar dialog and creator/profile copy
+  still promised Google Meet after confirmation switched to Zoom.
+- **Root cause:** The original video provider was hardcoded in several presentation
+  components and the offering mapper. Backend-focused tests did not assert the label.
+- **Fix:** Replace provider text with Zoom and update the factual privacy description.
+  No customer layout, time interaction or payment button progression changed.
+- **Regression prevention:** Rendered profile assertion plus Playwright checks the
+  real time-selection dialog says Zoom, and desktop/mobile screenshots are inspected.
+- **Related files:** CustomerBookingFlow, public/creator profile copy, offerings.ts,
+  privacy page, rendered-html and creator-journeys tests.
+- **Feature/date:** Found during browser screenshot QA; September 16, local work.
+
+## 2026-09-16: Refunded sessions fell out of the payment-history filter
+
+- **Bug / impact:** Code review found that adding cancellation states would remove
+  those transactions from the creator's historical payments view.
+- **Root cause:** History allowed only `paid` and `approved`, assuming payment never
+  transitioned to a refund state.
+- **Fix:** Retain cancellation-processing and cancelled transactions with their
+  original amount and explicit refund label. Historical emails with no price
+  snapshot no longer invent a zero-dollar payment.
+- **Regression prevention:** The complete browser cancellation journey opens Payments
+  and verifies the refunded session remains in history.
+- **Related files:** creator-payments.ts, booking-communications.ts, browser tests.
+- **Feature/date:** September 16, local cancellation implementation review.
+
+## 2026-09-16: Stripe succeeded could also mean a partial capture
+
+- **Bug / impact:** Review found that webhook reconciliation used `succeeded` alone
+  to mark a booking paid, although Stripe allows partial captures. A manually
+  under-captured PaymentIntent could therefore fulfill a full-price session.
+- **Root cause:** Full-amount validation existed in the acceptance workflow but not
+  the shared paid transition used by webhook and Checkout-return paths.
+- **Fix:** Centralize provider retrieval, booking metadata, captured amount and
+  currency verification in `markBookingPaid`; incomplete capture fails reconciliation
+  and cannot produce a confirmed booking. Manual partial captures need operator review.
+- **Regression prevention:** A succeeded partial-capture webhook replay remains unpaid
+  and requests redelivery; full capture, lost-response recovery and browser flows remain
+  mandatory. Existing fixtures now model Stripe's actual `amount_received` field.
+- **Related files:** bookings.ts, stripe-lifecycle.test.mjs, Calendar/browser fixtures.
+- **Feature/date:** September 16, adversarial payment review.
 
 ## 2026-09-17: Shared homepage links showed an obsolete promotional image
 

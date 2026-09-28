@@ -2,12 +2,22 @@
 
 Prepared September 16, 2026. This is the setup/submission pack for the implementation
 in [the architecture and release report](google-calendar-implementation.md).
-**The application was deployed with Annabel's approval on September 16 from main
-`dca3b8b`; migrations 0021–0024 and live desktop/mobile smoke checks passed. Google
-Console configuration, domain verification and Google verification approval remain
-unconfirmed.** Earlier account observations
-are historical: project `take-a-seat-platform` had an External/Testing audience,
-blank homepage/privacy URLs and undeclared Data Access scopes. Recheck the Console.
+The Calendar hardening deployment from main `dca3b8b`, migrations 0021–0024 and
+live smoke are historical evidence. PR #37's Zoom workflow remains undeployed.
+
+Final September 16 follow-up: homepage/privacy URLs and exactly the two scopes below
+are saved. The existing Web client has zero JavaScript origins and only the canonical
+production callback; credentials were preserved. **Domain ownership is verified**:
+Google accepted the exact root TXT saved in Cloudflare with Annabel's approval.
+Keep the TXT; existing DNS was preserved.
+
+Audience remains **External / Testing**. Public sensitive-scope OAuth approval is
+**not established**. Annabel confirmed Ella as first creator and her supplied identity
+already appears among the two test users. She is eligible to authorize today without
+adding another test user, but her actual consent/connection is not yet exercised.
+Testing Calendar grants have the seven-day limitation described below. Separate
+real development OAuth remains unconfigured. See the
+[current release audit](first-creator-release-audit-2026-09-16.md).
 
 ## 1. Project and environment separation
 
@@ -152,7 +162,7 @@ inbox and Verification Center for follow-up. [Sensitive-scope submission guidanc
 > Take a Seat reads free/busy intervals from the creator's primary calendar to
 > exclude conflicts from customer time choices and rechecks availability before
 > reserving and confirming an appointment. After confirmation, Take a Seat creates
-> a booking event on the creator's owned calendar, creates a Google Meet link, and
+> a booking event on the creator's owned calendar with the confirmed session link, and
 > invites the customer's email through Google Calendar. The customer does not need
 > to connect a Google account. Booking records remain authoritative in Take a Seat.
 > The calendar integration can update or cancel only the corresponding booking
@@ -265,4 +275,6 @@ settings can require acceptance before an invitation appears on their calendar.
 Changing publishing status is not verification approval. Offline access is renewable,
 not permanent. Only the creator's primary calendar is checked; secondary/shared
 calendar selection would be a separate product change. Existing Google Meet remains
-active; Zoom is a prepared meeting-URL input, not an implemented Zoom integration.
+active in the currently deployed application. PR #37 implements central Zoom and
+reuses its participant link in Google events, but that candidate is not deployed.
+Submission videos and reviewer instructions must match the version actually serving.

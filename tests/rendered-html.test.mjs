@@ -1,3 +1,4 @@
+process.env.STRIPE_BOOKING_PAYMENT_METHOD_CONFIGURATION = 'pmc_test';
 import { registerHooks } from "node:module";
 globalThis.__tasTestEnv = {};
 registerHooks({
@@ -653,11 +654,7 @@ test("wires accepted creators to public profile publishing", async () => {
   assert.match(bookingsLib, /accepted: "accepted"/);
   assert.match(bookingsLib, /paymentAuthorized: "payment_authorized"/);
   assert.match(bookingsLib, /markBookingPaymentAuthorized/);
-  assert.match(bookingApproveRoute, /booking\.status === "requested"/);
-  assert.match(bookingApproveRoute, /booking\.status === "payment_authorized"/);
-  assert.match(bookingApproveRoute, /capturePaymentIntent/);
-  assert.match(bookingApproveRoute, /\/payment_intents\/\$\{encodeURIComponent/);
-  assert.match(bookingApproveRoute, /await markBookingPaid\(/);
+  assert.match(bookingApproveRoute, /await acceptBooking\(booking.id\)/);
   assert.match(requestRoute, /payment_intent_data\[capture_method\]/);
   assert.match(requestRoute, /manual_capture_destination_charge/);
   assert.match(requestRoute, /take_a_seat_hold_/);
@@ -1057,7 +1054,7 @@ test("server-renders Ella's profile page", async () => {
   assert.match(html, /30 minutes/);
   assert.match(html, /\$50/);
   assert.match(html, /\$60/);
-  assert.match(html, /Private video call on Google Meet/);
+  assert.match(html, /Private video call on Zoom/);
   assert.match(html, /ella-profile\.jpg/);
   assert.match(html, /ella-reference-sundress\.jpg/);
   assert.match(html, /ella-reference-street-style\.jpg/);
@@ -1391,6 +1388,7 @@ test("creates Stripe Checkout destination charges with a platform fee", async (c
   assert.equal(headers.get("stripe-version"), "2026-08-26.dahlia");
 
   const body = stripeRequest.init.body;
+  assert.match(body.get("success_url") ?? "", /[?&]session_id=\{CHECKOUT_SESSION_ID\}(?:&|$)/);
   assert.equal(body.get("mode"), "payment");
   assert.equal(body.get("payment_intent_data[capture_method]"), "manual");
   assert.ok(Math.abs(Number(body.get("expires_at")) - Math.floor(Date.now() / 1000) - 1800) < 10);
@@ -1523,6 +1521,7 @@ test("sends public booking requests to Stripe Checkout for payment authorization
   assert.equal(stripeRequest.input, "https://api.stripe.com/v1/checkout/sessions");
 
   const body = stripeRequest.init.body;
+  assert.match(body.get("success_url") ?? "", /[?&]session_id=\{CHECKOUT_SESSION_ID\}(?:&|$)/);
   assert.equal(body.get("mode"), "payment");
   assert.equal(body.get("payment_intent_data[capture_method]"), "manual");
   assert.ok(Math.abs(Number(body.get("expires_at")) - Math.floor(Date.now() / 1000) - 1800) < 10);

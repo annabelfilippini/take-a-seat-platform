@@ -13,8 +13,8 @@ type ClerkEnvironment = {
 };
 
 // The React SDK handles browser auth; this completes Clerk's server handshake.
-// Include Calendar's browser navigations: returning from Google can require a
-// cross-origin Clerk handshake even while the session cookie is still valid.
+// Provider browser returns and expired-link refreshes can require a cross-origin
+// Clerk handshake even while the session cookie is still valid.
 // Keep it on GETs so redirects never discard a submitted application.
 export async function withClerkSessionRefresh(
   request: Request,
@@ -27,7 +27,9 @@ export async function withClerkSessionRefresh(
     (path === "/sign-in" || path.startsWith("/admin/") ||
       path === "/creators/dashboard" || path === "/creator/profile" ||
       path === "/api/google-calendar/oauth/start" ||
-      path === "/api/google-calendar/oauth/callback");
+      path === "/api/google-calendar/oauth/callback" ||
+      path === "/api/stripe/connect/start" ||
+      path === "/api/stripe/connect/return");
   if (!authDocument || !env.CLERK_SECRET_KEY || !env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) {
     return next(request);
   }

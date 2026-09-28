@@ -1068,7 +1068,7 @@ export function EditableCreatorProfilePreview({
 
         <aside className="reserve-panel" id="reserve" aria-label={`Book ${profile.name}`}>
           <h2 className="editable-reserve-heading">Choose a call</h2>
-          <p>Private video call on Google Meet.</p>
+          <p>Private video call on Zoom.</p>
           <label className="editable-call-currency">Currency<select aria-label="Call currency" value={profile.currency} onChange={(event) => update("currency", event.target.value)}>{["USD", "GBP", "EUR", "CAD", "AUD"].map((currency) => <option key={currency}>{currency}</option>)}</select></label>
           <CreatorOfferingsEditor offerings={profile.offerings ?? []} onChange={(items) => update("offerings",items)} />
           <button className="seat-primary-button editable-preview-booking-button" disabled type="button">

@@ -23,6 +23,7 @@
       "previews_enabled": false
     }
   ],
+  "triggers": { "crons": ["*/5 * * * *"] },
   "observability": {
     "enabled": true
   },
@@ -43,7 +44,12 @@
       "GOOGLE_TOKEN_ENCRYPTION_KEY",
       "RESEND_API_KEY",
       "STRIPE_SECRET_KEY",
-      "STRIPE_WEBHOOK_SECRET"
+      "STRIPE_WEBHOOK_SECRET",
+      "ZOOM_ACCOUNT_ID",
+      "ZOOM_CLIENT_ID",
+      "ZOOM_CLIENT_SECRET",
+      "ZOOM_HOST_USER_IDS",
+      "STRIPE_BOOKING_PAYMENT_METHOD_CONFIGURATION"
     ]
   },
   "no_bundle": true,

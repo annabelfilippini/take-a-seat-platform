@@ -323,7 +323,10 @@ async function createManualCaptureCheckoutSession({
     undefined,
     bookingId,
   );
+  const paymentConfiguration = getRuntimeEnv('STRIPE_BOOKING_PAYMENT_METHOD_CONFIGURATION');
+  if (!paymentConfiguration) throw new Error('A card-only booking payment configuration is required.');
   const params = new URLSearchParams({
+    payment_method_configuration: paymentConfiguration,
     cancel_url: cancelUrl,
     customer_email: bookingInput.customerEmail,
     integration_identifier: buildStripeIntegrationIdentifier(),
@@ -397,7 +400,9 @@ function addBookingParams(
     target.searchParams.set("booking_id", bookingId);
   }
 
-  return target.toString();
+  // Stripe substitutes this literal template before redirecting the customer.
+  // URLSearchParams encodes its braces, which prevents that substitution.
+  return target.toString().replace("%7BCHECKOUT_SESSION_ID%7D", "{CHECKOUT_SESSION_ID}");
 }
 
 function buildStripeIntegrationIdentifier() {

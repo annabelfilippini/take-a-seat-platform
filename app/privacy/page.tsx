@@ -53,7 +53,7 @@ export default function PrivacyPage() {
             for permission to check free and busy times on the creator&apos;s primary
             calendar and to create, recover, update, or cancel Take a Seat booking events on calendars the
             creator owns. This is used to prevent scheduling conflicts, add
-            confirmed appointments, create Google Meet links, and invite the
+            confirmed appointments with the session meeting link, and invite the
             customer.
           </p>
           <p>
@@ -74,6 +74,16 @@ export default function PrivacyPage() {
         </section>
 
         <section>
+          <h2>Video meetings</h2>
+          <p>Take a Seat creates Zoom meetings through its own account. We share the
+            session time, duration and creator name with Zoom and store the meeting
+            identifier and participant join link. Private application notes are not
+            included in meeting descriptions. Creators and customers receive the same
+            participant link; they do not receive account tokens or host start links.
+            Meetings are created without automatic recording.</p>
+        </section>
+
+        <section>
           <h2>How information is used and shared</h2>
           <p>
             We use information to review creator applications, authenticate
@@ -85,7 +95,7 @@ export default function PrivacyPage() {
           </p>
           <p>
             We use service providers including Cloudflare for hosting and storage,
-            Clerk for authentication, Google for Calendar and Meet, Stripe for
+            Clerk for authentication, Google for Calendar, Zoom for video meetings, Stripe for
             payments and creator payouts, and Resend for transactional email.
             These providers process information on our behalf for those services.
             We do not sell personal information or Google user data.

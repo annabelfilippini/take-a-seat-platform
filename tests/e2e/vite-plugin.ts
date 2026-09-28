@@ -12,7 +12,7 @@ export function e2ePlugin() {
       if (id.includes('/app/creators/email-sign-in/page.tsx')) {
         return code.replace('getClerkPublishableKey() ?', 'true ?');
       }
-      if (/app\/(?:_lib\/(?:email|checkout-holds|stripe-payments|stripe-connect|creator-payments|booking-decisions|google-calendar)|api\/(?:google-calendar\/oauth\/callback|bookings\/(?:request|approve)|stripe\/(?:checkout\/complete|webhook)))\b/.test(id) && !id.includes('node_modules')) {
+      if (/app\/(?:_lib\/(?:email|checkout-holds|stripe-payments|stripe-connect|creator-payments|booking-decisions|booking-workflow|zoom|google-calendar)|api\/(?:google-calendar\/oauth\/callback|bookings\/(?:request|approve)|stripe\/(?:checkout\/complete|webhook)))\b/.test(id) && !id.includes('node_modules')) {
         return `import { fixtureFetch as fetch } from "${resolve('tests/e2e/providers.ts')}";\n${code}`;
       }
     },

@@ -147,7 +147,7 @@ export function CustomerBookingFlow({
             <strong>{creatorName}</strong>
             {step === "details" ? <button className="customer-booking-text-button" onClick={() => setStep("time")} type="button">Edit time</button> : null}
           </div>
-          <span>{activeSeat.name} · {activeSeat.price} · Google Meet</span>
+          <span>{activeSeat.name} · {activeSeat.price} · Zoom</span>
           {step === "details" && selectedSlot ? <strong className="customer-booking-selected-time">{formatSelectedDate(activeSelectedDate)} · {selectedSlot.displayTime}</strong> : null}
           <span>Times shown in {viewerTimezone.replaceAll("_", " ")}</span>
         </div>

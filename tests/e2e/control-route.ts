@@ -15,7 +15,8 @@ export async function GET(request: Request) {
   return Response.json(events.results);
 }
 export async function POST(request: Request) {
-  const body = await request.json() as {sql?:string;args?:unknown[];creatorId?:string;invite?:boolean};
+  const body = await request.json() as {maintenance?:boolean;sql?:string;args?:unknown[];creatorId?:string;invite?:boolean};
+  if (body.maintenance) { const {runBookingMaintenance} = await import('../../app/_lib/booking-workflow'); await runBookingMaintenance(); return Response.json({ok:true}); }
   if (body.sql) return Response.json(await env.DB.prepare(body.sql).bind(...(body.args || [])).all());
   if(body.invite && body.creatorId) return Response.json(await createCreatorInvite((await getCreatorApplication(body.creatorId))!));
   return Response.json({ok:true});

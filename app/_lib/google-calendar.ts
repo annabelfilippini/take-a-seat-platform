@@ -3,7 +3,7 @@ import { encryptToken, decryptToken } from "./token-encryption";
 import { getRuntimeEnv } from "./runtime-env";
 import { localDateTimeToUtc } from "./availability";
 import { and, eq, or, isNull, lt } from "drizzle-orm";
-import { creatorCalendarConnections, creatorOnboardingProfiles, googleOAuthAttempts, customerBookings } from "../../db/schema";
+import { creatorCalendarConnections, creatorOnboardingProfiles, googleOAuthAttempts, customerBookings, zoomHostReservations } from "../../db/schema";
 import {
   getCustomerBooking,
   markBookingApprovedWithCalendar,
@@ -42,7 +42,7 @@ type GoogleCalendarEvent = {
 
 type CreatorCalendarConnection = typeof creatorCalendarConnections.$inferSelect;
 
-export async function approveBookingAndSendGoogleInvite(bookingId: string) {
+export async function approveBookingAndSendGoogleInvite(bookingId: string, guard: () => Promise<void> = async () => {}) {
   let booking = await getCustomerBooking(bookingId);
 
   if (!booking || booking.status === "approved") {
@@ -53,6 +53,7 @@ export async function approveBookingAndSendGoogleInvite(bookingId: string) {
     throw new Error("Booking is not paid.");
   }
 
+  if (booking.workflowStep && !booking.zoomMeetingId) throw new Error("Zoom setup must finish before the invitation.");
   const access = await getCreatorCalendarAccessToken(booking.creatorId);
 
   if (!access) {
@@ -104,6 +105,7 @@ export async function approveBookingAndSendGoogleInvite(bookingId: string) {
   }
   if (!safeMeetingUrl(booking.meetingUrl) && !hasVideoConference(event)) throw new Error("Google Meet is not ready. Retry calendar confirmation.");
 
+  await guard();
   await markBookingApprovedWithCalendar({
     bookingId: booking.id,
     googleCalendarEventId: event.id,
@@ -279,7 +281,7 @@ function buildEventDescription(booking: CustomerBooking) {
   return [
     "Take a Seat booking.",
     safeMeetingUrl(booking.meetingUrl) ? `Join your session: ${booking.meetingUrl}` : null,
-    booking.customerNote ? `Customer note: ${booking.customerNote}` : null,
+
   ]
     .filter(Boolean)
     .join("\n\n");
@@ -473,7 +475,8 @@ async function syncBookingCalendarUnlocked(bookingId: string) {
 // and event IDs and commits D1 first. A failed sync can be retried via the creator
 // calendar endpoint without repeating the reschedule or creating another event.
 export async function rescheduleConfirmedBooking(bookingId: string, appointmentStartAt: string, timezone: string) {
-  return withCalendarSyncLock(bookingId, () => rescheduleConfirmedBookingUnlocked(bookingId, appointmentStartAt, timezone));
+  const { withBookingLock } = await import('./booking-lock');
+  return withBookingLock(bookingId, () => withCalendarSyncLock(bookingId, () => rescheduleConfirmedBookingUnlocked(bookingId, appointmentStartAt, timezone)));
 }
 
 async function rescheduleConfirmedBookingUnlocked(bookingId: string, appointmentStartAt: string, timezone: string) {
@@ -494,11 +497,31 @@ async function rescheduleConfirmedBookingUnlocked(bookingId: string, appointment
   const snapshot = bookingAvailabilityRevision(booking.creatorId);
   const version = await readBookingAvailabilityRevision(booking.creatorId);
   if (!await canConfirmBookingCalendar(candidate)) throw new Error("That time is no longer available. Please choose another time.");
-  const updated = await db.update(customerBookings).set({ appointmentStartAt, appointmentEndAt: parts, timezone, calendarSyncedRevision: null, updatedAt: new Date().toISOString() }).where(and(
-    eq(customerBookings.id, booking.id), eq(customerBookings.status, "approved"), sql`${version} = (${snapshot})`,
-  )).returning({ id: customerBookings.id });
-  if (!updated.length) throw new Error("That time is no longer available. Please choose another time.");
-  await syncBookingCalendarUnlocked(booking.id);
+  const values = { workflowStep: 'reschedule', workflowRetryAt: Date.now(), appointmentStartAt, appointmentEndAt: parts, timezone, calendarSyncedRevision: null, updatedAt: new Date().toISOString() };
+  let updated: { id: string }[];
+  if (booking.zoomMeetingId) {
+    if (!booking.zoomHostId) throw new Error('Zoom host association is missing.');
+    const { zoomInterval } = await import('./zoom');
+    const times = zoomInterval(candidate), startAt = times.start - 15 * 60000, endAt = times.end + 15 * 60000;
+    // D1 batch is transactional: the reservation and booking move together, or
+    // neither moves. A process crash cannot leave capacity on the wrong time.
+    const results = await db.batch([
+      db.update(zoomHostReservations).set({ startAt, endAt }).where(and(
+        eq(zoomHostReservations.bookingId, booking.id), sql`${version} = (${snapshot})`,
+        sql`NOT EXISTS (SELECT 1 FROM zoom_host_reservations WHERE host_id=${booking.zoomHostId} AND booking_id!=${booking.id} AND start_at < ${endAt} AND end_at > ${startAt})`,
+      )).returning({ id: zoomHostReservations.bookingId }),
+      db.update(customerBookings).set(values).where(and(eq(customerBookings.id, booking.id), eq(customerBookings.status, 'approved'), sql`${version} = (${snapshot})`,
+        sql`EXISTS (SELECT 1 FROM zoom_host_reservations WHERE booking_id=${booking.id} AND start_at=${startAt} AND end_at=${endAt})`,
+      )).returning({ id: customerBookings.id }),
+    ]);
+    updated = results[1];
+  } else {
+    updated = await db.update(customerBookings).set(values).where(and(eq(customerBookings.id, booking.id), eq(customerBookings.status, 'approved'), sql`${version} = (${snapshot})`)).returning({ id: customerBookings.id });
+  }
+  if (!updated.length) throw new Error('That time or Zoom host is no longer available. Please choose another time.');
+  // D1 is the outbox: the scheduler updates this same Zoom meeting, same Google
+  // event, then emails the customer. No second meeting/invitation is created.
+  if (!booking.zoomMeetingId) await syncBookingCalendarUnlocked(booking.id);
 }
 
 // Serializes this booking's committed reschedules and outgoing sync operations.

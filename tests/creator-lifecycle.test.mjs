@@ -245,6 +245,38 @@ test("Calendar navigations refresh Clerk before consuming OAuth state and retain
   }
 });
 
+test("Stripe onboarding return and refresh retain the original destination through Clerk handshake", async () => {
+  const { withClerkSessionRefresh } = await import("../app/_lib/clerk-session-refresh.ts");
+  const env = { CLERK_SECRET_KEY: "test-only", NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "test-only" };
+  for (const route of ["start", "return"]) {
+    const request = new Request(`https://takeaseatwith.com/api/stripe/connect/${route}?creatorId=qa-owner&returnTo=%2Fcreator%2Fprofile`, {
+      headers: { "sec-fetch-dest": "document", "sec-fetch-site": "cross-site", referer: "https://connect.stripe.com/", cookie: "__session=fixture-old" },
+    });
+    let calls = 0;
+    const redirect = await withClerkSessionRefresh(request, env, async () => { calls++; return new Response("Must not run yet"); }, async incoming => ({
+      headers: new Headers({ location: `https://clerk.example.test/handshake?redirect_url=${encodeURIComponent(incoming.url)}` }),
+      isAuthenticated: false, status: "handshake",
+    }));
+    assert.equal(redirect.status, 307);
+    assert.equal(calls, 0, "Do not create an account or process return before session refresh");
+    assert.equal(new URL(redirect.headers.get("location")).searchParams.get("redirect_url"), request.url);
+    const returned = await withClerkSessionRefresh(request, env, async incoming => {
+      assert.equal(incoming.url, request.url);
+      assert.equal(incoming.headers.get("authorization"), "Bearer fixture-verified");
+      return new Response(null, {status:303,headers:{location:"/creator/profile?stripe=connected"}});
+    }, async () => ({headers:new Headers({"set-cookie":"__session=fixture-new; HttpOnly"}),isAuthenticated:true,status:"signed-in",token:"fixture-verified"}));
+    assert.equal(returned.status,303);
+    assert.equal(returned.headers.getSetCookie().length,1);
+    const signedOut = await withClerkSessionRefresh(request, env, async incoming => {
+      assert.equal(incoming.headers.has("authorization"),false);
+      return new Response("Denied",{status:403});
+    }, async () => ({headers:new Headers(),isAuthenticated:false,status:"signed-out"}));
+    assert.equal(signedOut.status,403);
+    const failure = await withClerkSessionRefresh(request, env, () => { throw new Error("Do not process Stripe on auth failure"); }, async () => {throw new Error("Clerk unavailable");});
+    assert.equal(failure.status,503);
+  }
+});
+
 test("duplicate acceptance links return the matching creator to their existing profile", async () => {
   const { getCreatorDashboardAccountFromInvite } = await import("../app/_lib/creator-dashboard.ts");
   const insert = sqlite.prepare("INSERT INTO creator_onboarding_profiles (id, name, email, instagram_platform, bio, application_status, public_slug) VALUES (?, ?, ?, ?, ?, 'accepted', ?)");
@@ -539,6 +571,21 @@ test("unaccepted applications cannot generate a setup email or provision an iden
 
 const { POST: saveAvailabilityRoute } = await import("../app/api/creators/availability/route.ts");
 const availabilitySeat = { id: "qa-seat", name: "15 minutes", unitAmount: 1000 };
+
+test("availability excludes sessions with no remaining creator response window", (t) => {
+  t.mock.timers.enable({ apis: ["Date"], now: new Date("2026-09-25T12:00:00Z") });
+  const rules = [{ timezone: "UTC", dayOfWeek: 5, startTime: "12:00", endTime: "14:00", minNoticeMinutes: 0, bufferMinutes: 0 }];
+  const options = { availabilityRules: rules, creatorId: "response-window", seat: availabilitySeat };
+  const listed = availability.getViewerAvailability({ ...options, viewerTimezone: "UTC", windowStart: new Date("2026-09-25T12:00:00Z"), windowDays: 5 }).flatMap(day => day.slots);
+  assert.ok(listed.length > 0);
+  assert.ok(listed.every(slot => slot.startsAtUtc > Date.now() + 30 * 60_000));
+  const match = time => availability.getMatchedAvailabilitySlot({ ...options, appointmentStartAt: `2026-09-25T${time}:00`, timezone: "UTC" });
+  assert.equal(match("12:15"), null, "Do not accept a forged near-term submission");
+  assert.equal(match("12:30"), null, "The exact response cutoff is already expired");
+  assert.ok(match("12:45"));
+  t.mock.timers.tick(15 * 60_000);
+  assert.equal(match("12:45"), null, "A previously listed slot is rejected after its deadline passes");
+});
 
 function availabilityForm(weekStart, slots = [], extra = {}) {
   return new URLSearchParams({

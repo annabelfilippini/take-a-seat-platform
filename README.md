@@ -138,3 +138,18 @@ Already handled during repository cleanup:
 The creator editor is `/creator/profile`, with authenticated draft preview at
 `/creator/preview`. See [storefront verification and deployment prerequisites](docs/creator-storefront-verification.md).
 Run `npm run test:e2e` for the isolated Playwright creator/customer journeys.
+
+## Booking confirmation work
+
+The centralized Zoom and durable booking workflow is implemented locally on
+`codex/booking-confirmation`, pending provider setup and deployment approval.
+See [booking workflow](docs/booking-confirmation-workflow.md) and
+[Zoom setup and verification](docs/zoom-production-setup.md) before deployment.
+New runtime requirements include a dedicated card-only Stripe payment configuration,
+central Zoom S2S credentials/licensed host pool, migration 0025 and the Worker cron.
+Migration 0025 is now applied to production; the application release remains blocked.
+See the [first creator release audit](docs/first-creator-release-audit-2026-09-16.md)
+for actual provider state and remaining launch steps.
+
+Each invocation owns its temporary app and D1. Set `TAKE_A_SEAT_E2E_PORT=4273`
+when another task is using the default port 4173.
